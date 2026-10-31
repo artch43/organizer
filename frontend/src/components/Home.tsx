@@ -17,7 +17,7 @@ import type { Area } from "@/lib/types";
 import { eventsByDay, inArea } from "@/lib/events";
 import { dateOf, firstOptInGroup, groupOf, statusProp } from "@/lib/model";
 import { addDays, fmtDate, parseD, today } from "@/lib/util";
-import { exampleData, go, removeExamples, setProp, toast, useStore } from "@/store";
+import { exampleData, go, removeExamples, setProp, toast, toggleHabit, useStore } from "@/store";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -38,7 +38,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyTitle } from "@/components/ui/empty";
+import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from "@/components/ui/empty";
 import { areaVar, greeting, useAreas, useToday } from "./common";
 import { Progress } from "@/components/ui/progress";
 import { Glyph } from "./icons";
@@ -81,7 +81,23 @@ export function Home() {
   const pick = (d: string) => setPicked(d === T ? null : d);
   const areaOf = (id?: string) => areas.find((a) => a.id === id);
   // A free day offers every open task (any day, or none) instead of an empty page.
-  const [showAll, setShowAll] = useState(false);
+  // Stays open (also on other days and visits) until "Esconder" is clicked.
+  const [showAll, setShowAllState] = useState(() => {
+    try {
+      return localStorage.getItem(SHOW_ALL_KEY) === "1";
+    } catch {
+      return false;
+    }
+  });
+  const setShowAll = (on: boolean) => {
+    setShowAllState(on);
+    try {
+      if (on) localStorage.setItem(SHOW_ALL_KEY, "1");
+      else localStorage.removeItem(SHOW_ALL_KEY);
+    } catch {
+      /* private mode */
+    }
+  };
 
   const entries: Entry[] = [];
   const allOpen: Entry[] = [];
@@ -118,6 +134,9 @@ export function Home() {
   }
   // Dated ones first, soonest first; then those without a date.
   allOpen.sort((a, b) => (a.day || "9").localeCompare(b.day || "9") || byTime(a, b));
+  // Open tasks not already listed above (the day's and the overdue ones).
+  const shownKeys = new Set(entries.map((e) => e.key));
+  const others = allOpen.filter((e) => !shownKeys.has(e.key));
   const overdue = isToday ? entries.filter((e) => e.day < T).sort((a, b) => a.day.localeCompare(b.day) || byTime(a, b)) : [];
   const todays = entries.filter((e) => e.day === D);
   const open = todays.filter((e) => !e.done).sort(byTime);
@@ -180,20 +199,32 @@ export function Home() {
                       : "Nenhuma tarefa com prazo para este dia."}
                 </EmptyDescription>
               </EmptyHeader>
-              {allOpen.length > 0 && (
-                <EmptyContent>
-                  <Button variant="outline" aria-expanded={showAll} onClick={() => setShowAll(!showAll)}>
-                    <ListTodo data-icon="inline-start" />
-                    {showAll ? "Esconder as outras tarefas" : `Ver todas as tarefas (${allOpen.length})`}
-                  </Button>
-                </EmptyContent>
-              )}
             </Empty>
           )}
-          {!open.length && !overdue.length && showAll && allOpen.length > 0 && (
-            <TaskGroup title="Todas as tarefas a fazer" count={allOpen.length} items={allOpen} T={T} />
-          )}
           {done.length > 0 && <DoneGroup items={done} T={T} label={isToday ? "Concluídas hoje" : "Concluídas"} />}
+          {/* Every other open task (any day, or none), shown until hidden again. */}
+          {others.length > 0 && (
+            <Button
+              variant="outline"
+              aria-expanded={showAll}
+              aria-controls="home-others"
+              onClick={() => setShowAll(!showAll)}
+              className="w-fit"
+            >
+              <ListTodo data-icon="inline-start" />
+              {showAll ? "Esconder as outras tarefas" : `Ver todas as tarefas (${others.length})`}
+            </Button>
+          )}
+          {showAll && others.length > 0 && (
+            <div id="home-others">
+              <TaskGroup
+                title={entries.length ? "Outras tarefas a fazer" : "Todas as tarefas a fazer"}
+                count={others.length}
+                items={others}
+                T={T}
+              />
+            </div>
+          )}
         </section>
         <aside className="flex flex-col gap-4" aria-label="Resumo">
           <Upcoming T={T} D={D} area={area} />
@@ -205,6 +236,7 @@ export function Home() {
 }
 
 const UPCOMING_DAYS = 3;
+const SHOW_ALL_KEY = "organizer:home-show-all";
 
 /** Events from now to the next few days (or only the picked day's), read-only; a click shows that day in the calendar. */
 function Upcoming({ T, D, area }: { T: string; D: string; area: string }) {
@@ -284,7 +316,7 @@ function Upcoming({ T, D, area }: { T: string; D: string; area: string }) {
   );
 }
 
-/** How many habits are done on the day (today or a past one); a click opens Hábitos. */
+/** The day's habits: a tap on a name marks it done (or not); the title opens Hábitos. */
 function HabitsToday({ D, isToday }: { D: string; isToday: boolean }) {
   const habits = useStore((s) => s.ws.habits);
   const log = useStore((s) => s.ws.habitLog[D]);
@@ -293,34 +325,52 @@ function HabitsToday({ D, isToday }: { D: string; isToday: boolean }) {
   const doneIds = new Set(log ?? []);
   const done = habits.filter((h) => doneIds.has(h.id)).length;
   return (
-    <button
-      onClick={() => go(page.id)}
-      className="lift flex flex-col gap-3 rounded-2xl border border-border/70 bg-card p-4 text-left shadow-card focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+    <section
+      aria-labelledby="home-habits"
+      className="flex flex-col gap-3 rounded-2xl border border-border/70 bg-card p-4 shadow-card"
     >
-      <span className="flex w-full items-center justify-between gap-2">
-        <span className="flex items-center gap-2 text-base font-semibold">
+      <div className="flex w-full items-center justify-between gap-2">
+        <h2 id="home-habits" className="flex items-center gap-2 text-base font-semibold">
           <Sprout className="size-[18px] text-success" aria-hidden="true" />
           {isToday ? "Hábitos de hoje" : "Hábitos do dia"}
-        </span>
-        <span className="text-sm font-semibold text-muted-foreground tabular-nums">
-          {done}/{habits.length}
-        </span>
-      </span>
-      <span className="flex flex-wrap gap-1.5">
-        {habits.map((h) => (
-          <span
-            key={h.id}
-            className={cn(
-              "flex items-center gap-1 rounded-full border px-2.5 py-1 text-sm",
-              doneIds.has(h.id) ? "border-success/40 bg-success/10 text-foreground" : "border-border text-muted-foreground",
-            )}
-          >
-            {doneIds.has(h.id) && <Check className="size-3.5 text-success" aria-label="feito" />}
-            {h.name}
+          <span className="text-sm font-semibold text-muted-foreground tabular-nums">
+            {done}/{habits.length}
           </span>
-        ))}
-      </span>
-    </button>
+        </h2>
+        <button
+          onClick={() => go(page.id)}
+          className="rounded-md px-1 text-sm font-medium text-primary-strong hover:underline focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+        >
+          Ver hábitos
+        </button>
+      </div>
+      <div className="flex flex-wrap gap-1.5">
+        {habits.map((h) => {
+          const on = doneIds.has(h.id);
+          return (
+            <button
+              key={h.id}
+              aria-pressed={on}
+              title={on ? "Desmarcar" : "Marcar como feito"}
+              onClick={() => withMotion(() => toggleHabit(h.id, D))}
+              className={cn(
+                "flex min-h-9 items-center gap-1 rounded-full border px-3 py-1 text-sm transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none",
+                on
+                  ? "border-success/40 bg-success/10 text-foreground"
+                  : "border-border text-muted-foreground hover:border-success/40 hover:text-foreground",
+              )}
+            >
+              {on ? (
+                <Check className="pop size-3.5 text-success" aria-hidden="true" />
+              ) : (
+                <Circle className="size-3.5" strokeWidth={2} aria-hidden="true" />
+              )}
+              {h.name}
+            </button>
+          );
+        })}
+      </div>
+    </section>
   );
 }
 
