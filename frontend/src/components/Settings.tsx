@@ -23,7 +23,6 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
-import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import {
   AlertDialog,
@@ -36,7 +35,6 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { AreaSwatches, areaVar, useAreas } from "./common";
-import { Glyph } from "./icons";
 import { AppearanceTab } from "./AppearanceTab";
 import { PasswordInput } from "./Auth";
 import { passwordProblem } from "@/lib/password";
@@ -74,24 +72,6 @@ export function Settings() {
           <TabsContent value="geral">
             <FieldGroup>
               <NameField value={st.name} onSave={(v) => set("name", v)} />
-              <Field>
-                <FieldLabel htmlFor="set-start">Abrir em</FieldLabel>
-                <Select value={st.start} onValueChange={(v) => set("start", v)}>
-                  <SelectTrigger id="set-start" className="w-full">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectGroup>
-                      {ws.pages.map((p) => (
-                        <SelectItem key={p.id} value={p.id}>
-                          <Glyph icon={p.icon} size="xs" />
-                          {p.title}
-                        </SelectItem>
-                      ))}
-                    </SelectGroup>
-                  </SelectContent>
-                </Select>
-              </Field>
               <p className="text-sm text-muted-foreground">Tema, cores e papel de parede ficam em Aparência.</p>
               <ExamplesField />
             </FieldGroup>

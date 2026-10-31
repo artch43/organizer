@@ -33,12 +33,10 @@ import { NotebookPen } from "lucide-react";
 import { Glyph } from "./components/icons";
 
 const NotesView = lazy(() => import("./components/notes/NotesView"));
-/** Set once the guide has been shown on this device. */
-
-/** The page shown on opening (Settings → página inicial), or Início. */
+/** The page shown on opening: always Início (the old "Abrir em" setting is no longer offered). */
 function startPage() {
   const { ws } = useStore.getState();
-  return ws.pages.some((p) => p.id === ws.settings.start) ? ws.settings.start : "home";
+  return ws.pages.find((p) => p.type === "home")?.id ?? "home";
 }
 
 function routeFromHash() {

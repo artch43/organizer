@@ -7,6 +7,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Circle,
+  ListTodo,
   CircleCheck,
   Sprout,
 } from "lucide-react";
@@ -37,7 +38,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from "@/components/ui/empty";
+import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyTitle } from "@/components/ui/empty";
 import { areaVar, greeting, useAreas, useToday } from "./common";
 import { Progress } from "@/components/ui/progress";
 import { Glyph } from "./icons";
@@ -51,8 +52,10 @@ interface Entry {
   area?: Area;
   done: boolean;
   order: number;
-  /** The task's day (YYYY-MM-DD): today, or earlier for overdue ones. */
+  /** The task's day (YYYY-MM-DD): today, or earlier for overdue ones; "" when it has no date. */
   day: string;
+  /** Say the day, not just the time (the list of all tasks mixes days). */
+  showDay?: boolean;
   onOpen?: () => void;
   /** Mark done / not done (absent when the list has no "done" column). */
   onToggle?: () => void;
@@ -77,8 +80,11 @@ export function Home() {
   const isToday = D === T;
   const pick = (d: string) => setPicked(d === T ? null : d);
   const areaOf = (id?: string) => areas.find((a) => a.id === id);
+  // A free day offers every open task (any day, or none) instead of an empty page.
+  const [showAll, setShowAll] = useState(false);
 
   const entries: Entry[] = [];
+  const allOpen: Entry[] = [];
   for (const it of Object.values(ws.items)) {
     const db = ws.dbs[it.db];
     if (!db || !inArea(it.area, area)) continue;
@@ -86,9 +92,10 @@ export function Home() {
     const day = d.slice(0, 10);
     const isDone = groupOf(db, it) === "done";
     // Today's tasks, plus earlier ones still open (overdue). Another day: just that day's.
-    if (!d || (isToday ? day > T || (day < T && isDone) : day !== D)) continue;
+    const shown = !!d && !(isToday ? day > T || (day < T && isDone) : day !== D);
+    if (!shown && isDone) continue;
     const page = ws.pages.find((p) => p.id === it.db);
-    entries.push({
+    const entry: Entry = {
       key: "t" + it.id,
       time: d.slice(11, 16),
       title: it.title || "Sem título",
@@ -105,8 +112,12 @@ export function Home() {
       onOpen: page ? () => go(page.id) : undefined,
       onToggle: firstOptInGroup(db, "done") ? () => toggleItemDone(it.id) : undefined,
       onMove: (to) => moveItemDay(it.id, to),
-    });
+    };
+    if (shown) entries.push(entry);
+    if (!isDone) allOpen.push({ ...entry, showDay: true });
   }
+  // Dated ones first, soonest first; then those without a date.
+  allOpen.sort((a, b) => (a.day || "9").localeCompare(b.day || "9") || byTime(a, b));
   const overdue = isToday ? entries.filter((e) => e.day < T).sort((a, b) => a.day.localeCompare(b.day) || byTime(a, b)) : [];
   const todays = entries.filter((e) => e.day === D);
   const open = todays.filter((e) => !e.done).sort(byTime);
@@ -169,7 +180,18 @@ export function Home() {
                       : "Nenhuma tarefa com prazo para este dia."}
                 </EmptyDescription>
               </EmptyHeader>
+              {allOpen.length > 0 && (
+                <EmptyContent>
+                  <Button variant="outline" aria-expanded={showAll} onClick={() => setShowAll(!showAll)}>
+                    <ListTodo data-icon="inline-start" />
+                    {showAll ? "Esconder as outras tarefas" : `Ver todas as tarefas (${allOpen.length})`}
+                  </Button>
+                </EmptyContent>
+              )}
             </Empty>
+          )}
+          {!open.length && !overdue.length && showAll && allOpen.length > 0 && (
+            <TaskGroup title="Todas as tarefas a fazer" count={allOpen.length} items={allOpen} T={T} />
           )}
           {done.length > 0 && <DoneGroup items={done} T={T} label={isToday ? "Concluídas hoje" : "Concluídas"} />}
         </section>
@@ -532,8 +554,12 @@ function moveItemDay(id: string, to: string | null) {
 }
 
 function Row({ e, i, T }: { e: Entry; i: number; T: string }) {
-  const late = e.day < T;
-  const when = late ? fmtDate(e.day) : e.time || "Dia todo";
+  const late = !!e.day && e.day < T;
+  const when = !e.day
+    ? "Sem data"
+    : late || (e.showDay && e.day !== T)
+      ? fmtDate(e.day)
+      : e.time || (e.showDay ? "Hoje" : "Dia todo");
   const body = (
     <>
       {/* The left column says when: the time today, or the day for overdue ones. */}
@@ -613,14 +639,18 @@ function Row({ e, i, T }: { e: Entry; i: number; T: string }) {
           <DropdownMenuContent align="end">
             <DropdownMenuLabel>Remarcar para</DropdownMenuLabel>
             <DropdownMenuGroup>
-              {late && <DropdownMenuItem onSelect={() => e.onMove(T)}>Hoje</DropdownMenuItem>}
+              {e.day !== T && <DropdownMenuItem onSelect={() => e.onMove(T)}>Hoje</DropdownMenuItem>}
               <DropdownMenuItem onSelect={() => e.onMove(addDays(T, 1))}>Amanhã</DropdownMenuItem>
               <DropdownMenuItem onSelect={() => e.onMove(addDays(T, 7))}>Daqui a uma semana</DropdownMenuItem>
             </DropdownMenuGroup>
-            <DropdownMenuSeparator />
-            <DropdownMenuGroup>
-              <DropdownMenuItem onSelect={() => e.onMove(null)}>Tirar a data</DropdownMenuItem>
-            </DropdownMenuGroup>
+            {e.day && (
+              <>
+                <DropdownMenuSeparator />
+                <DropdownMenuGroup>
+                  <DropdownMenuItem onSelect={() => e.onMove(null)}>Tirar a data</DropdownMenuItem>
+                </DropdownMenuGroup>
+              </>
+            )}
           </DropdownMenuContent>
         </DropdownMenu>
       )}
