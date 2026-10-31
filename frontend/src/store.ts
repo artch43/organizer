@@ -116,7 +116,11 @@ export function toast(msg: string, undo?: () => void) {
 }
 /** A friendly confirmation after creating something: emoji badge, title and an optional detail line. */
 export function celebrate(title: string, description?: string, emoji = "✨") {
-  sonner.success(title, { description, icon: createElement("span", { className: "toast-emoji", "aria-hidden": true }, emoji), duration: 3500 });
+  sonner.success(title, {
+    description,
+    icon: createElement("span", { className: "toast-emoji", "aria-hidden": true }, emoji),
+    duration: 3500,
+  });
 }
 /** Confirmation with a custom action button (e.g. "Ver no calendário"). */
 export function notify(msg: string, action?: { label: string; onClick: () => void }, description?: string, id?: string) {
@@ -185,8 +189,9 @@ function announceFresh() {
   const it = ws().items[id];
   if (!it) return;
   // Made with "Nova tarefa" and closed without a name or notes: nothing to keep, so no "Sem título" task is left behind.
+  // (One that already got its own note stays, so the note isn't left without its task.)
   if (!it.title.trim()) {
-    if (!it.notes.trim())
+    if (!it.notes.trim() && !taskNoteOf(ws().notes, id))
       mut((w) => {
         delete w.items[id];
       });
@@ -195,7 +200,11 @@ function announceFresh() {
   const page = ws().pages.find((p) => p.id === it.db);
   const d = typeof it.props.date === "string" ? it.props.date : "";
   const when = d ? fmtDate(d.slice(0, 10)).toLowerCase() + (d.slice(11, 16) ? " às " + d.slice(11, 16) : "") : "";
-  celebrate(`Tarefa “${it.title.trim()}” criada`, [page && `${emojiOf(page.icon)} ${page.title}`.trim(), when && `para ${when}`].filter(Boolean).join(" · "), "✅");
+  celebrate(
+    `Tarefa “${it.title.trim()}” criada`,
+    [page && `${emojiOf(page.icon)} ${page.title}`.trim(), when && `para ${when}`].filter(Boolean).join(" · "),
+    "✅",
+  );
 }
 export function openPeek(id: string, focus = false) {
   if (useStore.getState().ui.peek !== id) announceFresh();
@@ -311,20 +320,36 @@ export function moveItemTo(id: string, dbId: string) {
     }),
   );
 }
+/** Notes linked to these tasks (made with "Criar anotação"): they are deleted along with the task. */
+const linkedNotes = (w: Workspace, itemIds: Set<string>) => Object.values(w.notes).filter((n) => n.task && itemIds.has(n.task));
+function dropNotes(w: Workspace, notes: Note[]) {
+  for (const n of notes) delete w.notes[n.id];
+}
+function closeDroppedNotes(notes: Note[]) {
+  if (!notes.length) return;
+  setUi((u) => {
+    if (u.noteId && notes.some((n) => n.id === u.noteId)) u.noteId = null;
+  });
+}
+
 export function deleteItem(id: string) {
   const snap = ws().items[id];
+  const notes = linkedNotes(ws(), new Set([id]));
   mut((w) => {
     delete w.items[id];
+    dropNotes(w, notes);
   });
   setUi((u) => {
     if (u.peek === id) u.peek = null;
   });
+  closeDroppedNotes(notes);
   toast(
-    "Tarefa excluída",
+    notes.length ? "Tarefa e anotação excluídas" : "Tarefa excluída",
     snap &&
       (() =>
         mut((w) => {
           w.items[id] = snap;
+          for (const n of notes) w.notes[n.id] = n;
         })),
   );
 }
@@ -411,7 +436,11 @@ export function addBoard(title: string, icon: string, defaultArea?: string, fold
   });
   go(id);
   const name = title.trim() || "Nova lista";
-  celebrate(`Lista “${name}” criada`, folder ? `Na pasta ${folder.split("/").join(" › ")}` : "Adicione a primeira tarefa no quadro.", emojiOf(icon, "🗂️"));
+  celebrate(
+    `Lista “${name}” criada`,
+    folder ? `Na pasta ${folder.split("/").join(" › ")}` : "Adicione a primeira tarefa no quadro.",
+    emojiOf(icon, "🗂️"),
+  );
   return id;
 }
 export function renamePage(id: string, title: string, icon?: string) {
@@ -448,7 +477,9 @@ export function archivePage(id: string, on: boolean) {
     });
   set(on);
   if (on && useStore.getState().ui.route === id) go("home");
-  toast(on ? `“${page.title}” arquivada. Ela fica em Arquivadas, no fim das listas.` : `“${page.title}” de volta às listas`, () => set(!on));
+  toast(on ? `“${page.title}” arquivada. Ela fica em Arquivadas, no fim das listas.` : `“${page.title}” de volta às listas`, () =>
+    set(!on),
+  );
 }
 export function setPageFolder(id: string, folder: string, announce = false) {
   const before = ws().pages.find((x) => x.id === id);
@@ -460,7 +491,11 @@ export function setPageFolder(id: string, folder: string, announce = false) {
     else delete p.folder;
   });
   if (announce)
-    celebrate(`“${before.title}” movida`, folder ? `Para ${folder.split("/").join(" › ")}` : "Para fora das pastas", emojiOf(before.icon, "🗂️"));
+    celebrate(
+      `“${before.title}” movida`,
+      folder ? `Para ${folder.split("/").join(" › ")}` : "Para fora das pastas",
+      emojiOf(before.icon, "🗂️"),
+    );
 }
 
 /* ---------- task-list folders (sidebar) ---------- */
@@ -472,7 +507,11 @@ export function addBoardFolder(path: string) {
     if (!list.includes(clean)) w.settings.boardFolders = [...list, clean];
   });
   const at = clean.includes("/") ? clean.slice(0, clean.lastIndexOf("/")) : "";
-  celebrate(`Pasta “${clean.split("/").pop()}” criada`, at ? `Dentro de ${at.split("/").join(" › ")}` : "Arraste listas para dentro dela.", "📁");
+  celebrate(
+    `Pasta “${clean.split("/").pop()}” criada`,
+    at ? `Dentro de ${at.split("/").join(" › ")}` : "Arraste listas para dentro dela.",
+    "📁",
+  );
   return clean;
 }
 export function renameBoardFolder(from: string, to: string) {
@@ -513,8 +552,10 @@ export function deleteBoardFolderWithLists(path: string) {
     folders: before.settings.boardFolders ?? [],
     icons: before.settings.boardFolderIcons,
   };
+  const notes = linkedNotes(before, new Set(snap.items.map((it) => it.id)));
   mut((w) => {
     for (const it of Object.values(w.items)) if (ids.has(it.db)) delete w.items[it.id];
+    dropNotes(w, notes);
     for (const id of ids) delete w.dbs[id];
     w.pages = w.pages.filter((p) => !ids.has(p.id));
     w.settings.boardFolders = snap.folders.filter((f) => !inside(f));
@@ -522,6 +563,7 @@ export function deleteBoardFolderWithLists(path: string) {
       w.settings.boardFolderIcons = Object.fromEntries(Object.entries(w.settings.boardFolderIcons).filter(([k]) => !inside(k)));
   });
   if (ids.has(useStore.getState().ui.route)) go("home");
+  closeDroppedNotes(notes);
   toast(
     `Pasta excluída com ${pages.length} ${pages.length === 1 ? "lista" : "listas"} e ${snap.items.length} ${snap.items.length === 1 ? "tarefa" : "tarefas"}`,
     () =>
@@ -529,6 +571,7 @@ export function deleteBoardFolderWithLists(path: string) {
         w.pages.push(...snap.pages);
         for (const [id, db] of snap.dbs) if (db) w.dbs[id] = db;
         for (const it of snap.items) w.items[it.id] = it;
+        for (const n of notes) w.notes[n.id] = n;
         w.settings.boardFolders = snap.folders;
         w.settings.boardFolderIcons = snap.icons;
       }),
@@ -570,11 +613,14 @@ export function deletePage(id: string) {
     db: before.dbs[id],
     items: Object.values(before.items).filter((it) => it.db === id),
   };
+  const notes = linkedNotes(before, new Set(snap.items.map((it) => it.id)));
   mut((w) => {
     for (const it of Object.values(w.items)) if (it.db === id) delete w.items[it.id];
+    dropNotes(w, notes);
     delete w.dbs[id];
     w.pages = w.pages.filter((p) => p.id !== id);
   });
+  closeDroppedNotes(notes);
   if (useStore.getState().ui.route === id) go("home");
   const n = snap.items.length;
   toast(`“${snap.page.title}” excluída${n ? ` com ${n} ${n === 1 ? "tarefa" : "tarefas"}` : ""}`, () =>
@@ -582,6 +628,7 @@ export function deletePage(id: string) {
       w.pages.push(snap.page);
       if (snap.db) w.dbs[id] = snap.db;
       for (const it of snap.items) w.items[it.id] = it;
+      for (const n of notes) w.notes[n.id] = n;
     }),
   );
 }
@@ -605,14 +652,18 @@ export function removeExamples() {
   const ex = exampleData();
   const total = ex.items.length + ex.events.length;
   if (!total) return 0;
+  const notes = linkedNotes(ws(), new Set(ex.items.map((i) => i.id)));
   mut((w) => {
     for (const i of ex.items) delete w.items[i.id];
     for (const e of ex.events) delete w.events[e.id];
+    dropNotes(w, notes);
   });
+  closeDroppedNotes(notes);
   toast(`${total} ${total === 1 ? "exemplo removido" : "exemplos removidos"}`, () =>
     mut((w) => {
       for (const i of ex.items) w.items[i.id] = i;
       for (const e of ex.events) w.events[e.id] = e;
+      for (const n of notes) w.notes[n.id] = n;
     }),
   );
   return total;
@@ -777,7 +828,11 @@ export function toggleHabit(hid: string, day: string) {
   const h = ws().habits.find((x) => x.id === hid);
   if (!wasOn && h && day === today()) {
     const n = streakOf(ws().habitLog, hid);
-    celebrate(`${h.name}: feito hoje!`, n > 1 ? `${n} dias seguidos. Continue assim!` : "Primeiro dia da sequência.", n > 1 ? "🔥" : emojiOf(h.icon, "✅"));
+    celebrate(
+      `${h.name}: feito hoje!`,
+      n > 1 ? `${n} dias seguidos. Continue assim!` : "Primeiro dia da sequência.",
+      n > 1 ? "🔥" : emojiOf(h.icon, "✅"),
+    );
   }
 }
 export const checkReviews = () => mut(runReviews);

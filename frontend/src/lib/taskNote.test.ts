@@ -41,4 +41,24 @@ describe("anotação da tarefa", () => {
     expect(Object.keys(ws().notes).length).toBe(before);
     expect(useStore.getState().ui.noteId).toBe(note.id);
   });
+
+  it("sai junto quando a tarefa ou a lista dela é excluída", async () => {
+    const { useStore, openTaskNote, taskNoteOf, deleteItem, deletePage } = await import("../store");
+    const ws = () => useStore.getState().ws;
+    const [a, b] = Object.values(ws().items).filter((x) => x.db === Object.values(ws().items)[0].db);
+    const others = Object.values(ws().notes).filter((n) => !n.task).length;
+
+    openTaskNote(a.id);
+    expect(taskNoteOf(ws().notes, a.id)).toBeTruthy();
+    deleteItem(a.id);
+    expect(ws().items[a.id]).toBeUndefined();
+    expect(taskNoteOf(ws().notes, a.id)).toBeUndefined();
+    expect(useStore.getState().ui.noteId).toBeNull();
+
+    openTaskNote(b.id);
+    deletePage(b.db);
+    expect(taskNoteOf(ws().notes, b.id)).toBeUndefined();
+    // Notes not tied to a task stay.
+    expect(Object.values(ws().notes).filter((n) => !n.task).length).toBe(others);
+  });
 });
