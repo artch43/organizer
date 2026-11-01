@@ -239,4 +239,19 @@ describe("ícones do exemplo", () => {
     expect(out.habits[0].icon).toBe("lucide:book:purple");
     expect(out.habits[1].icon).toBe("🎯");
   });
+
+  it("alarme só quando escolhido: tira o padrão antigo de 30 min (v5), mas mantém outra escolha", () => {
+    const old = v1();
+    old.settings = { ...old.settings, guideVersion: 4, defaultAlerts: [30] } as never;
+    expect(normalizeWorkspace(old).settings.defaultAlerts).toEqual([]);
+
+    const chosen = v1();
+    chosen.settings = { ...chosen.settings, guideVersion: 4, defaultAlerts: [10, 60] } as never;
+    expect(normalizeWorkspace(chosen).settings.defaultAlerts).toEqual([10, 60]);
+
+    // Already on v5: a later choice of 30 min stays.
+    const later = v1();
+    later.settings = { ...later.settings, guideVersion: 5, defaultAlerts: [30] } as never;
+    expect(normalizeWorkspace(later).settings.defaultAlerts).toEqual([30]);
+  });
 });

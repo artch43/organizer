@@ -148,7 +148,14 @@ export function normalizeWorkspace(input: Workspace): Workspace {
   for (const t of Object.values(w.todos)) if (!t.done && !t.date) t.date = today();
   if (!w.pages.some((p) => p.type === "calendar")) {
     for (const p of w.pages) if (p.order >= 1) p.order += 1;
-    w.pages.push({ id: "calendario", title: "Calendário", icon: EXAMPLE_ICONS.pages.calendario[1], type: "calendar", parent: null, order: 1 });
+    w.pages.push({
+      id: "calendario",
+      title: "Calendário",
+      icon: EXAMPLE_ICONS.pages.calendario[1],
+      type: "calendar",
+      parent: null,
+      order: 1,
+    });
   }
 
   // Tasks: notes as text, an area, only the fixed fields.
@@ -170,11 +177,17 @@ export function normalizeWorkspace(input: Workspace): Workspace {
     }
   }
 
+  const version = w.settings.guideVersion ?? 1;
   // Version 4: one short guide, no loose tasks, beginner examples (see cleanUpV4).
-  if ((w.settings.guideVersion ?? 1) < GUIDE_VERSION) {
-    cleanUpV4(w);
-    w.settings.guideVersion = GUIDE_VERSION;
+  if (version < 4) cleanUpV4(w);
+  // Version 5: alarms only when chosen. The old "30 min antes" default for new events goes away
+  // (a different choice the person made is kept), and so does the example event's alarm.
+  if (version < 5) {
+    if (w.settings.defaultAlerts.length === 1 && w.settings.defaultAlerts[0] === 30) w.settings.defaultAlerts = [];
+    const ex = w.events["ex-aula"];
+    if (ex && ex.alerts.length === 1 && ex.alerts[0] === 30) ex.alerts = [];
   }
+  if (version < GUIDE_VERSION) w.settings.guideVersion = GUIDE_VERSION;
   dedupeHabits(w);
 
   // The example's emojis become drawn icons, but only where the person never changed them.
@@ -219,7 +232,9 @@ function cleanUpV4(w: Workspace) {
 
   const isExample = (it: Item) => {
     const tags = w.dbs[it.db]?.props.find((p) => p.id === "tags")?.options;
-    return Array.isArray(it.props.tags) && (it.props.tags as string[]).some((t) => tags?.find((o) => o.id === t)?.name === "Exemplo");
+    return (
+      Array.isArray(it.props.tags) && (it.props.tags as string[]).some((t) => tags?.find((o) => o.id === t)?.name === "Exemplo")
+    );
   };
   for (const it of Object.values(w.items)) if (isExample(it)) delete w.items[it.id];
   for (const e of Object.values(w.events)) if (/\(exemplo\)/i.test(e.title)) delete w.events[e.id];
@@ -245,7 +260,10 @@ function cleanUpV4(w: Workspace) {
     const status = db.props.find((p) => p.id === "status")?.options?.find((o) => (o.group ?? "todo") === "todo")?.id;
     const prio = nameIn("prio", it.props.prio);
     const tags = ((it.props.tags as string[]) ?? []).map((t) => nameIn("tags", t)).filter((o) => !!o);
-    const props: Item["props"] = { ...it.props, tags: tags.map((o) => optionNamed(db, "tags", o!.name, o!.color)).filter(Boolean) as string[] };
+    const props: Item["props"] = {
+      ...it.props,
+      tags: tags.map((o) => optionNamed(db, "tags", o!.name, o!.color)).filter(Boolean) as string[],
+    };
     delete props.status;
     delete props.prio;
     if (status) props.status = status;

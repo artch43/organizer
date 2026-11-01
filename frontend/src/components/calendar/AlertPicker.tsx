@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { BellRing, Mail, MessageCircle, Plus, X } from "lucide-react";
+import { BellOff, BellRing, Mail, MessageCircle, Plus, X } from "lucide-react";
 import type { AlertChannel } from "@/lib/types";
 import { formatPhone, normalizePhone } from "@/lib/util";
 import { ALERT_PRESETS, alertLabel } from "@/lib/events";
@@ -12,6 +12,9 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+
+/** The "Sem alarme" choice (no times picked): the default, so nothing is sent unless chosen. */
+export const NONE = "none";
 
 /** "Alarme": when to warn (presets plus custom, in minutes before the start) and where (e-mail or WhatsApp). Used by events and tasks. */
 export function AlertPicker({
@@ -48,7 +51,7 @@ export function AlertPicker({
           Alarme
         </FieldLegend>
         <FieldDescription>{hint}</FieldDescription>
-        {onChannelChange && (
+        {onChannelChange && value.length > 0 && (
           <div className="flex flex-col gap-2">
             <span className="text-sm font-medium">Receber em</span>
             <ToggleGroup
@@ -82,9 +85,18 @@ export function AlertPicker({
           spacing={2}
           className="flex-wrap"
           aria-label={`Quando avisar sobre este ${what}`}
-          value={value.map(String).filter((v) => presets.includes(v))}
-          onValueChange={(v) => onChange([...v.map(Number), ...custom].sort((a, b) => a - b))}
+          value={value.length ? value.map(String).filter((v) => presets.includes(v)) : [NONE]}
+          onValueChange={(v) =>
+            // "Sem alarme" clears the rest; picking a time takes "Sem alarme" away.
+            v.includes(NONE) && value.length
+              ? onChange([])
+              : onChange([...v.filter((x) => x !== NONE).map(Number), ...custom].sort((a, b) => a - b))
+          }
         >
+          <ToggleGroupItem value={NONE} className="px-2.5">
+            <BellOff aria-hidden="true" />
+            Sem alarme
+          </ToggleGroupItem>
           {ALERT_PRESETS.map((p) => (
             <ToggleGroupItem key={p.minutes} value={String(p.minutes)} className="px-2.5">
               {p.label}

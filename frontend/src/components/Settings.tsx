@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Download, KeyRound, Loader2, LogOut, Plus, Trash2, Upload } from "lucide-react";
 import type { AreaColor, Settings as S, Workspace } from "@/lib/types";
-import { WhatsAppNumber } from "./calendar/AlertPicker";
+import { NONE, WhatsAppNumber } from "./calendar/AlertPicker";
 import { ALERT_PRESETS } from "@/lib/events";
 import { downloadBackup, parseBackup } from "@/lib/backup";
 import { cloudEnabled, supabase } from "@/lib/supabase";
@@ -106,21 +106,29 @@ export function Settings() {
               </Field>
               <FieldSeparator />
               <FieldSet>
-                <FieldLegend variant="label">Alertas já marcados em eventos novos</FieldLegend>
+                <FieldLegend variant="label">Alarme já marcado em eventos novos</FieldLegend>
                 <ToggleGroup
                   type="multiple"
                   variant="outline"
                   size="sm"
                   spacing={2}
                   className="flex-wrap"
-                  value={st.defaultAlerts.map(String)}
+                  value={st.defaultAlerts.length ? st.defaultAlerts.map(String) : [NONE]}
                   onValueChange={(v) =>
                     set(
                       "defaultAlerts",
-                      v.map(Number).sort((a, b) => a - b),
+                      v.includes(NONE) && st.defaultAlerts.length
+                        ? []
+                        : v
+                            .filter((x) => x !== NONE)
+                            .map(Number)
+                            .sort((a, b) => a - b),
                     )
                   }
                 >
+                  <ToggleGroupItem value={NONE} className="px-2.5">
+                    Sem alarme
+                  </ToggleGroupItem>
                   {ALERT_PRESETS.map((p) => (
                     <ToggleGroupItem key={p.minutes} value={String(p.minutes)} className="px-2.5">
                       {p.label}

@@ -23,7 +23,8 @@ export const DEFAULT_SETTINGS: Settings = {
   name: "",
   areas: DEFAULT_AREAS,
   emailAlerts: true,
-  defaultAlerts: [30],
+  // No alarm unless the person picks one.
+  defaultAlerts: [],
   noteFolders: [],
 };
 
@@ -60,7 +61,7 @@ export function mkDb(
 }
 
 /** Bump when the guide text changes, so saved copies that were never edited get the new one. */
-export const GUIDE_VERSION = 4;
+export const GUIDE_VERSION = 5;
 
 /** The one guide: short on purpose, so it gets read to the end. Same id everywhere (no copies). */
 /** Set once the guide has opened by itself on this device (first visit). */
@@ -182,7 +183,7 @@ export function examples(T = today()) {
       area: "estudos",
       location: "",
       notes: "",
-      alerts: [30],
+      alerts: [],
       created: Date.now(),
       updated: Date.now(),
     },
