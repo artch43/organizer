@@ -264,6 +264,8 @@ function CardGrid({ title, notes }: { title: string; notes: Note[] }) {
 }
 
 /* ---------- left: folders and notes ---------- */
+const CLOSED_KEY = "organizer:notes-closed";
+
 function NotesPanel() {
   const notes = useStore((s) => s.ws.notes);
   const extra = useStore((s) => s.ws.settings.noteFolders);
@@ -271,7 +273,24 @@ function NotesPanel() {
   const tag = useStore((s) => s.ui.noteTag);
   const setUi = useStore((s) => s.setUi);
   const [q, setQ] = useState("");
-  const [closed, setClosed] = useState<Record<string, boolean>>({});
+  // Which folders are folded: kept on this device, so Anotações reopens the way it was left.
+  const [closed, setClosedState] = useState<Record<string, boolean>>(() => {
+    try {
+      return JSON.parse(localStorage.getItem(CLOSED_KEY) ?? "{}");
+    } catch {
+      return {};
+    }
+  });
+  const setClosed = (fn: (c: Record<string, boolean>) => Record<string, boolean>) =>
+    setClosedState((c) => {
+      const next = Object.fromEntries(Object.entries(fn(c)).filter(([, v]) => v));
+      try {
+        localStorage.setItem(CLOSED_KEY, JSON.stringify(next));
+      } catch {
+        /* private mode */
+      }
+      return next;
+    });
   const [drag, setDrag] = useState<string | null>(null);
   const [over, setOver] = useState<string | null>(null);
   const [folderDialog, setFolderDialog] = useState<{ mode: "new" | "rename"; path: string } | null>(null);
@@ -296,15 +315,18 @@ function NotesPanel() {
           .sort(byTitle)
       : null;
 
+  // Folders and notes catch the drop themselves (a note: into its folder); anywhere else in the list is the top level.
   const dropProps = (folder: string) => ({
     onDragOver: (e: React.DragEvent) => {
       if (!drag) return;
       e.preventDefault();
+      e.stopPropagation();
       if (over !== folder) setOver(folder);
     },
     onDragLeave: () => setOver((o) => (o === folder ? null : o)),
     onDrop: (e: React.DragEvent) => {
       e.preventDefault();
+      e.stopPropagation();
       if (drag && notes[drag] && notes[drag].folder !== folder) {
         updateNote(drag, { folder });
         toast(`Movida para ${folder || "Anotações"}`);
@@ -315,7 +337,8 @@ function NotesPanel() {
   });
   // Same title in more than one place: show the folder, so they can be told apart.
   const titleCount = new Map<string, number>();
-  for (const n of Object.values(notes)) titleCount.set(n.title.trim().toLowerCase(), (titleCount.get(n.title.trim().toLowerCase()) ?? 0) + 1);
+  for (const n of Object.values(notes))
+    titleCount.set(n.title.trim().toLowerCase(), (titleCount.get(n.title.trim().toLowerCase()) ?? 0) + 1);
   const noteRow = (n: Note, depth: number) => {
     const untitled = !n.title.trim() || /^sem título( \d+)?$/i.test(n.title.trim());
     const dup = (titleCount.get(n.title.trim().toLowerCase()) ?? 0) > 1;
@@ -337,6 +360,7 @@ function NotesPanel() {
           setDrag(null);
           setOver(null);
         }}
+        {...dropProps(n.folder)}
         className={cn(
           "relative flex w-full items-center gap-2 rounded-lg py-2 pr-2 text-left text-[15px] hover:bg-sidebar-accent focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none",
           // The open note: highlighted row with a bar in the accent color.
@@ -351,7 +375,10 @@ function NotesPanel() {
         )}
         <span className={cn("min-w-0 truncate", untitled && "text-muted-foreground italic")}>{n.title || "Sem título"}</span>
         {dup && (
-          <span className="ml-auto shrink-0 truncate pl-1 text-xs font-normal text-muted-foreground" title={`Na pasta ${n.folder || "raiz"}`}>
+          <span
+            className="ml-auto shrink-0 truncate pl-1 text-xs font-normal text-muted-foreground"
+            title={`Na pasta ${n.folder || "raiz"}`}
+          >
             {n.folder ? n.folder.split("/").pop() : "sem pasta"}
           </span>
         )}
@@ -506,7 +533,7 @@ function NotesPanel() {
           </Badge>
         )}
       </div>
-      <nav className="min-h-0 flex-1 overflow-y-auto px-2 pb-3">
+      <nav className={cn("min-h-0 flex-1 overflow-y-auto px-2 pb-3", over === "" && "bg-primary/5")} {...dropProps("")}>
         {flat ? (
           flat.length ? (
             flat.map((n) => noteRow(n, 0))
@@ -517,6 +544,17 @@ function NotesPanel() {
           tree("", 0)
         ) : (
           <p className="px-2 text-sm text-muted-foreground">Nenhuma nota ainda. Crie a primeira no botão acima.</p>
+        )}
+        {/* While a note from a folder is dragged: where to drop it to take it out. */}
+        {drag && notes[drag]?.folder && (
+          <div
+            className={cn(
+              "mt-2 rounded-lg border-2 border-dashed px-3 py-3 text-center text-sm text-muted-foreground",
+              over === "" ? "border-primary bg-primary/10 text-primary-strong" : "border-border",
+            )}
+          >
+            Solte aqui para tirar da pasta
+          </div>
         )}
         {tagCounts.length > 0 && !flat && (
           <div className="mt-5 flex flex-col gap-2 px-1">
@@ -831,7 +869,7 @@ function NotePane({ note, editorApi }: { note: Note; editorApi: React.MutableRef
               </span>
             ))}
             <Separator orientation="vertical" className="mx-1 h-5" />
-<IconTip label="Anexar imagem ou PDF (ou cole e arraste no texto)">
+            <IconTip label="Anexar imagem ou PDF (ou cole e arraste no texto)">
               <Button
                 variant="ghost"
                 size="sm"
@@ -907,11 +945,7 @@ function NotePane({ note, editorApi }: { note: Note; editorApi: React.MutableRef
             </button>
           ))}
         </div>
-        {dup && (
-          <p className="-mt-3 mb-4 text-sm text-warning">
-            Já existe outra nota com esse nome.
-          </p>
-        )}
+        {dup && <p className="-mt-3 mb-4 text-sm text-warning">Já existe outra nota com esse nome.</p>}
         <div className="flex-1">
           {mode === "edit" ? (
             <NoteEditor
