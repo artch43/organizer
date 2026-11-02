@@ -7,7 +7,6 @@ import {
   ChevronLeft,
   ChevronRight,
   Circle,
-  ListTodo,
   CircleCheck,
   Sprout,
 } from "lucide-react";
@@ -205,13 +204,18 @@ export function Home() {
           {/* Every other open task (any day, or none), shown until hidden again. */}
           {others.length > 0 && (
             <Button
-              variant="outline"
+              variant="ghost"
+              size="sm"
               aria-expanded={showAll}
               aria-controls="home-others"
               onClick={() => setShowAll(!showAll)}
-              className="w-fit"
+              className="w-fit font-normal text-muted-foreground"
             >
-              <ListTodo data-icon="inline-start" />
+              {showAll ? (
+                <ChevronLeft data-icon="inline-start" aria-hidden="true" />
+              ) : (
+                <ChevronRight data-icon="inline-start" aria-hidden="true" />
+              )}
               {showAll ? "Esconder as outras tarefas" : `Ver todas as tarefas (${others.length})`}
             </Button>
           )}
@@ -222,6 +226,7 @@ export function Home() {
                 count={others.length}
                 items={others}
                 T={T}
+                hideTitle
               />
             </div>
           )}
