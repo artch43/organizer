@@ -28,7 +28,6 @@ export interface UI {
   statusDialog: string | null;
   calendar: { view: "month" | "week"; anchor: string; showTasks: boolean };
   noteId: string | null;
-  noteMode: "edit" | "read";
   noteTag: string | null;
   notesTab: "list" | "note" | "side";
   /** Notes: show the list of notes / the side panel (outline and links). */
@@ -55,7 +54,6 @@ const defaultUi: UI = {
   statusDialog: null,
   calendar: { view: "month", anchor: today(), showTasks: true },
   noteId: null,
-  noteMode: "edit",
   noteTag: null,
   notesTab: "list",
   notesList: true,
@@ -87,7 +85,6 @@ export const useStore = create<Store>()(
           ws: s.ws,
           ui: {
             viewByDb: s.ui.viewByDb,
-            noteMode: s.ui.noteMode,
             notesList: s.ui.notesList,
             notesSide: s.ui.notesSide,
             area: s.ui.area,

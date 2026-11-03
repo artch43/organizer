@@ -14,6 +14,8 @@ import { defaultKeymap, history, historyKeymap, indentWithTab } from "@codemirro
 import { markdown, markdownLanguage } from "@codemirror/lang-markdown";
 import { HighlightStyle, syntaxHighlighting, syntaxTree } from "@codemirror/language";
 import { tags as t } from "@lezer/highlight";
+import { marked } from "marked";
+import DOMPurify from "dompurify";
 import { TAG_RE } from "../../lib/notes";
 import { ATTACH_PREFIX, attachmentUrl } from "../../lib/attachments";
 import { findMath, renderMath } from "../../lib/math";
@@ -129,6 +131,31 @@ class BulletWidget extends WidgetType {
   }
 }
 const bullet = Decoration.replace({ widget: new BulletWidget() });
+
+/** A clickable link while the cursor is outside its Markdown source, even on the same line. */
+class LinkWidget extends WidgetType {
+  constructor(readonly source: string) {
+    super();
+  }
+  eq(other: LinkWidget) {
+    return other.source === this.source;
+  }
+  toDOM() {
+    const el = document.createElement("span");
+    el.className = "cm-link-preview";
+    el.innerHTML = DOMPurify.sanitize(marked.parseInline(this.source, { async: false }) as string);
+    for (const a of el.querySelectorAll("a[href]")) {
+      a.setAttribute("target", "_blank");
+      a.setAttribute("rel", "noopener noreferrer");
+      // Keep the caret outside the source so the preview survives until the click opens the link.
+      a.addEventListener("mousedown", (e) => e.preventDefault());
+    }
+    return el;
+  }
+  ignoreEvent() {
+    return true;
+  }
+}
 
 /** The picture itself in place of ![name](anexo:ID) or ![name](https://...). */
 class ImageWidget extends WidgetType {
@@ -315,6 +342,21 @@ function buildDecorations(view: EditorView): DecorationSet {
           return false;
         }
         if (name === "InlineCode") out.push(Decoration.mark({ class: "cm-inline-code" }).range(node.from, node.to));
+        if (name === "Link") {
+          const url = node.node.getChild("URL");
+          const editing = view.hasFocus && state.selection.ranges.some((r) => r.to >= node.from && r.from <= node.to);
+          if (
+            url &&
+            !state.doc.sliceString(url.from, url.to).startsWith(ATTACH_PREFIX) &&
+            !editing &&
+            state.doc.lineAt(node.to).number === line.number
+          ) {
+            out.push(
+              Decoration.replace({ widget: new LinkWidget(state.doc.sliceString(node.from, node.to)) }).range(node.from, node.to),
+            );
+            return false;
+          }
+        }
         if (active.has(line.number)) return;
         if (name === "HeaderMark" || name === "QuoteMark") {
           let end = node.to;

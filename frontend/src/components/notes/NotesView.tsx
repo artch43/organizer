@@ -59,7 +59,6 @@ import { Badge } from "@/components/ui/badge";
 import { InputGroup, InputGroupAddon, InputGroupInput } from "@/components/ui/input-group";
 import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
-import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyTitle } from "@/components/ui/empty";
 import { useSidebar } from "@/components/ui/sidebar";
@@ -79,7 +78,6 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { NoteEditor, type EditorApi } from "./NoteEditor";
-import { NoteReader } from "./NoteReader";
 
 const byTitle = (a: Note, b: Note) => a.title.localeCompare(b.title, "pt-BR", { numeric: true });
 const ui = () => useStore.getState().setUi;
@@ -718,7 +716,6 @@ const TOOLS: { label: string; icon: typeof Bold; run: (api: EditorApi) => void; 
 ];
 
 function NotePane({ note, editorApi }: { note: Note; editorApi: React.MutableRefObject<EditorApi | null> }) {
-  const mode = useStore((s) => s.ui.noteMode);
   const notes = useStore((s) => s.ws.notes);
   const extra = useStore((s) => s.ws.settings.noteFolders);
   const listOpen = useStore((s) => s.ui.notesList);
@@ -801,26 +798,6 @@ function NotePane({ note, editorApi }: { note: Note; editorApi: React.MutableRef
                 </span>
               ))}
           </nav>
-          <ToggleGroup
-            type="single"
-            variant="outline"
-            size="sm"
-            value={mode}
-            onValueChange={(v) =>
-              v &&
-              setUi((u) => {
-                u.noteMode = v as "edit" | "read";
-              })
-            }
-            aria-label="Modo"
-          >
-            <ToggleGroupItem value="edit" className="px-3">
-              Editar
-            </ToggleGroupItem>
-            <ToggleGroupItem value="read" className="px-3">
-              Ler
-            </ToggleGroupItem>
-          </ToggleGroup>
           <IconTip label={sideOpen ? "Esconder sumário" : "Mostrar sumário"}>
             <Button
               variant={sideOpen ? "secondary" : "ghost"}
@@ -850,50 +827,43 @@ function NotePane({ note, editorApi }: { note: Note; editorApi: React.MutableRef
           </IconTip>
           <NoteMenu note={note} folders={folderList(notes, extra)} />
         </div>
-        {mode === "edit" && (
-          <div className="flex items-center gap-0.5 overflow-x-auto px-3 pb-2 md:px-5" role="toolbar" aria-label="Formatação">
-            {TOOLS.map((t, i) => (
-              <span key={t.label} className="flex items-center">
-                {(i === 4 || i === 7 || i === 11) && <Separator orientation="vertical" className="mx-1 h-5" />}
-                <IconTip label={t.kbd ? `${t.label} (Ctrl/⌘ ${t.kbd})` : t.label}>
-                  <Button
-                    variant="ghost"
-                    size="icon-sm"
-                    aria-label={t.label}
-                    onMouseDown={(e) => e.preventDefault()}
-                    onClick={() => editorApi.current && t.run(editorApi.current)}
-                  >
-                    <t.icon />
-                  </Button>
-                </IconTip>
-              </span>
-            ))}
-            <Separator orientation="vertical" className="mx-1 h-5" />
-            <IconTip label="Anexar imagem ou PDF (ou cole e arraste no texto)">
-              <Button
-                variant="ghost"
-                size="sm"
-                onMouseDown={(e) => e.preventDefault()}
-                onClick={() => fileInput.current?.click()}
-              >
-                <Paperclip data-icon="inline-start" />
-                Imagem ou PDF
-              </Button>
-            </IconTip>
-            <input
-              ref={fileInput}
-              type="file"
-              accept={[...IMAGE_TYPES, "application/pdf", ".pdf", ".heic", ".heif"].join(",")}
-              multiple
-              hidden
-              onChange={(e) => {
-                const files = [...(e.target.files ?? [])];
-                e.target.value = "";
-                if (files.length) void attach(files);
-              }}
-            />
-          </div>
-        )}
+        <div className="flex items-center gap-0.5 overflow-x-auto px-3 pb-2 md:px-5" role="toolbar" aria-label="Formatação">
+          {TOOLS.map((t, i) => (
+            <span key={t.label} className="flex items-center">
+              {(i === 4 || i === 7 || i === 11) && <Separator orientation="vertical" className="mx-1 h-5" />}
+              <IconTip label={t.kbd ? `${t.label} (Ctrl/⌘ ${t.kbd})` : t.label}>
+                <Button
+                  variant="ghost"
+                  size="icon-sm"
+                  aria-label={t.label}
+                  onMouseDown={(e) => e.preventDefault()}
+                  onClick={() => editorApi.current && t.run(editorApi.current)}
+                >
+                  <t.icon />
+                </Button>
+              </IconTip>
+            </span>
+          ))}
+          <Separator orientation="vertical" className="mx-1 h-5" />
+          <IconTip label="Anexar imagem ou PDF (ou cole e arraste no texto)">
+            <Button variant="ghost" size="sm" onMouseDown={(e) => e.preventDefault()} onClick={() => fileInput.current?.click()}>
+              <Paperclip data-icon="inline-start" />
+              Imagem ou PDF
+            </Button>
+          </IconTip>
+          <input
+            ref={fileInput}
+            type="file"
+            accept={[...IMAGE_TYPES, "application/pdf", ".pdf", ".heic", ".heif"].join(",")}
+            multiple
+            hidden
+            onChange={(e) => {
+              const files = [...(e.target.files ?? [])];
+              e.target.value = "";
+              if (files.length) void attach(files);
+            }}
+          />
+        </div>
       </div>
 
       <article className="mx-auto flex w-full max-w-3xl flex-1 flex-col px-6 pt-8 md:px-12">
@@ -947,18 +917,14 @@ function NotePane({ note, editorApi }: { note: Note; editorApi: React.MutableRef
         </div>
         {dup && <p className="-mt-3 mb-4 text-sm text-warning">Já existe outra nota com esse nome.</p>}
         <div className="flex-1">
-          {mode === "edit" ? (
-            <NoteEditor
-              noteId={note.id}
-              body={note.body}
-              onChange={(body) => updateNote(note.id, { body })}
-              onTag={onTag}
-              onFiles={attach}
-              apiRef={editorApi}
-            />
-          ) : (
-            <NoteReader body={note.body} onTag={onTag} />
-          )}
+          <NoteEditor
+            noteId={note.id}
+            body={note.body}
+            onChange={(body) => updateNote(note.id, { body })}
+            onTag={onTag}
+            onFiles={attach}
+            apiRef={editorApi}
+          />
         </div>
         <div className="mb-16" />
       </article>
@@ -1014,13 +980,7 @@ function NoteMenu({ note, folders }: { note: Note; folders: string[] }) {
 
 /* ---------- right: outline (optional) ---------- */
 function NoteSide({ note, editorApi }: { note: Note; editorApi: React.MutableRefObject<EditorApi | null> }) {
-  const mode = useStore((s) => s.ui.noteMode);
   const outline = headings(note.body);
-  const goto = (i: number, line: number) => {
-    if (mode === "edit") editorApi.current?.gotoLine(line);
-    else
-      document.querySelectorAll(".note-read :is(h1,h2,h3,h4,h5,h6)")[i]?.scrollIntoView({ behavior: "smooth", block: "start" });
-  };
   return (
     <div className="flex flex-col gap-6 p-5">
       <section className="flex flex-col gap-1.5">
@@ -1029,7 +989,7 @@ function NoteSide({ note, editorApi }: { note: Note; editorApi: React.MutableRef
           outline.map((h, i) => (
             <button
               key={i}
-              onClick={() => goto(i, h.line)}
+              onClick={() => editorApi.current?.gotoLine(h.line)}
               style={{ paddingLeft: (h.level - 1) * 12 + 6 }}
               className="truncate rounded-md py-1 pr-2 text-left text-sm text-muted-foreground hover:bg-muted hover:text-foreground"
             >

@@ -54,6 +54,11 @@
   border-radius: 4px;
   padding: 1px 3px;
 }
+.cm-link-preview a[href] {
+  color: var(--primary);
+  text-decoration: underline;
+  cursor: pointer;
+}
 .cm-tag {
   color: var(--primary);
   background: color-mix(in oklab, var(--primary) 12%, transparent);

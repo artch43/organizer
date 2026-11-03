@@ -173,8 +173,6 @@ function Workspace() {
       }
       if (!location.hash) history.replaceState(history.state, "", "#/" + startPage());
       openNotes(GUIDE_ID);
-      // Opens ready to read (Editar is one click away).
-      setUi((u) => void (u.noteMode = "read"));
     } else if (!routeFromHash()) toStart();
     checkReviews();
     const onHash = () => {

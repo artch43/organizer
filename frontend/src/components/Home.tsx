@@ -4,6 +4,7 @@ import {
   CalendarClock,
   CalendarDays,
   Check,
+  ChevronDown,
   ChevronLeft,
   ChevronRight,
   Circle,
@@ -212,7 +213,7 @@ export function Home() {
               className="w-fit font-normal text-muted-foreground"
             >
               {showAll ? (
-                <ChevronLeft data-icon="inline-start" aria-hidden="true" />
+                <ChevronDown data-icon="inline-start" aria-hidden="true" />
               ) : (
                 <ChevronRight data-icon="inline-start" aria-hidden="true" />
               )}
