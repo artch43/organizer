@@ -33,6 +33,8 @@ export interface UI {
   /** Notes: show the list of notes / the side panel (outline and links). */
   notesList: boolean;
   notesSide: boolean;
+  /** Duplicate-name warnings dismissed on this device, keyed by note and normalized title. */
+  dismissedNoteTitles: Record<string, string>;
 }
 interface Store {
   ws: Workspace;
@@ -58,6 +60,7 @@ const defaultUi: UI = {
   notesTab: "list",
   notesList: true,
   notesSide: false,
+  dismissedNoteTitles: {},
 };
 
 export const useStore = create<Store>()(
@@ -87,6 +90,7 @@ export const useStore = create<Store>()(
             viewByDb: s.ui.viewByDb,
             notesList: s.ui.notesList,
             notesSide: s.ui.notesSide,
+            dismissedNoteTitles: s.ui.dismissedNoteTitles,
             area: s.ui.area,
             calendar: { view: s.ui.calendar.view, showTasks: s.ui.calendar.showTasks },
           },

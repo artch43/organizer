@@ -135,7 +135,7 @@ export function AppSidebar() {
   const boards = allBoards.filter((p) => !p.archived);
   const archived = allBoards.filter((p) => p.archived);
   const [showArchived, setShowArchived] = useState(false);
-  // Open tasks per list, shown next to its name (empty lists look quieter).
+  // Open tasks per list, shown next to its name.
   const openCount = (id: string) => {
     const db = ws.dbs[id];
     return db ? Object.values(ws.items).filter((i) => i.db === id && groupOf(db, i) !== "done").length : 0;
@@ -622,12 +622,11 @@ function BoardItem({
           {...dragProps}
           isActive={active}
           title={`${p.title || "Sem título"} · ${count ? `${count} ${count === 1 ? "tarefa aberta" : "tarefas abertas"}` : "sem tarefas abertas"}. Clique duas vezes para renomear; arraste para uma pasta.`}
-          className={cn(!count && !active && "text-muted-foreground")}
           onClick={(e) => e.detail < 2 && onOpen()}
           onDoubleClick={onStartRename}
         >
           <IconSpot label="Trocar ícone da lista" value={p.icon} onPick={(v) => renamePage(p.id, p.title, v)}>
-            <Glyph icon={p.icon} size="sm" className={cn(!count && !active && "opacity-70")} />
+            <Glyph icon={p.icon} size="sm" />
           </IconSpot>
           <span>{p.title || "Sem título"}</span>
           {count > 0 && (

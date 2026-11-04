@@ -723,14 +723,17 @@ function NotePane({ note, editorApi }: { note: Note; editorApi: React.MutableRef
   const setUi = useStore((s) => s.setUi);
   const sidebar = useSidebar();
   const [title, setTitle] = useState(note.title);
+  const dismissedTitle = useStore((s) => s.ui.dismissedNoteTitles[note.id]);
   // The task this note was opened from (gone if the task was deleted).
   const task = useStore((s) => (note.task ? s.ws.items[note.task] : undefined));
   const onTag = useTagFilter();
   const fileInput = useRef<HTMLInputElement>(null);
   const attach = useAttach(editorApi, note.id);
+  const normalizedTitle = title.trim().toLowerCase();
   const dup =
-    title.trim() &&
-    Object.values(notes).some((n) => n.id !== note.id && n.title.trim().toLowerCase() === title.trim().toLowerCase());
+    !!normalizedTitle &&
+    Object.values(notes).some((n) => n.id !== note.id && n.title.trim().toLowerCase() === normalizedTitle);
+  const duplicateDismissed = dismissedTitle === normalizedTitle;
   const words = note.body.trim() ? note.body.trim().split(/\s+/).length : 0;
   const tags = extractTags(note.body);
   const commit = () => {
@@ -909,13 +912,47 @@ function NotePane({ note, editorApi }: { note: Note; editorApi: React.MutableRef
           <span className="tabular-nums">
             {words} {words === 1 ? "palavra" : "palavras"}
           </span>
+          {dup && !duplicateDismissed && <span className="text-sm text-warning">Já existe outra nota com esse nome.</span>}
+          {dup && !duplicateDismissed && (
+            <span className="relative inline-flex shrink-0 items-center">
+              <Button
+                type="button"
+                variant="outline"
+                size="xs"
+                className="peer size-4 cursor-pointer rounded-[3px] border-warning/40 bg-warning/20 p-0 text-warning shadow-none duration-200 hover:scale-105 hover:border-warning/70 hover:bg-warning/30 focus-visible:border-warning/60 focus-visible:ring-warning/25 motion-reduce:transform-none motion-reduce:transition-none dark:border-warning/40 dark:bg-warning/20 dark:hover:bg-warning/30"
+                aria-label="Dispensar aviso de nome duplicado"
+                onClick={() =>
+                  setUi((u) => {
+                    u.dismissedNoteTitles[note.id] = normalizedTitle;
+                  })
+                }
+              />
+              <span aria-hidden="true" className="pointer-events-none absolute left-full ml-2 -translate-x-1 py-1 text-[11px] font-medium whitespace-nowrap text-destructive opacity-0 transition-[opacity,transform] duration-200 ease-out peer-hover:translate-x-0 peer-hover:opacity-100 peer-focus-visible:translate-x-0 peer-focus-visible:opacity-100 motion-reduce:transform-none motion-reduce:transition-none">
+                dispensar
+              </span>
+            </span>
+          )}
+          {dup && duplicateDismissed && (
+            <button
+              type="button"
+              aria-label="Mostrar aviso de nome duplicado"
+              title="Já existe outra nota com esse nome. Clique para mostrar o aviso."
+              className="group inline-flex size-5 shrink-0 cursor-pointer items-center justify-center rounded-full transition-colors duration-200 hover:bg-warning/10 focus-visible:ring-2 focus-visible:ring-warning/40 focus-visible:ring-offset-2 focus-visible:ring-offset-background focus-visible:outline-none motion-reduce:transition-none"
+              onClick={() =>
+                setUi((u) => {
+                  delete u.dismissedNoteTitles[note.id];
+                })
+              }
+            >
+              <span className="size-1.5 rounded-full bg-warning transition-transform duration-200 group-hover:scale-125 group-focus-visible:scale-125 motion-reduce:transition-none" />
+            </button>
+          )}
           {tags.map((t) => (
             <button key={t} onClick={() => onTag(t)}>
               <Badge variant="secondary">#{t}</Badge>
             </button>
           ))}
         </div>
-        {dup && <p className="-mt-3 mb-4 text-sm text-warning">Já existe outra nota com esse nome.</p>}
         <div className="flex-1">
           <NoteEditor
             noteId={note.id}
