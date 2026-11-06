@@ -13,9 +13,9 @@ import {
 } from "lucide-react";
 import { useRef, useState } from "react";
 import { cn } from "@/lib/utils";
-import type { Area } from "@/lib/types";
+import type { Area, Option } from "@/lib/types";
 import { eventsByDay, inArea } from "@/lib/events";
-import { dateOf, firstOptInGroup, groupOf, statusProp } from "@/lib/model";
+import { dateOf, firstOptInGroup, groupOf, optOf, statusProp } from "@/lib/model";
 import { addDays, fmtDate, parseD, today } from "@/lib/util";
 import { exampleData, go, removeExamples, setProp, toast, toggleHabit, useStore } from "@/store";
 import {
@@ -39,7 +39,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from "@/components/ui/empty";
-import { areaVar, greeting, useAreas, useToday } from "./common";
+import { areaVar, greeting, OptionBadge, useAreas, useToday } from "./common";
 import { Progress } from "@/components/ui/progress";
 import { Glyph } from "./icons";
 import { vtName, withMotion } from "@/lib/motion";
@@ -50,6 +50,7 @@ interface Entry {
   title: string;
   sub?: React.ReactNode;
   area?: Area;
+  priority?: Option;
   done: boolean;
   order: number;
   /** The task's day (YYYY-MM-DD): today, or earlier for overdue ones; "" when it has no date. */
@@ -122,6 +123,7 @@ export function Home() {
         </span>
       ) : undefined,
       area: areaOf(it.area),
+      priority: optOf(db.props.find((p) => p.id === "prio"), it.props.prio),
       done: isDone,
       order: it.created,
       day,
@@ -630,7 +632,15 @@ function Row({ e, i, T }: { e: Entry; i: number; T: string }) {
         {when}
       </span>
       <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-        <span className={cn("truncate text-base font-medium", e.done && "text-muted-foreground line-through")}>{e.title}</span>
+        <span className="flex min-w-0 items-center gap-2">
+          <span className={cn("truncate text-base font-medium", e.done && "text-muted-foreground line-through")}>{e.title}</span>
+          {e.priority && (
+            <span className="flex min-w-0 max-w-[40%] shrink-0" title={`Prioridade: ${e.priority.name}`}>
+              <span className="sr-only">Prioridade: </span>
+              <OptionBadge opt={e.priority} />
+            </span>
+          )}
+        </span>
         {/* Phones: "when" moves under the title, so the title gets the width. */}
         <span className="flex min-w-0 items-center gap-1.5 truncate text-sm text-muted-foreground">
           <span className={cn("shrink-0 tabular-nums sm:hidden", late && "font-medium text-warning")}>

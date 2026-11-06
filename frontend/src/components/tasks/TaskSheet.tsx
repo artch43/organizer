@@ -176,13 +176,13 @@ export function TaskSheet() {
                       </SelectTrigger>
                       <SelectContent>
                         <SelectGroup>
-                          <SelectItem value={NONE}>Sem prioridade</SelectItem>
                           {prio.options!.map((o) => (
                             <SelectItem key={o.id} value={o.id}>
                               <span data-color={o.color} className="swatch-color size-2 rounded-full" />
                               {o.name}
                             </SelectItem>
                           ))}
+                          <SelectItem value={NONE}>Sem prioridade</SelectItem>
                         </SelectGroup>
                       </SelectContent>
                     </Select>
