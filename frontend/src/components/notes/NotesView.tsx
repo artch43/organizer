@@ -3,12 +3,10 @@ import {
   Bold,
   CalendarDays,
   CheckSquare,
-  ChevronDown,
   ChevronRight,
   Code,
   Download,
   FilePlus2,
-  FileText,
   Folder,
   FolderPlus,
   Heading1,
@@ -16,11 +14,13 @@ import {
   Heading3,
   Italic,
   Link2,
+  Mail,
   List,
   ListOrdered,
   Maximize2,
   Minimize2,
   MoreHorizontal,
+  NotebookPen,
   Paperclip,
   PanelLeft,
   PanelRight,
@@ -37,6 +37,8 @@ import {
 import { cn } from "@/lib/utils";
 import type { Note } from "@/lib/types";
 import { ago, extractTags, folderList, headings, plainSnippet } from "@/lib/notes";
+import { alarmTimes, hhmm } from "@/lib/alarms";
+import { fmtDate } from "@/lib/util";
 import { toast as sonner } from "sonner";
 import { IMAGE_TYPES, attachmentMarkdown, saveAttachment } from "@/lib/attachments";
 import { exportNoteMd, exportNotesZip, readMarkdownFiles } from "@/lib/notesIO";
@@ -60,8 +62,8 @@ import { InputGroup, InputGroupAddon, InputGroupInput } from "@/components/ui/in
 import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyTitle } from "@/components/ui/empty";
-import { useSidebar } from "@/components/ui/sidebar";
+import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty";
+import { Mascot } from "@/components/brand/Brand";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -78,8 +80,8 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { NoteEditor, type EditorApi } from "./NoteEditor";
+import { EmptyState } from "../EmptyState";
 
-const byTitle = (a: Note, b: Note) => a.title.localeCompare(b.title, "pt-BR", { numeric: true });
 const ui = () => useStore.getState().setUi;
 
 /**
@@ -95,10 +97,10 @@ export default function NotesView() {
   const editorApi = useRef<EditorApi | null>(null);
   const phone = (t: string) => (tab !== t ? "max-md:hidden" : "");
   return (
-    <div className="flex min-h-0 flex-1">
+    <div className="flex min-h-0 min-w-0 flex-1">
       {listOpen && (
         <aside
-          className={cn("flex min-h-0 w-full shrink-0 flex-col border-r bg-sidebar/60 md:w-72", phone("list"))}
+          className={cn("flex min-h-0 w-full shrink-0 flex-col border-r md:w-80", phone("list"))}
           aria-label="Lista de notas"
         >
           <NotesPanel />
@@ -108,7 +110,7 @@ export default function NotesView() {
         {note ? <NotePane key={note.id} note={note} editorApi={editorApi} /> : <NotesHome />}
       </section>
       {note && sideOpen && (
-        <aside className="hidden min-h-0 w-72 shrink-0 overflow-y-auto border-l xl:block" aria-label="Sumário">
+        <aside className="hidden min-h-0 w-80 shrink-0 overflow-y-auto border-l xl:flex" aria-label="Sumário">
           <NoteSide note={note} editorApi={editorApi} />
         </aside>
       )}
@@ -195,6 +197,9 @@ function NotesHome() {
         !pinned.length && (
           <Empty className="border">
             <EmptyHeader>
+              <EmptyMedia variant="icon">
+                <NotebookPen />
+              </EmptyMedia>
               <EmptyTitle>{query ? "Nada encontrado" : "Nenhuma nota ainda"}</EmptyTitle>
               <EmptyDescription>
                 {query ? "Tente outra palavra." : "Comece uma nota nova ou abra a nota do dia."}
@@ -225,11 +230,11 @@ function CardGrid({ title, notes }: { title: string; notes: Note[] }) {
               key={n.id}
               data-del={"note:" + n.id}
               onClick={() => openNotes(n.id)}
-              className="group flex min-h-36 flex-col gap-2 rounded-xl border bg-card p-4 text-left shadow-xs transition-[border-color,box-shadow] hover:border-primary/40 hover:shadow-sm focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+              className="group flex min-h-36 flex-col gap-2 rounded-xl border bg-card p-4 text-left shadow-xs transition-[border-color,box-shadow] hover:border-primary-strong/40 hover:shadow-sm focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
             >
               <span className="flex items-start gap-2">
                 <span className="line-clamp-2 flex-1 font-semibold break-words">{n.title || "Sem título"}</span>
-                {n.pinned && <Pin className="size-3.5 shrink-0 text-primary" aria-label="Fixada" />}
+                {n.pinned && <Pin className="size-3.5 shrink-0 text-primary-strong" aria-label="Fixada" />}
               </span>
               <span
                 className={cn(
@@ -262,7 +267,6 @@ function CardGrid({ title, notes }: { title: string; notes: Note[] }) {
 }
 
 /* ---------- left: folders and notes ---------- */
-const CLOSED_KEY = "organizer:notes-closed";
 
 function NotesPanel() {
   const notes = useStore((s) => s.ws.notes);
@@ -271,49 +275,46 @@ function NotesPanel() {
   const tag = useStore((s) => s.ui.noteTag);
   const setUi = useStore((s) => s.setUi);
   const [q, setQ] = useState("");
-  // Which folders are folded: kept on this device, so Anotações reopens the way it was left.
-  const [closed, setClosedState] = useState<Record<string, boolean>>(() => {
+  // The folder chip chosen ("" = Todas): kept on this device.
+  const [chip, setChipState] = useState(() => {
     try {
-      return JSON.parse(localStorage.getItem(CLOSED_KEY) ?? "{}");
+      return localStorage.getItem(CHIP_KEY) ?? "";
     } catch {
-      return {};
+      return "";
     }
   });
-  const setClosed = (fn: (c: Record<string, boolean>) => Record<string, boolean>) =>
-    setClosedState((c) => {
-      const next = Object.fromEntries(Object.entries(fn(c)).filter(([, v]) => v));
-      try {
-        localStorage.setItem(CLOSED_KEY, JSON.stringify(next));
-      } catch {
-        /* private mode */
-      }
-      return next;
-    });
+  const setChip = (f: string) => {
+    setChipState(f);
+    try {
+      localStorage.setItem(CHIP_KEY, f);
+    } catch {
+      /* private mode */
+    }
+  };
   const [drag, setDrag] = useState<string | null>(null);
   const [over, setOver] = useState<string | null>(null);
   const [folderDialog, setFolderDialog] = useState<{ mode: "new" | "rename"; path: string } | null>(null);
   const fileInput = useRef<HTMLInputElement>(null);
   const list = Object.values(notes);
   const folders = folderList(notes, extra);
-  const currentFolder = current ? (notes[current]?.folder ?? "") : "";
-  const tagCounts = useMemo(() => {
-    const m = new Map<string, number>();
-    for (const n of Object.values(notes)) for (const t of extractTags(n.body)) m.set(t, (m.get(t) ?? 0) + 1);
-    return [...m.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
-  }, [notes]);
+  const top = folders.filter((f) => !f.includes("/"));
+  const active = top.includes(chip) ? chip : "";
+  const subs = active ? folders.filter((f) => f.startsWith(active + "/")) : [];
+  const currentFolder = current ? (notes[current]?.folder ?? "") : active;
+  const tagCounts = useTagCounts();
   const query = q.trim().toLowerCase();
-  const flat =
-    query || tag
-      ? list
-          .filter(
-            (n) =>
-              (!query || n.title.toLowerCase().includes(query) || n.body.toLowerCase().includes(query)) &&
-              (!tag || extractTags(n.body).includes(tag)),
-          )
-          .sort(byTitle)
-      : null;
+  const inChip = (n: Note) => !active || n.folder === active || n.folder.startsWith(active + "/");
+  const shown = list
+    .filter(
+      (n) =>
+        inChip(n) &&
+        (!query || n.title.toLowerCase().includes(query) || n.body.toLowerCase().includes(query)) &&
+        (!tag || extractTags(n.body).includes(tag)),
+    )
+    // Pinned first, then the most recently edited.
+    .sort((x, y) => Number(!!y.pinned) - Number(!!x.pinned) || y.updated - x.updated);
 
-  // Folders and notes catch the drop themselves (a note: into its folder); anywhere else in the list is the top level.
+  // A chip (or "Todas", the top level) catches a dragged note: it moves to that folder.
   const dropProps = (folder: string) => ({
     onDragOver: (e: React.DragEvent) => {
       if (!drag) return;
@@ -327,138 +328,41 @@ function NotesPanel() {
       e.stopPropagation();
       if (drag && notes[drag] && notes[drag].folder !== folder) {
         updateNote(drag, { folder });
-        toast(`Movida para ${folder || "Anotações"}`);
+        toast(`Movida para ${folder || "Notas (sem pasta)"}`);
       }
       setDrag(null);
       setOver(null);
     },
   });
-  // Same title in more than one place: show the folder, so they can be told apart.
-  const titleCount = new Map<string, number>();
-  for (const n of Object.values(notes))
-    titleCount.set(n.title.trim().toLowerCase(), (titleCount.get(n.title.trim().toLowerCase()) ?? 0) + 1);
-  const noteRow = (n: Note, depth: number) => {
-    const untitled = !n.title.trim() || /^sem título( \d+)?$/i.test(n.title.trim());
-    const dup = (titleCount.get(n.title.trim().toLowerCase()) ?? 0) > 1;
-    const open = n.id === current;
+  const chipBtn = (f: string, label: string) => {
+    const on = active === f;
     return (
       <button
-        key={n.id}
-        data-del={"note:" + n.id}
-        draggable
-        aria-current={open ? "page" : undefined}
-        style={{ paddingLeft: 10 + depth * 14 }}
-        onClick={() => openNotes(n.id)}
-        onDragStart={(e) => {
-          e.dataTransfer.effectAllowed = "move";
-          e.dataTransfer.setData("text/plain", n.id);
-          requestAnimationFrame(() => setDrag(n.id));
-        }}
-        onDragEnd={() => {
-          setDrag(null);
-          setOver(null);
-        }}
-        {...dropProps(n.folder)}
+        key={f || "todas"}
+        type="button"
+        aria-pressed={on}
+        onClick={() => setChip(f)}
+        {...dropProps(f)}
+        title={drag ? `Soltar para mover para ${label}` : undefined}
         className={cn(
-          "relative flex w-full items-center gap-2 rounded-lg py-2 pr-2 text-left text-[15px] hover:bg-sidebar-accent focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none",
-          // The open note: highlighted row with a bar in the accent color.
-          open &&
-            "bg-sidebar-accent font-semibold text-sidebar-accent-foreground before:absolute before:inset-y-1.5 before:left-0 before:w-1 before:rounded-full before:bg-primary",
+          "flex h-9 items-center rounded-full border px-3.5 text-[15px] font-medium transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none",
+          on ? "border-primary-strong bg-primary/14 text-primary-strong" : "text-foreground/85 hover:bg-muted",
+          drag && !on && "border-dashed",
+          over === f && "border-primary-strong bg-primary/20 ring-2 ring-primary-strong/40",
         )}
       >
-        {n.pinned ? (
-          <Pin className="size-4 shrink-0 text-primary" />
-        ) : (
-          <FileText className={cn("size-4 shrink-0", open ? "text-primary-strong" : "text-muted-foreground")} />
-        )}
-        <span className={cn("min-w-0 truncate", untitled && "text-muted-foreground italic")}>{n.title || "Sem título"}</span>
-        {dup && (
-          <span
-            className="ml-auto shrink-0 truncate pl-1 text-xs font-normal text-muted-foreground"
-            title={`Na pasta ${n.folder || "raiz"}`}
-          >
-            {n.folder ? n.folder.split("/").pop() : "sem pasta"}
-          </span>
-        )}
+        {label}
       </button>
     );
   };
-  const notesIn = (folder: string) => {
-    const xs = list.filter((n) => n.folder === folder).sort(byTitle);
-    return folder.startsWith("Diário") ? xs.reverse() : xs.sort((a, b) => Number(!!b.pinned) - Number(!!a.pinned));
-  };
-  const tree = (parent: string, depth: number): React.ReactNode[] => [
-    ...folders
-      .filter((f) => (parent ? f.startsWith(parent + "/") && !f.slice(parent.length + 1).includes("/") : !f.includes("/")))
-      .map((f) => {
-        const open = !closed[f];
-        const name = f.split("/").pop()!;
-        return (
-          <div key={"f:" + f}>
-            <div
-              className={cn("group flex items-center rounded-md hover:bg-sidebar-accent", over === f && "ring-2 ring-primary")}
-              style={{ paddingLeft: 2 + depth * 14 }}
-              {...dropProps(f)}
-            >
-              <button
-                className="flex min-w-0 flex-1 items-center gap-1.5 py-2 text-left text-[15px] font-medium"
-                onClick={() => setClosed((c) => ({ ...c, [f]: open }))}
-                aria-expanded={open}
-              >
-                {open ? <ChevronDown className="size-3.5 shrink-0" /> : <ChevronRight className="size-3.5 shrink-0" />}
-                <Folder className="size-3.5 shrink-0 text-muted-foreground" />
-                <span className="truncate">{name}</span>
-              </button>
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    size="icon-xs"
-                    aria-label={`Opções da pasta ${name}`}
-                    className="opacity-0 group-hover:opacity-100 focus-visible:opacity-100 pointer-coarse:opacity-100"
-                  >
-                    <MoreHorizontal />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="start">
-                  <DropdownMenuGroup>
-                    <DropdownMenuItem onSelect={() => createNote({ folder: f })}>
-                      <FilePlus2 />
-                      Nova nota aqui
-                    </DropdownMenuItem>
-                    <DropdownMenuItem onSelect={() => setFolderDialog({ mode: "new", path: f })}>
-                      <FolderPlus />
-                      Nova subpasta
-                    </DropdownMenuItem>
-                    <DropdownMenuItem onSelect={() => setFolderDialog({ mode: "rename", path: f })}>
-                      <Pencil />
-                      Renomear
-                    </DropdownMenuItem>
-                  </DropdownMenuGroup>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem variant="destructive" onSelect={() => deleteFolder(f)}>
-                    <Trash2 />
-                    Excluir pasta
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-            </div>
-            {open && tree(f, depth + 1)}
-          </div>
-        );
-      }),
-    ...notesIn(parent).map((n) => noteRow(n, depth)),
-  ];
 
   return (
     <>
-      <div
-        className={cn("flex items-center gap-1 px-3 pt-3 pb-2", over === "" && "rounded-md ring-2 ring-primary")}
-        {...dropProps("")}
-      >
-        {/* Short label so it fits next to the four buttons; goes to the overview of all notes. */}
+      <div className="flex items-center gap-1 px-4 pt-5 pb-3">
+        {/* Small, writing, next to the list's title. */}
+        <Mascot pose="anota" size={30} className="-my-1 shrink-0" />
         <button
-          className="mr-auto min-w-0 truncate rounded-md px-1 text-[15px] font-semibold hover:text-primary-strong"
+          className="mr-auto min-w-0 truncate rounded-md px-1.5 text-lg font-bold hover:text-primary-strong"
           title="Ver todas as notas"
           onClick={() => openNotes(null)}
         >
@@ -474,7 +378,7 @@ function NotesPanel() {
             variant="ghost"
             size="icon-sm"
             aria-label="Nova pasta"
-            onClick={() => setFolderDialog({ mode: "new", path: currentFolder })}
+            onClick={() => setFolderDialog({ mode: "new", path: "" })}
           >
             <FolderPlus />
           </Button>
@@ -500,20 +404,75 @@ function NotesPanel() {
           </Button>
         </IconTip>
       </div>
-      <div className="flex flex-col gap-2 px-3 pb-2">
-        <InputGroup>
+      <div className="flex flex-col gap-3 px-4 pb-3">
+        <InputGroup className="h-10 rounded-xl">
           <InputGroupAddon>
             <Search />
           </InputGroupAddon>
           <InputGroupInput
             type="search"
             autoComplete="off"
-            placeholder="Filtrar notas…"
+            placeholder="Filtrar notas"
             aria-label="Filtrar notas"
             value={q}
             onChange={(e) => setQ(e.target.value)}
           />
         </InputGroup>
+        {/* Folders as chips: one tap shows only that folder's notes; drop a note on one to move it there. */}
+        <div className="flex flex-wrap items-center gap-2" role="group" aria-label="Pastas">
+          {chipBtn("", "Todas")}
+          {top.map((f) => chipBtn(f, f))}
+          {active && (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="icon-sm" aria-label={`Opções da pasta ${active}`} className="rounded-full">
+                  <MoreHorizontal />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start">
+                <DropdownMenuGroup>
+                  <DropdownMenuItem onSelect={() => createNote({ folder: active })}>
+                    <FilePlus2 />
+                    Nova nota aqui
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onSelect={() => setFolderDialog({ mode: "new", path: active })}>
+                    <FolderPlus />
+                    Nova subpasta
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onSelect={() => setFolderDialog({ mode: "rename", path: active })}>
+                    <Pencil />
+                    Renomear
+                  </DropdownMenuItem>
+                </DropdownMenuGroup>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  variant="destructive"
+                  onSelect={() => {
+                    deleteFolder(active);
+                    setChip("");
+                  }}
+                >
+                  <Trash2 />
+                  Excluir pasta
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          )}
+        </div>
+        {subs.length > 0 && (
+          <div className="flex flex-wrap gap-1.5 text-xs text-muted-foreground">
+            Subpastas:
+            {subs.map((f) => (
+              <span
+                key={f}
+                {...dropProps(f)}
+                className={cn("rounded-md bg-muted px-1.5", over === f && "ring-2 ring-primary-strong")}
+              >
+                {f.slice(active.length + 1)}
+              </span>
+            ))}
+          </div>
+        )}
         {tag && (
           <Badge variant="secondary" className="w-fit gap-1 pr-1">
             #{tag}
@@ -531,48 +490,65 @@ function NotesPanel() {
           </Badge>
         )}
       </div>
-      <nav className={cn("min-h-0 flex-1 overflow-y-auto px-2 pb-3", over === "" && "bg-primary/5")} {...dropProps("")}>
-        {flat ? (
-          flat.length ? (
-            flat.map((n) => noteRow(n, 0))
-          ) : (
-            <p className="px-2 text-sm text-muted-foreground">Nenhuma nota encontrada.</p>
-          )
-        ) : list.length || folders.length ? (
-          tree("", 0)
+      <nav aria-label="Notas" className="min-h-0 flex-1 overflow-y-auto px-2.5 pb-3">
+        {shown.length ? (
+          <ul className="flex flex-col gap-0.5">
+            {shown.map((n) => {
+              const open = n.id === current;
+              const untitled = !n.title.trim() || /^sem título( \d+)?$/i.test(n.title.trim());
+              return (
+                <li key={n.id}>
+                  <button
+                    data-del={"note:" + n.id}
+                    draggable
+                    aria-current={open ? "page" : undefined}
+                    onClick={() => openNotes(n.id)}
+                    onDragStart={(e) => {
+                      e.dataTransfer.effectAllowed = "move";
+                      e.dataTransfer.setData("text/plain", n.id);
+                      requestAnimationFrame(() => setDrag(n.id));
+                    }}
+                    onDragEnd={() => {
+                      setDrag(null);
+                      setOver(null);
+                    }}
+                    className={cn(
+                      "flex w-full flex-col gap-0.5 rounded-xl px-3.5 py-3 text-left transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none",
+                      open ? "bg-muted" : "hover:bg-muted/60",
+                      drag === n.id && "opacity-50",
+                    )}
+                  >
+                    <span
+                      className={cn(
+                        "flex items-center gap-1.5 text-base font-semibold",
+                        untitled && "font-medium text-muted-foreground italic",
+                      )}
+                    >
+                      {n.pinned && <Pin className="size-3.5 shrink-0 text-primary-strong" aria-label="Fixada" />}
+                      <span className="truncate">{n.title || "Sem título"}</span>
+                    </span>
+                    <span className="truncate text-sm text-muted-foreground">
+                      {n.folder ? n.folder.split("/").join(" › ") : "Sem pasta"} · {ago(n.updated)}
+                    </span>
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
         ) : (
-          <p className="px-2 text-sm text-muted-foreground">Nenhuma nota ainda. Crie a primeira no botão acima.</p>
+          <EmptyState
+            compact
+            pose={list.length ? "dorme" : "anota"}
+            title={list.length ? "Nenhuma nota encontrada" : "Nenhuma nota ainda"}
+            text={list.length ? "Tente outra palavra ou outra pasta." : "Escreva resumos, ideias e planos."}
+            action={list.length ? undefined : { label: "Nova nota", run: () => createNote({ folder: currentFolder }) }}
+          />
         )}
-        {/* While a note from a folder is dragged: where to drop it to take it out. */}
-        {drag && notes[drag]?.folder && (
-          <div
-            className={cn(
-              "mt-2 rounded-lg border-2 border-dashed px-3 py-3 text-center text-sm text-muted-foreground",
-              over === "" ? "border-primary bg-primary/10 text-primary-strong" : "border-border",
-            )}
-          >
-            Solte aqui para tirar da pasta
-          </div>
-        )}
-        {tagCounts.length > 0 && !flat && (
+        {/* Tags live in the panel beside an open note; with none open, here. */}
+        {!current && tagCounts.length > 0 && (
           <div className="mt-5 flex flex-col gap-2 px-1">
             <span className="text-xs font-medium text-muted-foreground">Tags</span>
-            <div className="flex flex-wrap gap-1">
-              {tagCounts.slice(0, 30).map(([t, n]) => (
-                <button
-                  key={t}
-                  onClick={() =>
-                    setUi((u) => {
-                      u.noteTag = t;
-                    })
-                  }
-                >
-                  <Badge variant="outline">
-                    #{t} <span className="text-muted-foreground">{n}</span>
-                  </Badge>
-                </button>
-              ))}
-            </div>
+            <TagCloud counts={tagCounts} />
           </div>
         )}
       </nav>
@@ -607,6 +583,42 @@ function NotesPanel() {
       </div>
       {folderDialog && <FolderDialog {...folderDialog} onClose={() => setFolderDialog(null)} />}
     </>
+  );
+}
+
+const CHIP_KEY = "organizer:notes-chip";
+
+/** Tags of all notes, most used first. */
+function useTagCounts() {
+  const notes = useStore((s) => s.ws.notes);
+  return useMemo(() => {
+    const m = new Map<string, number>();
+    for (const n of Object.values(notes)) for (const t of extractTags(n.body)) m.set(t, (m.get(t) ?? 0) + 1);
+    return [...m.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
+  }, [notes]);
+}
+
+/** "#prova · 4" chips; the note's own tags are highlighted. A tap filters the list by the tag. */
+function TagCloud({ counts, mine = [] }: { counts: [string, number][]; mine?: string[] }) {
+  const onTag = useTagFilter();
+  return (
+    <div className="flex flex-wrap gap-1.5">
+      {counts.slice(0, 24).map(([t, n]) => (
+        <button
+          key={t}
+          type="button"
+          onClick={() => onTag(t)}
+          className={cn(
+            "rounded-lg px-2 py-1 text-sm font-semibold transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none",
+            mine.includes(t)
+              ? "bg-primary/16 text-primary-strong hover:bg-primary/24"
+              : "bg-muted text-muted-foreground hover:text-foreground",
+          )}
+        >
+          #{t} <span className="font-normal opacity-80">· {n}</span>
+        </button>
+      ))}
+    </div>
   );
 }
 
@@ -721,7 +733,6 @@ function NotePane({ note, editorApi }: { note: Note; editorApi: React.MutableRef
   const listOpen = useStore((s) => s.ui.notesList);
   const sideOpen = useStore((s) => s.ui.notesSide);
   const setUi = useStore((s) => s.setUi);
-  const sidebar = useSidebar();
   const [title, setTitle] = useState(note.title);
   const dismissedTitle = useStore((s) => s.ui.dismissedNoteTitles[note.id]);
   // The task this note was opened from (gone if the task was deleted).
@@ -731,34 +742,31 @@ function NotePane({ note, editorApi }: { note: Note; editorApi: React.MutableRef
   const attach = useAttach(editorApi, note.id);
   const normalizedTitle = title.trim().toLowerCase();
   const dup =
-    !!normalizedTitle &&
-    Object.values(notes).some((n) => n.id !== note.id && n.title.trim().toLowerCase() === normalizedTitle);
+    !!normalizedTitle && Object.values(notes).some((n) => n.id !== note.id && n.title.trim().toLowerCase() === normalizedTitle);
   const duplicateDismissed = dismissedTitle === normalizedTitle;
   const words = note.body.trim() ? note.body.trim().split(/\s+/).length : 0;
   const tags = extractTags(note.body);
   const commit = () => {
     if (title.trim() !== note.title) renameNote(note.id, title);
   };
-  const focusMode = !listOpen && !sideOpen && !sidebar.open;
+  const focusMode = !listOpen && !sideOpen;
   const toggleFocus = () => {
     if (focusMode) {
       setUi((u) => {
         u.notesList = true;
       });
-      sidebar.setOpen(true);
     } else {
       setUi((u) => {
         u.notesList = false;
         u.notesSide = false;
       });
-      sidebar.setOpen(false);
     }
   };
 
   return (
     <div className="flex min-h-full flex-col">
-      <div className="sticky top-0 z-[2] flex flex-col border-b bg-background/95 backdrop-blur supports-backdrop-filter:bg-background/80">
-        <div className="flex items-center gap-1 px-3 py-2 md:px-5">
+      <div className="sticky top-0 z-[2] flex flex-col bg-background/95 backdrop-blur supports-backdrop-filter:bg-background/85">
+        <div className="mx-auto flex w-full max-w-3xl items-center gap-1.5 px-4 pt-5 pb-2 md:px-12">
           {!listOpen && (
             <IconTip label="Mostrar lista de notas">
               <Button
@@ -789,17 +797,24 @@ function NotePane({ note, editorApi }: { note: Note; editorApi: React.MutableRef
           >
             <ChevronRight className="rotate-180" />
           </Button>
-          <nav aria-label="Caminho" className="flex min-w-0 flex-1 items-center gap-1 truncate text-sm text-muted-foreground">
-            <button className="hover:text-foreground" onClick={() => openNotes(null)}>
-              Anotações
+          <nav
+            aria-label="Caminho"
+            className="flex min-w-0 flex-1 items-center gap-1.5 truncate text-[15px] text-muted-foreground"
+          >
+            <button className="flex items-center gap-1.5 hover:text-foreground" onClick={() => openNotes(null)}>
+              <Folder className="size-4 shrink-0" aria-hidden="true" />
+              {note.folder ? note.folder.split("/")[0] : "Notas"}
             </button>
             {note.folder &&
-              note.folder.split("/").map((f, i) => (
-                <span key={i} className="flex items-center gap-1">
-                  <ChevronRight className="size-3.5" />
-                  {f}
-                </span>
-              ))}
+              note.folder
+                .split("/")
+                .slice(1)
+                .map((f, i) => (
+                  <span key={i} className="flex items-center gap-1.5">
+                    <ChevronRight className="size-3.5" aria-hidden="true" />
+                    {f}
+                  </span>
+                ))}
           </nav>
           <IconTip label={sideOpen ? "Esconder sumário" : "Mostrar sumário"}>
             <Button
@@ -817,20 +832,23 @@ function NotePane({ note, editorApi }: { note: Note; editorApi: React.MutableRef
               <PanelRight />
             </Button>
           </IconTip>
-          <IconTip label={focusMode ? "Sair do modo foco" : "Modo foco"}>
-            <Button
-              variant="ghost"
-              size="icon-sm"
-              aria-label={focusMode ? "Sair do modo foco" : "Modo foco"}
-              className="max-md:hidden"
-              onClick={toggleFocus}
-            >
-              {focusMode ? <Minimize2 /> : <Maximize2 />}
-            </Button>
-          </IconTip>
+          <Button
+            variant="outline"
+            aria-pressed={focusMode}
+            title={focusMode ? "Sair do modo foco" : "Modo foco: esconde tudo menos a nota"}
+            className="h-10 gap-2 rounded-xl px-4 text-[15px] max-md:hidden"
+            onClick={toggleFocus}
+          >
+            {focusMode ? <Minimize2 data-icon="inline-start" /> : <Maximize2 data-icon="inline-start" />}
+            {focusMode ? "Sair do foco" : "Foco"}
+          </Button>
           <NoteMenu note={note} folders={folderList(notes, extra)} />
         </div>
-        <div className="flex items-center gap-0.5 overflow-x-auto px-3 pb-2 md:px-5" role="toolbar" aria-label="Formatação">
+        <div
+          className="mx-auto flex w-full max-w-3xl items-center gap-0.5 overflow-x-auto border-b px-3 pb-2 text-muted-foreground md:px-11"
+          role="toolbar"
+          aria-label="Formatação"
+        >
           {TOOLS.map((t, i) => (
             <span key={t.label} className="flex items-center">
               {(i === 4 || i === 7 || i === 11) && <Separator orientation="vertical" className="mx-1 h-5" />}
@@ -869,7 +887,7 @@ function NotePane({ note, editorApi }: { note: Note; editorApi: React.MutableRef
         </div>
       </div>
 
-      <article className="mx-auto flex w-full max-w-3xl flex-1 flex-col px-6 pt-8 md:px-12">
+      <article className="mx-auto flex w-full max-w-3xl flex-1 flex-col px-5 pt-6 md:px-12">
         <input
           aria-label="Título da nota"
           autoComplete="off"
@@ -888,29 +906,40 @@ function NotePane({ note, editorApi }: { note: Note; editorApi: React.MutableRef
               setTimeout(() => editorApi.current?.focus(), 0);
             }
           }}
-          className="w-full bg-transparent text-4xl leading-tight font-bold tracking-tight text-balance outline-none placeholder:text-muted-foreground md:text-5xl"
+          className="w-full bg-transparent text-4xl leading-tight font-extrabold tracking-tight text-balance outline-none placeholder:text-muted-foreground md:text-5xl"
         />
-        <div className="mt-3 mb-6 flex flex-wrap items-center gap-x-3 gap-y-1.5 text-sm text-muted-foreground">
+        <div className="mt-3 mb-7 flex flex-wrap items-center gap-x-3 gap-y-2 text-[15px] text-muted-foreground">
+          {tags.map((t, i) => (
+            <button
+              key={t}
+              onClick={() => onTag(t)}
+              className={cn(
+                "rounded-lg px-2 py-0.5 text-sm font-semibold transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none",
+                i === 0
+                  ? "bg-primary/16 text-primary-strong hover:bg-primary/24"
+                  : "bg-muted text-muted-foreground hover:text-foreground",
+              )}
+            >
+              #{t}
+            </button>
+          ))}
           {task && (
             <button
               type="button"
               onClick={() => openPeek(task.id)}
-              title="Abrir a tarefa desta anotação"
-              className="flex items-center gap-1.5 rounded-full bg-primary/10 px-2.5 py-0.5 font-medium text-primary-strong transition-colors hover:bg-primary/15 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+              title="Abrir a tarefa desta nota"
+              className="flex items-center gap-1.5 rounded-md transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
             >
-              <CheckSquare className="size-3.5" aria-hidden="true" />
-              Tarefa: {task.title || "Sem título"}
+              <Link2 className="size-4" aria-hidden="true" />
+              Ligada a “{task.title || "Sem título"}”
             </button>
           )}
-          {note.folder && (
-            <span className="flex items-center gap-1">
-              <Folder className="size-3.5" />
-              {note.folder}
+          {/* Without the side panel (smaller screens or hidden): when it was edited and its size. */}
+          <span className={cn(sideOpen && "xl:hidden")}>
+            Editada {ago(note.updated)} ·{" "}
+            <span className="tabular-nums">
+              {words} {words === 1 ? "palavra" : "palavras"}
             </span>
-          )}
-          <span>Editada {ago(note.updated)}</span>
-          <span className="tabular-nums">
-            {words} {words === 1 ? "palavra" : "palavras"}
           </span>
           {dup && !duplicateDismissed && <span className="text-sm text-warning">Já existe outra nota com esse nome.</span>}
           {dup && !duplicateDismissed && (
@@ -927,7 +956,10 @@ function NotePane({ note, editorApi }: { note: Note; editorApi: React.MutableRef
                   })
                 }
               />
-              <span aria-hidden="true" className="pointer-events-none absolute left-full ml-2 -translate-x-1 py-1 text-[11px] font-medium whitespace-nowrap text-destructive opacity-0 transition-[opacity,transform] duration-200 ease-out peer-hover:translate-x-0 peer-hover:opacity-100 peer-focus-visible:translate-x-0 peer-focus-visible:opacity-100 motion-reduce:transform-none motion-reduce:transition-none">
+              <span
+                aria-hidden="true"
+                className="pointer-events-none absolute left-full ml-2 -translate-x-1 py-1 text-[11px] font-medium whitespace-nowrap text-destructive opacity-0 transition-[opacity,transform] duration-200 ease-out peer-hover:translate-x-0 peer-hover:opacity-100 peer-focus-visible:translate-x-0 peer-focus-visible:opacity-100 motion-reduce:transform-none motion-reduce:transition-none"
+              >
                 dispensar
               </span>
             </span>
@@ -947,11 +979,6 @@ function NotePane({ note, editorApi }: { note: Note; editorApi: React.MutableRef
               <span className="size-1.5 rounded-full bg-warning transition-transform duration-200 group-hover:scale-125 group-focus-visible:scale-125 motion-reduce:transition-none" />
             </button>
           )}
-          {tags.map((t) => (
-            <button key={t} onClick={() => onTag(t)}>
-              <Badge variant="secondary">#{t}</Badge>
-            </button>
-          ))}
         </div>
         <div className="flex-1">
           <NoteEditor
@@ -973,7 +1000,7 @@ function NoteMenu({ note, folders }: { note: Note; folders: string[] }) {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="ghost" size="icon-sm" aria-label="Opções da nota">
+        <Button variant="outline" size="icon" aria-label="Opções da nota" className="size-10 rounded-xl">
           <MoreHorizontal />
         </Button>
       </DropdownMenuTrigger>
@@ -1015,20 +1042,27 @@ function NoteMenu({ note, folders }: { note: Note; folders: string[] }) {
   );
 }
 
-/* ---------- right: outline (optional) ---------- */
+/* ---------- right: outline, tags and the linked task ---------- */
 function NoteSide({ note, editorApi }: { note: Note; editorApi: React.MutableRefObject<EditorApi | null> }) {
   const outline = headings(note.body);
+  const counts = useTagCounts();
+  const mine = extractTags(note.body);
+  const task = useStore((s) => (note.task ? s.ws.items[note.task] : undefined));
+  const words = note.body.trim() ? note.body.trim().split(/\s+/).length : 0;
+  const date = task && typeof task.props.date === "string" ? task.props.date : "";
+  const time = date.slice(11, 16);
+  const alarm = date && task?.alerts?.length ? alarmTimes(date.slice(0, 10), !time, time, task.alerts)[0] : undefined;
   return (
-    <div className="flex flex-col gap-6 p-5">
-      <section className="flex flex-col gap-1.5">
-        <h3 className="text-sm font-semibold">Sumário</h3>
+    <div className="flex min-h-full w-full flex-col gap-8 px-6 pt-7 pb-5">
+      <section className="flex flex-col gap-1">
+        <h3 className="pb-1 text-sm font-semibold text-muted-foreground">Sumário</h3>
         {outline.length ? (
           outline.map((h, i) => (
             <button
               key={i}
               onClick={() => editorApi.current?.gotoLine(h.line)}
-              style={{ paddingLeft: (h.level - 1) * 12 + 6 }}
-              className="truncate rounded-md py-1 pr-2 text-left text-sm text-muted-foreground hover:bg-muted hover:text-foreground"
+              style={{ paddingLeft: (h.level - 1) * 14 }}
+              className="truncate rounded-md py-1.5 text-left text-base text-foreground/90 transition-colors hover:text-primary-strong focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
             >
               {h.text}
             </button>
@@ -1037,6 +1071,41 @@ function NoteSide({ note, editorApi }: { note: Note; editorApi: React.MutableRef
           <p className="text-sm text-muted-foreground">Use títulos (# ou o botão H1) para montar o sumário.</p>
         )}
       </section>
+      {counts.length > 0 && (
+        <section className="flex flex-col gap-2.5">
+          <h3 className="text-sm font-semibold text-muted-foreground">Tags</h3>
+          <TagCloud counts={[...counts].sort((a, b) => Number(mine.includes(b[0])) - Number(mine.includes(a[0])))} mine={mine} />
+        </section>
+      )}
+      {task && (
+        <section className="flex flex-col gap-2.5">
+          <h3 className="text-sm font-semibold text-muted-foreground">Tarefa ligada</h3>
+          <button
+            type="button"
+            onClick={() => openPeek(task.id)}
+            className="flex flex-col gap-2.5 rounded-2xl border bg-card p-4 text-left shadow-card transition-colors hover:border-primary-strong/40 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+          >
+            <span className="text-base font-semibold">{task.title || "Sem título"}</span>
+            <span className="flex flex-wrap items-center gap-2.5 text-sm text-muted-foreground">
+              {date && (
+                <span className="flex items-center gap-1.5 tabular-nums">
+                  <CalendarDays className="size-4" aria-hidden="true" />
+                  {fmtDate(date)}
+                </span>
+              )}
+              {alarm && (
+                <span className="flex items-center gap-1 rounded-md bg-primary/14 px-1.5 py-0.5 font-semibold text-primary-strong tabular-nums">
+                  <Mail className="size-3.5" aria-hidden="true" />
+                  {hhmm(alarm.at)}
+                </span>
+              )}
+            </span>
+          </button>
+        </section>
+      )}
+      <p className="mt-auto text-sm text-muted-foreground">
+        <span className="tabular-nums">{words}</span> {words === 1 ? "palavra" : "palavras"} · salva {ago(note.updated)}
+      </p>
     </div>
   );
 }

@@ -1,11 +1,27 @@
+import { Mascot } from "@/components/brand/Brand";
 import { useRef, useState } from "react";
 import { NewTaskDialog } from "./NewTaskDialog";
+import { EmptyState } from "../EmptyState";
 import { withMotion } from "@/lib/motion";
-import { ArrowDownUp, CalendarDays, Check, Columns3, Filter, Plus, Search, Settings2, Table2, X } from "lucide-react";
+import {
+  ArrowDownUp,
+  CalendarDays,
+  Check,
+  Columns3,
+  Filter,
+  FolderTree,
+  PanelLeft,
+  Plus,
+  Search,
+  Settings2,
+  Table2,
+  X,
+} from "lucide-react";
 import type { Filter as F, Page, View } from "@/lib/types";
-import { applyFilters, defaultsFromFilters, filterLabel } from "@/lib/model";
+import { applyFilters, defaultsFromFilters, filterLabel, groupOf } from "@/lib/model";
 import { celebrate, renamePage, useStore } from "@/store";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { motion } from "motion/react";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -24,8 +40,8 @@ import { OptionBadge } from "../common";
 import { Board } from "./Board";
 import { TaskTable } from "./TaskTable";
 import { TaskCalendar } from "./TaskCalendar";
-import { emojiOf } from "@/lib/util";
-import { Glyph } from "../icons";
+import { AreaSwitcher } from "../app/Topbar";
+import { setListsPanel, setListsSheet, useListsUi } from "../lists/state";
 
 const ICON = { board: Columns3, table: Table2, calendar: CalendarDays } as const;
 const DATE_FILTERS: [string, string][] = [
@@ -50,29 +66,67 @@ export function DbPage({ page }: { page: Page }) {
   const mutView = (fn: (v: View) => void) => mut((w) => fn(w.dbs[page.id].views.find((x) => x.id === view.id)!));
   // Opens the short "Nova tarefa" form; nothing is saved until the person confirms it.
   const create = (props: { date?: string } = {}) => setNewTask({ date: props.date ?? "" });
+  // "4 tarefas abertas · 1 para revisar · na pasta Faculdade"
+  const items = Object.values(ws.items).filter((i) => i.db === page.id);
+  const openN = items.filter((i) => groupOf(db, i) !== "done").length;
+  const reviewN = items.filter((i) => groupOf(db, i) === "review").length;
+  const folder = page.folder?.split("/").pop();
+  const subtitle = [
+    openN ? `${openN} ${openN === 1 ? "tarefa aberta" : "tarefas abertas"}` : "Nenhuma tarefa aberta",
+    reviewN ? `${reviewN} para revisar` : "",
+    folder ? `na pasta ${folder}` : "",
+  ]
+    .filter(Boolean)
+    .join(" · ");
 
   return (
-    <div className="flex flex-col gap-5 px-4 py-6 md:px-8 md:py-8">
-      <div className="flex items-center gap-2 sm:gap-3">
-        <PageTitle page={page} />
-        <Button
-          variant="outline"
-          aria-label="Editar status"
-          title="Editar status"
-          className="max-sm:size-10 max-sm:px-0"
-          onClick={() =>
-            setUi((u) => {
-              u.statusDialog = page.id;
-            })
-          }
-        >
-          <Settings2 data-icon="inline-start" className="max-sm:m-0" />
-          <span className="max-sm:hidden">Editar status</span>
-        </Button>
-        <Button onClick={() => create()} aria-label="Nova tarefa" className="max-sm:size-10 max-sm:px-0">
-          <Plus data-icon="inline-start" className="max-sm:m-0" />
-          <span className="max-sm:hidden">Nova tarefa</span>
-        </Button>
+    <div className="flex min-w-0 flex-col gap-5 px-4 pt-5 pb-28 md:px-8 md:pt-7">
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-3">
+        <ListsToggle />
+        <PageTitle page={page} subtitle={subtitle} />
+        <div className="flex items-center gap-2 max-sm:w-full">
+          <FilterButton
+            dbId={page.id}
+            view={view}
+            onAdd={(f) =>
+              mutView((v) => {
+                if (v.filters.some((g) => sameFilter(g, f))) return;
+                // Only one date filter at a time: a new one replaces the old.
+                if (f.prop === "date") v.filters = v.filters.filter((g) => g.prop !== "date");
+                v.filters.push(f);
+              })
+            }
+          />
+          <SortButton
+            view={view}
+            onChange={(sort) =>
+              withMotion(() =>
+                mutView((v) => {
+                  if (sort === undefined) delete v.sort;
+                  else v.sort = sort;
+                }),
+              )
+            }
+          />
+          <Button
+            variant="outline"
+            aria-label="Editar status"
+            title="Editar status"
+            className="h-10 rounded-xl max-lg:size-10 max-lg:px-0"
+            onClick={() =>
+              setUi((u) => {
+                u.statusDialog = page.id;
+              })
+            }
+          >
+            <Settings2 data-icon="inline-start" className="max-lg:m-0" />
+            <span className="max-lg:hidden">Editar status</span>
+          </Button>
+          <Button onClick={() => create()} className="h-10 rounded-xl px-4 font-semibold max-sm:ml-auto">
+            <Plus data-icon="inline-start" />
+            Nova tarefa
+          </Button>
+        </div>
       </div>
 
       <div className="flex flex-wrap items-center gap-2">
@@ -88,16 +142,31 @@ export function DbPage({ page }: { page: Page }) {
             {db.views.map((v) => {
               const Icon = ICON[v.type];
               return (
-                <TabsTrigger key={v.id} value={v.id}>
-                  <Icon />
-                  {v.name}
+                <TabsTrigger
+                  key={v.id}
+                  value={v.id}
+                  className="relative data-active:bg-transparent data-active:shadow-none group-data-[variant=default]/tabs-list:data-active:shadow-none dark:data-active:border-transparent dark:data-active:bg-transparent"
+                >
+                  {/* The selected tab's background glides to the next one. */}
+                  {v.id === view.id && (
+                    <motion.span
+                      aria-hidden="true"
+                      layoutId={`view-tab-${page.id}`}
+                      transition={{ type: "spring", duration: 0.3, bounce: 0.1 }}
+                      className="absolute inset-0 rounded-md bg-background shadow-sm dark:bg-input/30 dark:ring-1 dark:ring-input"
+                    />
+                  )}
+                  <span className="relative flex items-center gap-1.5">
+                    <Icon />
+                    {v.name}
+                  </span>
                 </TabsTrigger>
               );
             })}
           </TabsList>
         </Tabs>
         <div className="flex items-center gap-2 max-sm:w-full sm:ml-auto">
-          <InputGroup className="w-48 max-sm:flex-1">
+          <InputGroup className="h-10 w-56 rounded-xl max-sm:flex-1">
             <InputGroupAddon>
               <Search />
             </InputGroupAddon>
@@ -114,29 +183,6 @@ export function DbPage({ page }: { page: Page }) {
               }}
             />
           </InputGroup>
-          <SortButton
-            view={view}
-            onChange={(sort) =>
-              withMotion(() =>
-                mutView((v) => {
-                if (sort === undefined) delete v.sort;
-                else v.sort = sort;
-              }),
-              )
-            }
-          />
-          <FilterButton
-            dbId={page.id}
-            view={view}
-            onAdd={(f) =>
-              mutView((v) => {
-                if (v.filters.some((g) => sameFilter(g, f))) return;
-                // Only one date filter at a time: a new one replaces the old.
-                if (f.prop === "date") v.filters = v.filters.filter((g) => g.prop !== "date");
-                v.filters.push(f);
-              })
-            }
-          />
         </div>
       </div>
 
@@ -172,6 +218,17 @@ export function DbPage({ page }: { page: Page }) {
         </div>
       )}
 
+      {/* A brand-new list: say what it's for, with the button that starts it (the columns stay below for dragging). */}
+      {view.type === "board" && !hasAny && (
+        <div className="rounded-2xl border border-dashed bg-card/60">
+          <EmptyState
+            pose="checklist"
+            title="Lista vazia"
+            text="Anote o que precisa ser feito. Cada tarefa vira um cartão que você arrasta entre as colunas."
+            action={{ label: "Criar a primeira tarefa", run: () => create() }}
+          />
+        </div>
+      )}
       {view.type === "board" && <Board page={page} db={db} view={view} list={list} />}
       {view.type === "table" && <TaskTable db={db} list={list} hasAny={hasAny} onCreate={() => create()} />}
       {view.type === "calendar" && <TaskCalendar dbId={page.id} db={db} list={list} onCreate={(date) => create({ date })} />}
@@ -203,7 +260,12 @@ function SortButton({ view, onChange }: { view: View; onChange: (s: View["sort"]
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="outline" aria-label={`Ordenar: ${cur.label}`} title={`Ordem: ${cur.label}`} className="max-sm:size-10 max-sm:px-0">
+        <Button
+          variant="outline"
+          aria-label={`Ordenar: ${cur.label}`}
+          title={`Ordem: ${cur.label}`}
+          className="h-10 rounded-xl max-sm:size-10 max-sm:px-0"
+        >
           <ArrowDownUp data-icon="inline-start" className="max-sm:m-0" />
           <span className="max-sm:hidden">{key === "auto" ? "Ordenar" : cur.key === "manual" ? "Manual" : "Ordenado"}</span>
         </Button>
@@ -219,8 +281,8 @@ function SortButton({ view, onChange }: { view: View; onChange: (s: View["sort"]
         </DropdownMenuRadioGroup>
         <DropdownMenuSeparator />
         <p className="px-2 py-1.5 text-xs text-muted-foreground">
-          Na automática, o prazo mais próximo vem primeiro e, no mesmo dia, a prioridade mais alta. Arrastar um cartão
-          dentro da coluna muda para a manual.
+          Na automática, o prazo mais próximo vem primeiro e, no mesmo dia, a prioridade mais alta. Arrastar um cartão dentro da
+          coluna muda para a manual.
         </p>
       </DropdownMenuContent>
     </DropdownMenu>
@@ -231,7 +293,9 @@ const sameFilter = (a: F, b: F) => a.prop === b.prop && a.op === b.op && a.val =
 
 function FilterButton({ dbId, view, onAdd }: { dbId: string; view: View; onAdd: (f: F) => void }) {
   const db = useStore((s) => s.ws.dbs[dbId]);
+  const area = useStore((s) => s.ui.area);
   const [open, setOpen] = useState(false);
+  const count = view.filters.length + (area !== "all" ? 1 : 0);
   const add = (f: F) => {
     onAdd(f);
     setOpen(false);
@@ -249,7 +313,10 @@ function FilterButton({ dbId, view, onAdd }: { dbId: string; view: View; onAdd: 
     >
       {children}
       {used(f) && (
-        <Check className="absolute -top-1 -right-1 size-3.5 rounded-full bg-primary p-0.5 text-primary-foreground" aria-hidden="true" />
+        <Check
+          className="absolute -top-1 -right-1 size-3.5 rounded-full bg-primary p-0.5 text-primary-foreground"
+          aria-hidden="true"
+        />
       )}
     </button>
   );
@@ -265,32 +332,36 @@ function FilterButton({ dbId, view, onAdd }: { dbId: string; view: View; onAdd: 
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
-        <Button variant={view.filters.length ? "secondary" : "outline"}>
-          <Filter data-icon="inline-start" />
-          Filtrar{view.filters.length ? ` (${view.filters.length})` : ""}
+        <Button
+          variant={count ? "secondary" : "outline"}
+          className="h-10 rounded-xl"
+          aria-label={`Filtrar${count ? ` (${count})` : ""}`}
+        >
+          <Filter data-icon="inline-start" className="max-sm:m-0" />
+          <span className="max-sm:hidden">Filtrar{count ? ` (${count})` : ""}</span>
         </Button>
       </PopoverTrigger>
       <PopoverContent align="end" className="flex w-80 flex-col gap-4">
+        {/* The area filter is shared with Início and the calendar. */}
+        <div className="flex flex-col gap-1.5">
+          <span className="text-xs font-medium text-muted-foreground">Área (vale para todo o site)</span>
+          <AreaSwitcher className="min-w-0" />
+        </div>
+        <Separator />
         {section(
           "Status",
-          status.options!.map((o) => (
-            pick({ prop: "status", op: "is", val: o.id }, <OptionBadge opt={o} dot />)
-          )),
+          status.options!.map((o) => pick({ prop: "status", op: "is", val: o.id }, <OptionBadge opt={o} dot />)),
         )}
         {prio?.options?.length
           ? section(
               "Prioridade",
-              prio.options.map((o) => (
-                pick({ prop: "prio", op: "is", val: o.id }, <OptionBadge opt={o} />)
-              )),
+              prio.options.map((o) => pick({ prop: "prio", op: "is", val: o.id }, <OptionBadge opt={o} />)),
             )
           : null}
         {tags?.options?.length
           ? section(
               "Etiqueta",
-              tags.options.map((o) => (
-                pick({ prop: "tags", op: "is", val: o.id }, <OptionBadge opt={o} />)
-              )),
+              tags.options.map((o) => pick({ prop: "tags", op: "is", val: o.id }, <OptionBadge opt={o} />)),
             )
           : null}
         <Separator />
@@ -316,7 +387,7 @@ function FilterButton({ dbId, view, onAdd }: { dbId: string; view: View; onAdd: 
 }
 
 /** The list's name; double-click to rename it in place. */
-function PageTitle({ page }: { page: Page }) {
+function PageTitle({ page, subtitle }: { page: Page; subtitle: string }) {
   const [editing, setEditing] = useState(false);
   const [v, setV] = useState(page.title);
   // Esc cancels for good: the blur that may follow when the field goes away must not save.
@@ -327,39 +398,74 @@ function PageTitle({ page }: { page: Page }) {
     setEditing(false);
     if (save && v.trim() && v.trim() !== page.title) {
       renamePage(page.id, v);
-      celebrate("Lista renomeada", `Agora se chama “${v.trim()}”`, emojiOf(page.icon, "✏️"));
+      celebrate("Lista renomeada", `Agora se chama “${v.trim()}”`, "anota");
     }
   };
   return (
-    <h1 className="mr-auto flex min-w-0 items-center gap-2 text-3xl font-extrabold tracking-tight md:text-4xl">
-      <Glyph icon={page.icon} size="lg" />
-      {editing ? (
-        <input
-          autoFocus
-          aria-label="Nome da lista"
-          value={v}
-          onFocus={(e) => e.currentTarget.select()}
-          onChange={(e) => setV(e.target.value)}
-          onBlur={() => done(true)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter") done(true);
-            if (e.key === "Escape") done(false);
-          }}
-          className="min-w-0 flex-1 rounded-lg bg-transparent px-1 outline-none focus-visible:ring-2 focus-visible:ring-ring"
-        />
-      ) : (
-        <span
-          className="cursor-text truncate rounded-lg px-1 hover:bg-muted/60"
-          title="Clique duas vezes para renomear"
-          onDoubleClick={() => {
-            setV(page.title);
-            decided.current = false;
-            setEditing(true);
-          }}
-        >
-          {page.title || "Sem título"}
-        </span>
-      )}
-    </h1>
+    <div className="mr-auto flex min-w-0 items-center gap-4">
+      {/* The mascot files a card into his folder, next to the list's name. */}
+      <Mascot pose="organiza" size={56} className="mascot-pop shrink-0 max-sm:hidden" />
+      <div className="flex min-w-0 flex-col">
+        <h1 className="flex min-w-0 items-center text-3xl leading-tight font-extrabold tracking-tight md:text-[2.5rem]">
+          {editing ? (
+            <input
+              autoFocus
+              aria-label="Nome da lista"
+              value={v}
+              onFocus={(e) => e.currentTarget.select()}
+              onChange={(e) => setV(e.target.value)}
+              onBlur={() => done(true)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") done(true);
+                if (e.key === "Escape") done(false);
+              }}
+              className="min-w-0 flex-1 rounded-lg bg-transparent px-1 outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            />
+          ) : (
+            <span
+              className="cursor-text truncate rounded-lg px-1 hover:bg-muted/60"
+              title="Clique duas vezes para renomear"
+              onDoubleClick={() => {
+                setV(page.title);
+                decided.current = false;
+                setEditing(true);
+              }}
+            >
+              {page.title || "Sem título"}
+            </span>
+          )}
+        </h1>
+        <p className="truncate px-1 text-base text-muted-foreground">{subtitle}</p>
+      </div>
+    </div>
+  );
+}
+
+/** Opens/closes the folders and lists: the panel beside (computer) or the sheet (phone). */
+function ListsToggle() {
+  const open = useListsUi((s) => s.panel);
+  return (
+    <>
+      <Button
+        variant="outline"
+        size="icon"
+        aria-label={open ? "Esconder pastas e listas (Ctrl+B)" : "Mostrar pastas e listas (Ctrl+B)"}
+        aria-pressed={open}
+        title={open ? "Esconder pastas e listas (Ctrl+B)" : "Mostrar pastas e listas (Ctrl+B)"}
+        onClick={() => setListsPanel(!open)}
+        className="size-10 shrink-0 rounded-xl max-md:hidden"
+      >
+        <PanelLeft />
+      </Button>
+      <Button
+        variant="outline"
+        aria-label="Pastas e listas"
+        onClick={() => setListsSheet(true)}
+        className="h-10 shrink-0 rounded-xl md:hidden"
+      >
+        <FolderTree data-icon="inline-start" />
+        Listas
+      </Button>
+    </>
   );
 }

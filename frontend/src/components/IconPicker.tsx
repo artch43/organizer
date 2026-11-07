@@ -5,7 +5,9 @@ import { EMOJI_GROUPS } from "@/lib/util";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { ICON_COLORS, ICON_COLOR_NAMES, ICON_GROUPS, Glyph, makeIcon, parseIcon, type IconColor } from "./icons";
+import { Mascot } from "./brand/Brand";
+import { ICON_COLORS, ICON_COLOR_NAMES, ICON_GROUPS, Glyph, makeIcon, makePixelIcon, parseIcon, type IconColor } from "./icons";
+import { PIXEL_CATEGORIES, PIXEL_ICONS } from "./brand/pixelIcons";
 
 /**
  * Choose an icon: drawn icons by theme (with a color for the tile), or an emoji. Opens from the
@@ -39,7 +41,8 @@ export function IconPicker({
     onOpenChange?.(v);
     if (openProp === undefined) setOpenState(v);
   };
-  const [mode, setMode] = useState<"icons" | "emoji">(cur.kind === "emoji" && cur.text ? "emoji" : "icons");
+  type Mode = "pixel" | "icons" | "emoji";
+  const [mode, setMode] = useState<Mode>(cur.kind === "emoji" && cur.text ? "emoji" : cur.kind === "lucide" ? "icons" : "pixel");
   const [group, setGroup] = useState(0);
   const [color, setColor] = useState<IconColor>(cur.kind === "lucide" ? cur.color : "teal");
   const [q, setQ] = useState("");
@@ -49,6 +52,10 @@ export function IconPicker({
     setOpen(false);
   };
   const query = q.trim().toLowerCase();
+  const pixelCat = PIXEL_CATEGORIES[group] ?? PIXEL_CATEGORIES[0];
+  const pixelFound = Object.entries(PIXEL_ICONS).filter(([k, d]) =>
+    query ? d.label.toLowerCase().includes(query) || k.includes(query) : d.category === pixelCat.id,
+  );
   const found = query
     ? ICON_GROUPS.flatMap((g) => Object.entries(g.items)).filter(
         ([k, d], i, all) =>
@@ -75,8 +82,8 @@ export function IconPicker({
         align="start"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="grid grid-cols-2 rounded-lg bg-muted p-1" role="tablist" aria-label="Tipo de ícone">
-          {(["icons", "emoji"] as const).map((m) => (
+        <div className="grid grid-cols-3 rounded-lg bg-muted p-1" role="tablist" aria-label="Tipo de ícone">
+          {(["pixel", "icons", "emoji"] as const).map((m) => (
             <button
               key={m}
               type="button"
@@ -91,12 +98,63 @@ export function IconPicker({
                 mode === m ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground",
               )}
             >
-              {m === "icons" ? "Ícones" : "Emoji"}
+              {m === "pixel" ? "Pixel" : m === "icons" ? "Ícones" : "Emoji"}
             </button>
           ))}
         </div>
 
-        {mode === "icons" ? (
+        {mode === "pixel" ? (
+          <>
+            <div className="relative">
+              <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                className="pl-9"
+                aria-label="Buscar desenho"
+                placeholder="Buscar: casa, livro, café…"
+                value={q}
+                onChange={(e) => setQ(e.target.value)}
+              />
+            </div>
+            {!query && (
+              <div className="no-scrollbar -mx-3 flex gap-1 overflow-x-auto px-3" role="tablist" aria-label="Temas">
+                {PIXEL_CATEGORIES.map((c, i) => (
+                  <button
+                    key={c.id}
+                    type="button"
+                    role="tab"
+                    aria-selected={group === i}
+                    onClick={() => setGroup(i)}
+                    className={chip(group === i)}
+                  >
+                    {c.name}
+                  </button>
+                ))}
+              </div>
+            )}
+            {/* Drawings in pixel art: they bring their own colors, so there's no color to pick here. */}
+            <div className="grid max-h-60 grid-cols-6 gap-1.5 overflow-y-auto" role="tabpanel">
+              {folder && !query && (
+                <IconButton label="Pasta (padrão)" selected={!value} onClick={() => pick("")} big>
+                  <Mascot pose="pasta" size={26} className="mascot-still" />
+                </IconButton>
+              )}
+              {pixelFound.map(([k, d]) => (
+                <IconButton
+                  key={k}
+                  label={d.label}
+                  selected={cur.kind === "pixel" && cur.key === k}
+                  onClick={() => pick(makePixelIcon(k))}
+                  big
+                >
+                  <Glyph icon={makePixelIcon(k)} size="lg" />
+                </IconButton>
+              ))}
+              {!pixelFound.length && (
+                <p className="col-span-6 py-4 text-center text-sm text-muted-foreground">Nenhum desenho com esse nome.</p>
+              )}
+            </div>
+          </>
+        ) : mode === "icons" ? (
           <>
             <div className="relative">
               <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
@@ -154,7 +212,8 @@ export function IconPicker({
             <div className="grid max-h-60 grid-cols-7 gap-1 overflow-y-auto" role="tabpanel">
               {folder && !query && (
                 <IconButton label="Pasta (padrão)" selected={!value} onClick={() => pick("")}>
-                  <Glyph icon="" size="md" fallback={ICON_GROUPS.at(-1)!.items.folder.icon} />
+                  {/* The default folder icon is the mascot (he is a folder). */}
+                  <Mascot pose="pasta" size={22} className="mascot-still" />
                 </IconButton>
               )}
               {found.map(([k, d]) => {
@@ -217,11 +276,14 @@ function IconButton({
   selected,
   onClick,
   children,
+  big,
 }: {
   label: string;
   selected: boolean;
   onClick: () => void;
   children: React.ReactNode;
+  /** Pixel art: a bigger cell, so the drawing can be seen. */
+  big?: boolean;
 }) {
   return (
     <button
@@ -232,7 +294,8 @@ function IconButton({
       onClick={onClick}
       className={cn(
         "flex size-10 items-center justify-center rounded-lg transition-[background-color,transform] hover:scale-110 hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none",
-        selected && "bg-accent ring-2 ring-primary",
+        big && "size-12",
+        selected && "bg-accent ring-2 ring-primary-strong",
       )}
     >
       {children}

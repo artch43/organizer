@@ -1,10 +1,10 @@
 @import "tailwindcss";
 @import "tw-animate-css";
-@import "shadcn/tailwind.css";
+@import "./shadcn-tailwind.css";
 @import "@fontsource-variable/plus-jakarta-sans";
 @import "@fontsource-variable/jetbrains-mono";
 
-@custom-variant dark (&:is(.dark *));
+@custom-variant dark (&:is(.dark *, .ink *));
 
 @theme inline {
   --font-heading: var(--font-sans);
@@ -65,48 +65,48 @@
 }
 
 :root {
-  --background: #f3f5f7;
-  --foreground: #1e2330;
-  --card: #ffffff;
-  --card-foreground: #1e2330;
-  --popover: #ffffff;
-  --popover-foreground: #1e2330;
-  --primary: #1f7a8c;
-  --primary-foreground: #ffffff;
-  --secondary: #edf0f4;
-  --secondary-foreground: #1e2330;
-  --muted: #edf0f4;
-  --muted-foreground: #5b6272;
-  --accent: #e8eef2;
-  --accent-foreground: #1e2330;
-  --destructive: #c93b3b;
-  --border: #e3e7ec;
-  --input: #828a99;
-  --ring: #1f7a8c;
-  --chart-1: #1f7a8c;
+  --background: #faf7f2;
+  --foreground: #0b1d51;
+  --card: #fffdf9;
+  --card-foreground: #0b1d51;
+  --popover: #fffdf9;
+  --popover-foreground: #0b1d51;
+  --primary: #ff5fa2;
+  --primary-foreground: #0b1d51;
+  --secondary: #f1ece3;
+  --secondary-foreground: #0b1d51;
+  --muted: #f4efe7;
+  --muted-foreground: #4a5578;
+  --accent: #f1ece3;
+  --accent-foreground: #0b1d51;
+  --destructive: #d92d20;
+  --border: #e7e0d3;
+  --input: #8f897d;
+  --ring: #0b1d51;
+  --chart-1: #c21a6b;
   --chart-2: #e0604f;
   --chart-3: #7b5cd6;
   --chart-4: #b97a0c;
   --chart-5: #2f8f5b;
-  --radius: 0.875rem;
+  --radius: 0.625rem;
   /* Soft relief for cards: a hairline plus a short, low blur. */
-  --shadow-card: 0 1px 2px rgb(30 35 48 / 0.06), 0 2px 8px -2px rgb(30 35 48 / 0.08);
-  --shadow-lift: 0 2px 4px rgb(30 35 48 / 0.06), 0 10px 24px -8px rgb(30 35 48 / 0.18);
-  --column: #e9edf2;
+  --shadow-card: 0 1px 2px rgb(11 29 81 / 0.05), 0 1px 1px rgb(11 29 81 / 0.03);
+  --shadow-lift: 0 2px 4px rgb(11 29 81 / 0.06), 0 10px 24px -8px rgb(11 29 81 / 0.16);
+  --column: #f4f0e8;
   /* The brand color dark enough for text on its own light tints (AA). */
-  --primary-strong: #155f6d;
-  --sidebar: #fbfcfd;
-  --sidebar-foreground: #1e2330;
-  --sidebar-primary: #1f7a8c;
-  --sidebar-primary-foreground: #ffffff;
-  --sidebar-accent: #e3f0f2;
-  --sidebar-accent-foreground: #155f6d;
-  --sidebar-border: #e6e9ee;
-  --sidebar-ring: #1f7a8c;
-  --success: #267a4c;
+  --primary-strong: #c21a6b;
+  --sidebar: #0b1d51;
+  --sidebar-foreground: #ffffff;
+  --sidebar-primary: #ff5fa2;
+  --sidebar-primary-foreground: #0b1d51;
+  --sidebar-accent: #412c63;
+  --sidebar-accent-foreground: #ff8cc0;
+  --sidebar-border: #1c2e66;
+  --sidebar-ring: #ff5fa2;
+  --success: #15803d;
   --warning: #985a00;
   --area-coral: #e0604f;
-  --area-petrol: #1f7a8c;
+  --area-petrol: #1e40af;
   --area-violet: #7b5cd6;
   --area-amber: #b97a0c;
   --area-green: #2f8f5b;
@@ -133,47 +133,49 @@
   --tag-red-fg: #9d2a22;
 }
 
-.dark {
+/* .ink: a region that keeps a dark ground in light mode too (the sidebar and the phone's bottom bar). */
+.dark,
+.ink {
   color-scheme: dark;
-  --shadow-card: 0 1px 2px rgb(0 0 0 / 0.4), 0 2px 8px -2px rgb(0 0 0 / 0.35);
+  --shadow-card: 0 1px 2px rgb(0 0 0 / 0.35), 0 1px 1px rgb(0 0 0 / 0.2);
   --shadow-lift: 0 2px 4px rgb(0 0 0 / 0.4), 0 12px 28px -8px rgb(0 0 0 / 0.55);
-  --column: #181c23;
-  --primary-strong: #8fd9e5;
-  --background: #12151a;
-  --foreground: #e8eaee;
-  --card: #1b1f27;
-  --card-foreground: #e8eaee;
-  --popover: #1e222b;
-  --popover-foreground: #e8eaee;
-  --primary: #5cc2d3;
-  --primary-foreground: #0c1b1f;
-  --secondary: #232833;
-  --secondary-foreground: #e8eaee;
-  --muted: #232833;
-  --muted-foreground: #9ca3b1;
-  --accent: #262c38;
-  --accent-foreground: #e8eaee;
-  --destructive: #f0776f;
-  --border: #2a303b;
-  --input: #6b7385;
-  --ring: #5cc2d3;
-  --chart-1: #5cc2d3;
+  --column: #1f2023;
+  --primary-strong: #c6ff3d;
+  --background: #1a1b1e;
+  --foreground: #fafafa;
+  --card: #222327;
+  --card-foreground: #fafafa;
+  --popover: #26272c;
+  --popover-foreground: #fafafa;
+  --primary: #c6ff3d;
+  --primary-foreground: #0a0a0a;
+  --secondary: #2a2b30;
+  --secondary-foreground: #fafafa;
+  --muted: #26272b;
+  --muted-foreground: #a1a1aa;
+  --accent: #2a2b30;
+  --accent-foreground: #fafafa;
+  --destructive: #ff6b5e;
+  --border: #313238;
+  --input: #6e717a;
+  --ring: #c6ff3d;
+  --chart-1: #c6ff3d;
   --chart-2: #f08a7b;
   --chart-3: #a994f0;
   --chart-4: #f0ba4e;
   --chart-5: #6fd39a;
-  --sidebar: #181c23;
-  --sidebar-foreground: #e8eaee;
-  --sidebar-primary: #5cc2d3;
-  --sidebar-primary-foreground: #0c1b1f;
-  --sidebar-accent: #1d3439;
-  --sidebar-accent-foreground: #8fd9e5;
-  --sidebar-border: #262b35;
-  --sidebar-ring: #5cc2d3;
-  --success: #6fd39a;
-  --warning: #f0ba4e;
+  --sidebar: #151619;
+  --sidebar-foreground: #fafafa;
+  --sidebar-primary: #c6ff3d;
+  --sidebar-primary-foreground: #0a0a0a;
+  --sidebar-accent: #2f391e;
+  --sidebar-accent-foreground: #c6ff3d;
+  --sidebar-border: #26272b;
+  --sidebar-ring: #c6ff3d;
+  --success: #c6ff3d;
+  --warning: #f5b841;
   --area-coral: #f08a7b;
-  --area-petrol: #5cc2d3;
+  --area-petrol: #c6ff3d;
   --area-violet: #a994f0;
   --area-amber: #f0ba4e;
   --area-green: #6fd39a;
@@ -198,6 +200,37 @@
   --tag-pink-fg: #f4acd2;
   --tag-red-bg: #4b2523;
   --tag-red-fg: #ffada4;
+}
+
+/* Light mode: the sidebar and the phone's bottom bar are deep blue (the 30%), with pink as the accent. */
+:root:not(.dark) .ink {
+  --background: #0b1d51;
+  --foreground: #ffffff;
+  --card: #102462;
+  --card-foreground: #ffffff;
+  --popover: #102462;
+  --popover-foreground: #ffffff;
+  --primary: #ff5fa2;
+  --primary-foreground: #0b1d51;
+  --primary-strong: #ff8cc0;
+  --secondary: #16296a;
+  --secondary-foreground: #ffffff;
+  --muted: #16296a;
+  --muted-foreground: #a9b4d6;
+  --accent: #16296a;
+  --accent-foreground: #ffffff;
+  --border: #1c2e66;
+  --input: #6f7da8;
+  --ring: #ff5fa2;
+  --sidebar: #0b1d51;
+  --sidebar-foreground: #ffffff;
+  --sidebar-primary: #ff5fa2;
+  --sidebar-primary-foreground: #0b1d51;
+  --sidebar-accent: #412c63;
+  --sidebar-accent-foreground: #ff8cc0;
+  --sidebar-border: #1c2e66;
+  --sidebar-ring: #ff5fa2;
+  --success: #6fd39a;
 }
 
 @layer base {
@@ -330,78 +363,86 @@
   .area-soft {
     background: color-mix(in oklab, var(--area, var(--muted)) 12%, var(--card));
   }
+  /* A calendar pill: the area's color as a soft fill, its text tinted the same way. */
+  .area-pill {
+    background: color-mix(in oklab, var(--area, var(--muted-foreground)) 22%, var(--card));
+    color: color-mix(in oklab, var(--area, var(--muted-foreground)) 55%, var(--foreground));
+  }
 }
 
 /* Toasts: a soft card with an emoji badge and a colored edge by type. Unlayered, so they win over sonner's own styles. */
-  [data-sonner-toaster] [data-sonner-toast].cn-toast {
-    gap: 0.85rem;
-    padding: 0.9rem 1rem 0.9rem 1.1rem;
-    border-radius: 1rem;
-    font-size: 15px;
-    box-shadow:
-      0 1px 2px color-mix(in oklab, var(--foreground) 6%, transparent),
-      0 12px 32px -12px color-mix(in oklab, var(--foreground) 22%, transparent);
-    overflow: hidden;
+[data-sonner-toaster] [data-sonner-toast].cn-toast {
+  gap: 0.85rem;
+  padding: 0.9rem 1rem 0.9rem 1.1rem;
+  border-radius: 1rem;
+  font-size: 15px;
+  box-shadow:
+    0 1px 2px color-mix(in oklab, var(--foreground) 6%, transparent),
+    0 12px 32px -12px color-mix(in oklab, var(--foreground) 22%, transparent);
+  overflow: hidden;
+}
+[data-sonner-toaster] [data-sonner-toast].cn-toast::before {
+  content: "";
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 4px;
+  background: var(--border);
+}
+[data-sonner-toaster] [data-sonner-toast].cn-toast[data-type="success"]::before {
+  background: var(--success);
+}
+[data-sonner-toaster] [data-sonner-toast].cn-toast[data-type="error"]::before {
+  background: var(--destructive);
+}
+[data-sonner-toaster] [data-sonner-toast].cn-toast[data-type="loading"]::before {
+  background: var(--primary);
+}
+[data-sonner-toaster] [data-sonner-toast].cn-toast [data-icon] {
+  width: auto;
+  height: auto;
+  margin: 0;
+  flex-shrink: 0;
+}
+[data-sonner-toaster] [data-sonner-toast].cn-toast [data-title] {
+  font-weight: 650;
+  line-height: 1.3;
+}
+[data-sonner-toaster] [data-sonner-toast].cn-toast [data-description] {
+  color: var(--muted-foreground);
+  font-size: 14px;
+  margin-top: 2px;
+}
+[data-sonner-toaster] [data-sonner-toast].cn-toast [data-button] {
+  height: 2rem;
+  padding: 0 0.8rem;
+  border-radius: 0.6rem;
+  font-size: 14px;
+  font-weight: 600;
+}
+.toast-icon {
+  display: grid;
+  place-items: center;
+  width: 2.25rem;
+  height: 2.25rem;
+  border-radius: 0.625rem;
+  color: var(--primary-strong);
+  background: color-mix(in oklab, var(--primary) 16%, var(--card));
+  animation: toast-pop 360ms cubic-bezier(0.34, 1.4, 0.64, 1);
+}
+.toast-icon svg {
+  width: 1.125rem;
+  height: 1.125rem;
+}
+@keyframes toast-pop {
+  0% {
+    transform: scale(0.7);
+    opacity: 0;
   }
-  [data-sonner-toaster] [data-sonner-toast].cn-toast::before {
-    content: "";
-    position: absolute;
-    inset: 0 auto 0 0;
-    width: 4px;
-    background: var(--border);
+  100% {
+    transform: scale(1);
+    opacity: 1;
   }
-  [data-sonner-toaster] [data-sonner-toast].cn-toast[data-type="success"]::before {
-    background: var(--success);
-  }
-  [data-sonner-toaster] [data-sonner-toast].cn-toast[data-type="error"]::before {
-    background: var(--destructive);
-  }
-  [data-sonner-toaster] [data-sonner-toast].cn-toast[data-type="loading"]::before {
-    background: var(--primary);
-  }
-  [data-sonner-toaster] [data-sonner-toast].cn-toast [data-icon] {
-    width: auto;
-    height: auto;
-    margin: 0;
-    flex-shrink: 0;
-  }
-  [data-sonner-toaster] [data-sonner-toast].cn-toast [data-title] {
-    font-weight: 650;
-    line-height: 1.3;
-  }
-  [data-sonner-toaster] [data-sonner-toast].cn-toast [data-description] {
-    color: var(--muted-foreground);
-    font-size: 14px;
-    margin-top: 2px;
-  }
-  [data-sonner-toaster] [data-sonner-toast].cn-toast [data-button] {
-    height: 2rem;
-    padding: 0 0.8rem;
-    border-radius: 0.6rem;
-    font-size: 14px;
-    font-weight: 600;
-  }
-  .toast-emoji {
-    display: grid;
-    place-items: center;
-    width: 2.25rem;
-    height: 2.25rem;
-    border-radius: 0.75rem;
-    font-size: 1.25rem;
-    line-height: 1;
-    background: color-mix(in oklab, var(--success) 14%, var(--card));
-    animation: toast-pop 420ms cubic-bezier(0.34, 1.56, 0.64, 1);
-  }
-  @keyframes toast-pop {
-    0% {
-      transform: scale(0.4) rotate(-12deg);
-      opacity: 0;
-    }
-    100% {
-      transform: scale(1) rotate(0);
-      opacity: 1;
-    }
-  }
+}
 
 /* A task card that was just created. */
 .card-new {
@@ -423,45 +464,104 @@
   }
 }
 
-/* Sign-in: the brand side. Deep petrol, the week of bars grows in once, the day card floats slightly. */
-.auth-panel {
+/* ---------- The entrance (sign-in showcase) ---------- */
+/* The stage: deep blue with a pink glow in light mode, graphite with a lime glow in dark mode; the glow sits behind the mascot. */
+.auth-stage {
   background:
-    radial-gradient(120% 80% at 100% 0%, color-mix(in oklab, #2a9bb0 55%, transparent), transparent 60%),
-    #14505c;
+    radial-gradient(55% 60% at 62% 58%, color-mix(in oklab, #ff5fa2 34%, transparent), transparent 70%),
+    radial-gradient(80% 60% at 0% 0%, color-mix(in oklab, #4f7bff 30%, transparent), transparent 60%), #0b1d51;
 }
-.dark .auth-panel {
+.dark .auth-stage {
   background:
-    radial-gradient(120% 80% at 100% 0%, color-mix(in oklab, #1f7a8c 45%, transparent), transparent 60%),
-    #0d2f36;
+    radial-gradient(55% 60% at 62% 58%, color-mix(in oklab, #c6ff3d 16%, transparent), transparent 70%),
+    radial-gradient(80% 60% at 0% 0%, color-mix(in oklab, #4f7bff 12%, transparent), transparent 60%), #121316;
 }
-/* Tablet sign-in: the whole screen in the brand color, the band blends in and the card sits centered. */
-@media (min-width: 640px) and (max-width: 1023.98px) {
-  .auth-shell {
-    background:
-      radial-gradient(120% 80% at 100% 0%, color-mix(in oklab, #2a9bb0 55%, transparent), transparent 60%),
-      #14505c;
+@media (max-width: 1023.98px) {
+  .auth-stage {
+    background: radial-gradient(90% 40% at 50% 18%, color-mix(in oklab, #ff5fa2 34%, transparent), transparent 70%), #0b1d51;
   }
-  .dark .auth-shell {
-    background:
-      radial-gradient(120% 80% at 100% 0%, color-mix(in oklab, #1f7a8c 45%, transparent), transparent 60%),
-      #0d2f36;
-  }
-  .auth-shell .auth-panel {
-    background: none;
+  .dark .auth-stage {
+    background: radial-gradient(90% 40% at 50% 18%, color-mix(in oklab, #c6ff3d 16%, transparent), transparent 70%), #121316;
   }
 }
-.auth-bar {
-  transform-origin: bottom;
-  animation: auth-bar 700ms cubic-bezier(0.22, 1, 0.36, 1) both;
+/* A faint grid of voxel dots, fading toward the edges. */
+.auth-dots {
+  background-image: radial-gradient(circle, rgb(255 255 255 / 0.1) 1.2px, transparent 1.6px);
+  background-size: 26px 26px;
+  mask-image: radial-gradient(70% 70% at 55% 55%, #000 30%, transparent 85%);
 }
-@keyframes auth-bar {
+/* "num lugar só." in the accent color, with a soft underline that draws in. */
+.auth-highlight {
+  color: var(--primary);
+  background: linear-gradient(currentColor, currentColor) no-repeat 0 92% / 100% 0.08em;
+  animation: auth-underline 700ms 1.1s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+@keyframes auth-underline {
   from {
-    transform: scaleY(0.08);
-    opacity: 0.4;
+    background-size: 0% 0.08em;
   }
 }
-.auth-card {
-  transform: rotate(-1.5deg);
+/* The words and the form come in while the mascot assembles; the form a beat later. */
+.auth-rise {
+  animation: auth-rise 700ms 250ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+.auth-form {
+  animation: auth-rise 700ms 700ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+@keyframes auth-rise {
+  from {
+    opacity: 0;
+    transform: translateY(18px);
+  }
+}
+@media (min-width: 1024px) {
+  .auth-form {
+    animation-name: auth-slide;
+  }
+  @keyframes auth-slide {
+    from {
+      opacity: 0;
+      transform: translateX(28px);
+    }
+  }
+}
+/* "Criar conta grátis": a slow glow in the accent color invites the click. */
+.auth-cta {
+  animation: auth-glow 2.6s 2s ease-in-out infinite;
+}
+@keyframes auth-glow {
+  0%,
+  100% {
+    box-shadow: 0 10px 30px -10px color-mix(in oklab, var(--primary) 60%, transparent);
+  }
+  50% {
+    box-shadow: 0 10px 44px -6px color-mix(in oklab, var(--primary) 90%, transparent);
+  }
+}
+@media (hover: hover) {
+  .auth-cta:hover {
+    transform: translateY(-2px);
+  }
+}
+/* The speech bubble pops each time he says something new. */
+.auth-bubble {
+  transform-origin: bottom left;
+  animation: auth-bubble 320ms cubic-bezier(0.34, 1.4, 0.64, 1) both;
+}
+@keyframes auth-bubble {
+  from {
+    opacity: 0;
+    transform: scale(0.85) translateY(6px);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .auth-highlight,
+  .auth-rise,
+  .auth-form,
+  .auth-cta,
+  .auth-bubble {
+    animation: none;
+  }
 }
 
 /* ---------- Motion: short, purposeful, and off for people who ask for less motion ---------- */
@@ -523,9 +623,15 @@
   cursor: grabbing;
 }
 
-/* The top bar is sticky (4rem): anything scrolled to by a link or by focus stops below it, not under it. */
+/* The top bar is sticky (4rem; plus the 3.5rem area bar from tablets up): anything scrolled to by a
+   link or by focus stops below them, not under them. */
 html {
   scroll-padding-top: 4.5rem;
+}
+@media (min-width: 768px) {
+  html {
+    scroll-padding-top: 8rem;
+  }
 }
 @media (max-width: 767.98px) {
   /* Phones: the bottom bar covers the last 4rem. */
@@ -543,6 +649,197 @@ html {
 }
 .edge-fade[data-fade-left][data-fade-right] {
   mask-image: linear-gradient(to right, transparent, #000 2.5rem, #000 calc(100% - 2.5rem), transparent);
+}
+
+/* A check that lands in pixel steps (done in Início, a habit marked). */
+.pixel-hop {
+  animation: pixel-hop 300ms steps(4, end) both;
+}
+@keyframes pixel-hop {
+  0% {
+    transform: scale(0.4) translateY(4px);
+  }
+  50% {
+    transform: scale(1.25) translateY(-3px);
+  }
+  100% {
+    transform: none;
+  }
+}
+/* The burst of pixel squares when the day's last task is done (src/lib/pixelBurst.ts). */
+.pixel-burst {
+  position: fixed;
+  z-index: 70;
+  width: 0;
+  height: 0;
+  pointer-events: none;
+}
+.pixel-burst span {
+  position: absolute;
+  width: var(--size);
+  height: var(--size);
+  border-radius: 1px;
+  animation: pixel-fly 900ms cubic-bezier(0.2, 0.7, 0.3, 1) both;
+}
+@keyframes pixel-fly {
+  0% {
+    transform: translate(-50%, -50%) scale(0.6);
+    opacity: 1;
+  }
+  70% {
+    opacity: 1;
+  }
+  100% {
+    transform: translate(calc(-50% + var(--dx)), calc(-50% + var(--dy) + 40px)) scale(1);
+    opacity: 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .pixel-hop {
+    animation: none;
+  }
+}
+
+/* Progresso: the pixels of each day's stack land one after another. */
+.pixel-pop {
+  animation: pixel-pop 260ms steps(3, end) both;
+  animation-delay: calc(var(--i, 0) * 28ms);
+}
+@keyframes pixel-pop {
+  from {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .pixel-pop {
+    animation: none;
+  }
+}
+
+/* ---------- The page background (src/components/app/AppBackdrop.tsx) ---------- */
+/* Underneath: a plain gradient in the palette (shown while the animated one loads, or without WebGL).
+   On top: the ShaderGradient canvas, faded in. Cards keep their solid backgrounds on top of both. */
+.app-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  overflow: hidden;
+  pointer-events: none;
+  background:
+    radial-gradient(70% 60% at 15% 10%, rgb(255 156 198 / 0.55), transparent 70%),
+    radial-gradient(60% 60% at 90% 90%, rgb(185 200 255 / 0.6), transparent 70%), #faf7f2;
+}
+.dark .app-backdrop {
+  background:
+    radial-gradient(70% 60% at 15% 10%, rgb(127 174 28 / 0.35), transparent 70%),
+    radial-gradient(60% 60% at 90% 90%, rgb(47 75 184 / 0.35), transparent 70%), #121316;
+}
+.shader-backdrop {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  transition: opacity 900ms ease-out;
+}
+.shader-backdrop[data-shown] {
+  opacity: 1;
+}
+/* A light film grain over the gradient: a static noise texture (no work per frame). */
+.shader-backdrop::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  opacity: 0.09;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0.5 0 0 0 0 0.5 0 0 0 0 0.5 0 0 0 1 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  mix-blend-mode: overlay;
+}
+/* A veil of the page color over the moving gradient: it stays visible but calm, and text placed
+   straight on the page (greeting, headings, chips) keeps its contrast. */
+.shader-backdrop::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, rgb(250 247 242 / 0.45), rgb(250 247 242 / 0.05) 45%, rgb(250 247 242 / 0.2));
+}
+.dark .shader-backdrop::after {
+  background: linear-gradient(180deg, rgb(18 19 22 / 0.62), rgb(18 19 22 / 0.3) 45%, rgb(18 19 22 / 0.45));
+}
+/* With the gradient behind them, dark-mode cards are slightly see-through so its colors tint them. */
+html:not(.dark):not(.has-wallpaper) [data-app-root] {
+  --card: rgb(255 253 249 / 0.88);
+}
+html.dark:not(.has-wallpaper) [data-app-root] {
+  --card: rgb(34 35 39 / 0.8);
+  --column: rgb(31 32 35 / 0.7);
+}
+.app-glow {
+  position: absolute;
+  width: 70vmax;
+  height: 70vmax;
+  border-radius: 50%;
+  will-change: transform;
+  animation: app-drift 38s ease-in-out infinite alternate;
+}
+.app-glow-1 {
+  top: -30vmax;
+  left: -18vmax;
+  background: radial-gradient(closest-side, var(--glow-1), transparent);
+}
+.app-glow-2 {
+  top: -22vmax;
+  right: -26vmax;
+  background: radial-gradient(closest-side, var(--glow-2), transparent);
+  animation-duration: 46s;
+  animation-delay: -12s;
+}
+.app-glow-3 {
+  bottom: -34vmax;
+  left: 18vmax;
+  background: radial-gradient(closest-side, var(--glow-3), transparent);
+  animation-duration: 52s;
+  animation-delay: -24s;
+}
+.app-glow-4 {
+  bottom: -28vmax;
+  right: -20vmax;
+  width: 56vmax;
+  height: 56vmax;
+  background: radial-gradient(closest-side, var(--glow-4), transparent);
+  animation-duration: 42s;
+  animation-delay: -6s;
+}
+@keyframes app-drift {
+  0% {
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+  33% {
+    transform: translate3d(9vmax, 6vmax, 0) scale(1.08);
+  }
+  66% {
+    transform: translate3d(-5vmax, 11vmax, 0) scale(0.94);
+  }
+  100% {
+    transform: translate3d(7vmax, -4vmax, 0) scale(1.04);
+  }
+}
+.app-dots {
+  position: absolute;
+  inset: 0;
+  background-image: radial-gradient(circle, rgb(11 29 81 / 0.07) 1px, transparent 1.5px);
+  background-size: 24px 24px;
+  mask-image: radial-gradient(80% 70% at 50% 30%, #000 20%, transparent 80%);
+}
+.dark .app-dots {
+  background-image: radial-gradient(circle, rgb(255 255 255 / 0.05) 1px, transparent 1.5px);
+}
+.app-backdrop[data-still] .app-glow {
+  animation: none;
+}
+@media (prefers-reduced-motion: reduce) {
+  .app-glow {
+    animation: none;
+  }
 }
 
 /* Wallpaper (Settings → Aparência): the picture, then a veil of the page color so text stays legible.
@@ -568,33 +865,8 @@ html.has-wallpaper body::after {
   background: var(--background);
   opacity: var(--wallpaper-veil, 0.65);
 }
-html.has-wallpaper [data-slot="sidebar-wrapper"],
-html.has-wallpaper [data-slot="sidebar-inset"] {
+html.has-wallpaper [data-app-root] {
   background: transparent;
-}
-
-/* Sidebar looks (Settings → Aparência → Barra lateral). */
-html.sidebar-tint {
-  --sidebar: color-mix(in oklab, var(--primary) 9%, var(--background));
-  --sidebar-accent: color-mix(in oklab, var(--primary) 18%, var(--background));
-  --sidebar-border: color-mix(in oklab, var(--primary) 18%, var(--border));
-  /* The active item sits on a stronger tint here: its text is deepened to keep 4.5:1. */
-  --sidebar-accent-foreground: color-mix(in oklab, var(--primary-strong) 80%, #000);
-}
-html.dark.sidebar-tint {
-  --sidebar: color-mix(in oklab, var(--primary) 12%, var(--background));
-  --sidebar-accent: color-mix(in oklab, var(--primary) 24%, var(--background));
-  --sidebar-accent-foreground: color-mix(in oklab, var(--primary-strong) 80%, #fff);
-}
-/* Frosted glass: the wallpaper shows through, blurred, under a veil of the sidebar color (kept strong enough for legible text). */
-html.sidebar-glass [data-slot="sidebar-inner"],
-html.sidebar-glass [data-mobile="true"][data-slot="sidebar"] {
-  background: color-mix(in oklab, var(--sidebar) 74%, transparent);
-  -webkit-backdrop-filter: blur(22px) saturate(1.3);
-  backdrop-filter: blur(22px) saturate(1.3);
-}
-html.sidebar-glass [data-slot="sidebar-container"] {
-  border-color: color-mix(in oklab, var(--sidebar-border) 60%, transparent);
 }
 
 /* ---------- Drag to trash (src/components/app/TrashDropZone.tsx) ---------- */
@@ -732,4 +1004,513 @@ html.sidebar-glass [data-slot="sidebar-container"] {
 /* Menus, popovers and empty states ease in (dialogs and sheets already do). */
 [data-slot="empty"] {
   animation: page-enter 320ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+/* ---------- Brand: logo and mascot (src/components/brand) ---------- */
+/* One logo drawing per theme. */
+.logo-claro {
+  display: none;
+}
+:root:not(.dark) .logo-escuro {
+  display: none;
+}
+:root:not(.dark) .logo-claro {
+  display: block;
+}
+/* The pixel "create" icons (Listas): one drawing per theme, and a little hop in pixel steps under the pointer. */
+.pix-claro {
+  display: none;
+}
+:root:not(.dark) .pix-escuro {
+  display: none;
+}
+:root:not(.dark) .pix-claro {
+  display: block;
+}
+.pix-icon {
+  transition: transform 180ms steps(2, end);
+}
+@media (hover: hover) and (prefers-reduced-motion: no-preference) {
+  button:hover > .pix-icon,
+  button:focus-visible > .pix-icon {
+    transform: translateY(-2px);
+  }
+}
+/* The index cards rise one after another under the pointer, in pixel steps. */
+.logo-art g {
+  transition: transform 220ms steps(3, end);
+}
+.logo:hover .l-card-1,
+a:hover .logo .l-card-1,
+button:hover .logo .l-card-1 {
+  transform: translateY(-1.5px);
+}
+.logo:hover .l-card-2,
+a:hover .logo .l-card-2,
+button:hover .logo .l-card-2 {
+  transform: translateY(-2.5px);
+  transition-delay: 60ms;
+}
+.logo:hover .l-card-3,
+a:hover .logo .l-card-3,
+button:hover .logo .l-card-3 {
+  transform: translateY(-1.5px);
+  transition-delay: 120ms;
+}
+
+/* Mascot: every motion moves in whole pixels (steps), like a sprite. */
+.mascot {
+  overflow: visible;
+}
+.mascot g {
+  transform-box: fill-box;
+  transform-origin: center;
+}
+/* Frames that only show while their animation runs. */
+.m-blink,
+.m-wave-b,
+.m-cheer-b {
+  opacity: 0;
+}
+/* Idle: a slow one-pixel bob, and a blink every few seconds. */
+.mascot .m-all {
+  animation: m-bob 1.6s steps(1, end) infinite;
+}
+.mascot .m-eyes {
+  animation: m-eyes-open 4.2s steps(1, end) infinite;
+}
+.mascot .m-blink {
+  animation: m-eyes-shut 4.2s steps(1, end) infinite;
+}
+@keyframes m-bob {
+  50% {
+    transform: translateY(-1px);
+  }
+}
+@keyframes m-eyes-open {
+  94% {
+    opacity: 1;
+  }
+  95%,
+  99% {
+    opacity: 0;
+  }
+}
+@keyframes m-eyes-shut {
+  0%,
+  94% {
+    opacity: 0;
+  }
+  95%,
+  99% {
+    opacity: 1;
+  }
+}
+/* Waving: the raised arm swings between two frames. */
+.mascot .m-wave-a {
+  animation: m-frame-a 0.9s steps(1, end) infinite;
+}
+.mascot .m-wave-b {
+  animation: m-frame-b 0.9s steps(1, end) infinite;
+}
+@keyframes m-frame-a {
+  50% {
+    opacity: 0;
+  }
+}
+@keyframes m-frame-b {
+  0% {
+    opacity: 0;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+/* Cheering: arms pump, the body hops, sparkles twinkle. */
+.mascot[data-pose="comemora"] .m-all {
+  animation: m-hop 0.8s steps(1, end) infinite;
+}
+.mascot .m-cheer-a {
+  animation: m-frame-a 0.8s steps(1, end) infinite;
+}
+.mascot .m-cheer-b {
+  animation: m-frame-b 0.8s steps(1, end) infinite;
+}
+.mascot .m-sparkle {
+  animation: m-twinkle 0.8s steps(1, end) infinite;
+}
+@keyframes m-hop {
+  50% {
+    transform: translateY(-2px);
+  }
+}
+@keyframes m-twinkle {
+  50% {
+    opacity: 0.25;
+  }
+}
+/* Alarm by e-mail: the envelope jiggles, the alert dot pulses. */
+.mascot .m-envelope {
+  animation: m-jiggle 1.4s steps(1, end) infinite;
+}
+.mascot .m-badge {
+  animation: m-pulse 1.4s steps(1, end) infinite;
+}
+@keyframes m-jiggle {
+  10% {
+    transform: translateX(-1px);
+  }
+  20% {
+    transform: translateX(1px);
+  }
+  30% {
+    transform: translateX(-1px);
+  }
+  40% {
+    transform: none;
+  }
+}
+@keyframes m-pulse {
+  0%,
+  40% {
+    transform: scale(1.35);
+  }
+  50% {
+    transform: none;
+  }
+}
+/* Checklist: the ticks appear one after another, then start again. */
+.mascot .m-check-1 {
+  animation: m-tick-1 2.6s steps(1, end) infinite;
+}
+.mascot .m-check-2 {
+  animation: m-tick-2 2.6s steps(1, end) infinite;
+}
+@keyframes m-tick-1 {
+  0% {
+    opacity: 0;
+  }
+  25% {
+    opacity: 1;
+  }
+}
+@keyframes m-tick-2 {
+  0% {
+    opacity: 0;
+  }
+  55% {
+    opacity: 1;
+  }
+}
+/* Writing: the pencil scribbles. */
+.mascot .m-pencil {
+  animation: m-scribble 0.7s steps(1, end) infinite;
+}
+@keyframes m-scribble {
+  25% {
+    transform: translate(-1px, 1px);
+  }
+  50% {
+    transform: translate(0, 1px);
+  }
+  75% {
+    transform: translate(-1px, 0);
+  }
+}
+/* Sleeping: slow breath, and the Zzz float up one after another. */
+.mascot[data-pose="dorme"] .m-all {
+  animation: m-bob 2.8s steps(1, end) infinite;
+}
+.mascot .m-z1,
+.mascot .m-z2,
+.mascot .m-z3 {
+  animation: m-float 2.4s steps(4, end) infinite;
+}
+.mascot .m-z2 {
+  animation-delay: 0.4s;
+}
+.mascot .m-z3 {
+  animation-delay: 0.8s;
+}
+@keyframes m-float {
+  0% {
+    opacity: 0;
+    transform: translateY(2px);
+  }
+  30% {
+    opacity: 1;
+  }
+  80% {
+    opacity: 1;
+    transform: translateY(-1px);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-2px);
+  }
+}
+/* Calendar: the top sheet flips up and off, showing tomorrow underneath, then comes back. */
+.mascot .m-cal-front {
+  animation: m-flip 3.2s steps(1, end) infinite;
+}
+@keyframes m-flip {
+  70% {
+    opacity: 1;
+    transform: none;
+  }
+  76% {
+    opacity: 0.6;
+    transform: translateY(-2px) scaleY(0.6);
+  }
+  82%,
+  96% {
+    opacity: 0;
+    transform: translateY(-3px) scaleY(0.2);
+  }
+}
+/* Habits: drops fall from the can and the sprout grows. */
+.mascot .m-drops {
+  animation: m-drip 1s steps(3, end) infinite;
+}
+@keyframes m-drip {
+  from {
+    transform: translateY(-1px);
+    opacity: 1;
+  }
+  to {
+    transform: translateY(2px);
+    opacity: 0.2;
+  }
+}
+.mascot .m-sprout-1 {
+  animation: m-stage-1 4s steps(1, end) infinite;
+}
+.mascot .m-sprout-2 {
+  animation: m-stage-2 4s steps(1, end) infinite;
+}
+@keyframes m-stage-1 {
+  50%,
+  100% {
+    opacity: 0;
+  }
+}
+@keyframes m-stage-2 {
+  0% {
+    opacity: 0;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+/* Task lists: a card flies from his hand into the folder (it slides behind his front). */
+.mascot .m-file-card {
+  animation: m-file 2.6s steps(7, end) infinite;
+}
+@keyframes m-file {
+  0% {
+    transform: none;
+    opacity: 1;
+  }
+  55% {
+    transform: translate(-8px, 5px);
+    opacity: 1;
+  }
+  60%,
+  100% {
+    transform: translate(-8px, 6px);
+    opacity: 0;
+  }
+}
+
+/* ---------- Folders: the mascot is himself a folder ---------- */
+/* Open folder: his index cards rise in a fan, one after another, in whole pixels. */
+.mascot .m-card-1,
+.mascot .m-card-2,
+.mascot .m-card-3 {
+  transition: transform 240ms steps(3, end);
+}
+.mascot .m-card-2 {
+  transition-delay: 60ms;
+}
+.mascot .m-card-3 {
+  transition-delay: 120ms;
+}
+.mascot[data-open] .m-card-1 {
+  transform: translate(-1px, -3px);
+}
+.mascot[data-open] .m-card-2 {
+  transform: translateY(-4px);
+}
+.mascot[data-open] .m-card-3 {
+  transform: translate(1px, -3px);
+}
+/* Folder icons in a list stay still (no bob, no blink), so several folders don't fidget;
+   hovering the row lifts the middle card a pixel, a hint that it opens. */
+.mascot-still .m-all,
+.mascot-still .m-eyes,
+.mascot-still .m-blink {
+  animation: none;
+}
+:is(button, [role="button"]):hover .mascot-still:not([data-open]) .m-card-2 {
+  transform: translateY(-1px);
+  transition-delay: 0ms;
+}
+
+/* "Create a folder": holding a "+" card. Every few seconds his cards rise one after another,
+   like a folder opening, then the "+" pulses. Under the pointer the folder stays open and the
+   "+" pops. (Different from the task lists, where he files a card into himself.) */
+.mascot[data-pose="nova-pasta"] .m-card-1 {
+  animation: m-riffle-1 3.2s steps(1, end) infinite;
+}
+.mascot[data-pose="nova-pasta"] .m-card-2 {
+  animation: m-riffle-2 3.2s steps(1, end) infinite;
+}
+.mascot[data-pose="nova-pasta"] .m-card-3 {
+  animation: m-riffle-3 3.2s steps(1, end) infinite;
+}
+.mascot[data-pose="nova-pasta"] .m-badge {
+  animation: m-plus 3.2s steps(1, end) infinite;
+}
+@keyframes m-riffle-1 {
+  62% {
+    transform: translate(-1px, -2px);
+  }
+  88% {
+    transform: none;
+  }
+}
+@keyframes m-riffle-2 {
+  66% {
+    transform: translateY(-3px);
+  }
+  88% {
+    transform: none;
+  }
+}
+@keyframes m-riffle-3 {
+  70% {
+    transform: translate(1px, -2px);
+  }
+  88% {
+    transform: none;
+  }
+}
+@keyframes m-plus {
+  76% {
+    transform: scale(1.25);
+  }
+  82% {
+    transform: none;
+  }
+}
+:is(button:hover, button:focus-visible) .mascot[data-pose="nova-pasta"] .m-card-1 {
+  animation: none;
+  transform: translate(-1px, -2px);
+}
+:is(button:hover, button:focus-visible) .mascot[data-pose="nova-pasta"] .m-card-2 {
+  animation: none;
+  transform: translateY(-3px);
+}
+:is(button:hover, button:focus-visible) .mascot[data-pose="nova-pasta"] .m-card-3 {
+  animation: none;
+  transform: translate(1px, -2px);
+}
+:is(button:hover, button:focus-visible) .mascot[data-pose="nova-pasta"] .m-badge {
+  animation: m-plus-pop 360ms cubic-bezier(0.34, 1.6, 0.64, 1) both;
+}
+@keyframes m-plus-pop {
+  50% {
+    transform: scale(1.4);
+  }
+  to {
+    transform: scale(1.15);
+  }
+}
+/* "Folder created" toast: the new folder opens once. */
+.toast-mascot .mascot[data-pose="pasta"] .m-card-1 {
+  animation: m-open-1 360ms steps(3, end) 260ms both;
+}
+.toast-mascot .mascot[data-pose="pasta"] .m-card-2 {
+  animation: m-open-2 360ms steps(3, end) 320ms both;
+}
+.toast-mascot .mascot[data-pose="pasta"] .m-card-3 {
+  animation: m-open-3 360ms steps(3, end) 380ms both;
+}
+@keyframes m-open-1 {
+  to {
+    transform: translate(-1px, -2px);
+  }
+}
+@keyframes m-open-2 {
+  to {
+    transform: translateY(-3px);
+  }
+}
+@keyframes m-open-3 {
+  to {
+    transform: translate(1px, -2px);
+  }
+}
+
+/* A folder that was just created drops into the sidebar: the row grows in, the mascot lands with
+   a small bounce (and opens, since a new folder starts open). */
+.folder-new {
+  animation: folder-new 380ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+@keyframes folder-new {
+  from {
+    opacity: 0;
+    transform: translateY(-8px) scale(0.97);
+  }
+}
+.folder-new .mascot {
+  animation: mascot-drop 560ms cubic-bezier(0.34, 1.5, 0.64, 1) 80ms both;
+}
+@keyframes mascot-drop {
+  from {
+    opacity: 0;
+    transform: translateY(-12px) scale(0.6);
+  }
+}
+/* A list that was just created slides in from the side with a glow that fades. */
+.board-new {
+  border-radius: var(--radius-lg);
+  animation: board-new 1100ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+@keyframes board-new {
+  0% {
+    opacity: 0;
+    transform: translateX(-16px);
+    background: color-mix(in oklab, var(--primary) 34%, transparent);
+  }
+  30% {
+    opacity: 1;
+    transform: none;
+    background: color-mix(in oklab, var(--primary) 26%, transparent);
+  }
+  100% {
+    background: transparent;
+  }
+}
+
+/* A mascot that has just appeared pops in (toasts, empty states). */
+.mascot-pop {
+  animation: mascot-pop 420ms cubic-bezier(0.34, 1.4, 0.64, 1) both;
+}
+@keyframes mascot-pop {
+  from {
+    opacity: 0;
+    transform: translateY(6px) scale(0.85);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .mascot *,
+  .mascot,
+  .mascot-pop,
+  .folder-new,
+  .board-new,
+  .logo-art g {
+    animation: none !important;
+    transition: none !important;
+  }
 }

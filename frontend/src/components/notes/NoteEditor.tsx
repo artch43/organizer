@@ -38,7 +38,7 @@ function setLinePrefix(view: EditorView, prefix: string) {
   const changes: { from: number; to: number; insert: string }[] = [];
   const seen = new Set<number>();
   for (const r of state.selection.ranges)
-    for (let pos = r.from; pos <= r.to; ) {
+    for (let pos = r.from; pos <= r.to;) {
       const line = state.doc.lineAt(pos);
       if (!seen.has(line.number)) {
         seen.add(line.number);
@@ -234,7 +234,11 @@ class MathWidget extends WidgetType {
   }
 }
 const inCodeAt = (state: EditorState, pos: number) => {
-  for (let n: ReturnType<ReturnType<typeof syntaxTree>["resolveInner"]> | null = syntaxTree(state).resolveInner(pos, 1); n; n = n.parent)
+  for (
+    let n: ReturnType<ReturnType<typeof syntaxTree>["resolveInner"]> | null = syntaxTree(state).resolveInner(pos, 1);
+    n;
+    n = n.parent
+  )
     if (n.name === "FencedCode" || n.name === "InlineCode" || n.name === "CodeBlock") return true;
   return false;
 };
@@ -296,7 +300,10 @@ function mathMarks(state: EditorState): DecorationSet {
     if (i + 2 < text.length) out.push(mathOpen.range(i + 2, text.length));
     break;
   }
-  return Decoration.set(out.filter((r) => r.from < r.to), true);
+  return Decoration.set(
+    out.filter((r) => r.from < r.to),
+    true,
+  );
 }
 
 const IMG = /!\[([^\]\n]*)\]\(((?:anexo:|https?:\/\/)[^)\s]+)\)/g;
@@ -326,7 +333,7 @@ function buildDecorations(view: EditorView): DecorationSet {
         const h = /^(?:ATX|Setext)Heading(\d)$/.exec(name);
         if (h) out.push(lineDeco("cm-h" + h[1]).range(line.from));
         if (name === "Blockquote") {
-          for (let p = node.from; p <= node.to; ) {
+          for (let p = node.from; p <= node.to;) {
             const l = state.doc.lineAt(p);
             out.push(lineDeco("cm-quote").range(l.from));
             p = l.to + 1;
@@ -334,7 +341,7 @@ function buildDecorations(view: EditorView): DecorationSet {
         }
         if (name === "FencedCode" || name === "InlineCode" || name === "CodeBlock") code.push([node.from, node.to]);
         if (name === "FencedCode") {
-          for (let p = node.from; p <= node.to; ) {
+          for (let p = node.from; p <= node.to;) {
             const l = state.doc.lineAt(p);
             out.push(lineDeco("cm-codeblock").range(l.from));
             p = l.to + 1;
@@ -372,7 +379,7 @@ function buildDecorations(view: EditorView): DecorationSet {
       },
     });
     // Checklists and bullets render as widgets outside the line being edited.
-    for (let pos = from; pos <= to; ) {
+    for (let pos = from; pos <= to;) {
       const line = state.doc.lineAt(pos);
       if (!active.has(line.number) && !inCode(line.from, line.to)) {
         const task = /^(\s*)[-*+] \[([ xX])\] /.exec(line.text);

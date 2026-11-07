@@ -3,7 +3,6 @@ import { Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { deleteByShortcut } from "@/lib/shortcuts";
 import { deleteBoardFolder, deleteBoardFolderWithLists, deletePage, useStore } from "@/store";
-import { SidebarMenuButton, SidebarMenuItem } from "@/components/ui/sidebar";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -161,61 +160,80 @@ export function TrashDrops() {
   );
 }
 
-/**
- * "Lixeira" in the sidebar: click to open it, or drop a task, event, note, list or folder on it to
- * delete. While something is dragged it glows; over it, it turns red and the can wiggles; on drop it
- * "gulps" and the spot bursts. The usual toast offers Desfazer.
- */
-export function SidebarTrash({ onOpen }: { onOpen: () => void }) {
+/** Drop-target behaviour shared by every "Lixeira" (sidebar row and the top bar button). */
+export function useTrashTarget() {
   const drag = useTrashDrag();
   const [over, setOver] = useState(false);
   const [gulp, setGulp] = useState(0);
   useEffect(() => {
     if (!drag) setOver(false);
   }, [drag]);
+  const handlers = {
+    onDragEnter: (e: React.DragEvent) => {
+      if (!dragged) return;
+      e.preventDefault();
+      setOver(true);
+    },
+    onDragOver: (e: React.DragEvent) => {
+      if (!dragged) return;
+      e.preventDefault();
+      e.stopPropagation();
+      e.dataTransfer.dropEffect = "move";
+      if (!over) setOver(true);
+    },
+    onDragLeave: (e: React.DragEvent) => {
+      if (!e.currentTarget.contains(e.relatedTarget as Node)) setOver(false);
+    },
+    onDrop: (e: React.DragEvent) => {
+      const d = dragged;
+      if (!d) return;
+      e.preventDefault();
+      e.stopPropagation();
+      setOver(false);
+      setGulp((g) => g + 1);
+      onDropped?.(d, e.clientX, e.clientY);
+    },
+  };
+  const what = LABEL[drag?.kind ?? "task"];
+  return { drag, over, gulp, handlers, what };
+}
+
+/** The can itself: opens its lid while something hovers it and "gulps" on drop. */
+export function TrashCan({ over, gulp }: { over: boolean; gulp: number }) {
   return (
-    <SidebarMenuItem
-      onDragEnter={(e) => {
-        if (!dragged) return;
-        e.preventDefault();
-        setOver(true);
-      }}
-      onDragOver={(e) => {
-        if (!dragged) return;
-        e.preventDefault();
-        e.stopPropagation();
-        e.dataTransfer.dropEffect = "move";
-        if (!over) setOver(true);
-      }}
-      onDragLeave={(e) => {
-        if (!e.currentTarget.contains(e.relatedTarget as Node)) setOver(false);
-      }}
-      onDrop={(e) => {
-        const d = dragged;
-        if (!d) return;
-        e.preventDefault();
-        e.stopPropagation();
-        setOver(false);
-        setGulp((g) => g + 1);
-        onDropped?.(d, e.clientX, e.clientY);
-      }}
+    <span key={gulp} className={cn("flex", gulp > 0 && "trash-gulp")}>
+      <span className={cn("trash-can flex", over && "trash-open")}>
+        <Trash2 aria-hidden="true" />
+      </span>
+    </span>
+  );
+}
+
+/**
+ * "Lixeira" in the top bar: an icon button that works like the sidebar one. While something is being
+ * dragged it opens up with a label, so it is an easy target on pages without the sidebar.
+ */
+export function HeaderTrash({ onOpen }: { onOpen: () => void }) {
+  const { drag, over, gulp, handlers, what } = useTrashTarget();
+  return (
+    <button
+      type="button"
+      {...handlers}
+      onClick={onOpen}
+      aria-label="Lixeira"
+      title={over ? `Soltar para excluir ${what}` : "Lixeira. Arraste algo até aqui para excluir."}
+      className={cn(
+        "flex h-10 min-w-10 items-center justify-center gap-2 rounded-xl px-2.5 text-muted-foreground transition-[background-color,color,box-shadow,transform] duration-200 hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none [&_svg]:size-5",
+        drag &&
+          !over &&
+          "bg-destructive/8 px-3.5 text-destructive outline-2 -outline-offset-2 outline-dashed outline-destructive/50",
+        over && "scale-[1.04] bg-destructive! px-3.5 text-white! ring-2 ring-destructive",
+      )}
     >
-      <SidebarMenuButton
-        onClick={onOpen}
-        title={over ? `Soltar para excluir ${LABEL[drag?.kind ?? "task"]}` : "Lixeira. Arraste algo até aqui para excluir."}
-        className={cn(
-          "transition-[background-color,color,box-shadow,transform] duration-200",
-          drag && !over && "bg-destructive/8 text-destructive outline-2 -outline-offset-2 outline-dashed outline-destructive/50",
-          over && "scale-[1.03] bg-destructive! text-white! ring-2 ring-destructive",
-        )}
-      >
-        <span key={gulp} className={cn("flex", gulp > 0 && "trash-gulp")}>
-          <span className={cn("trash-can flex", over && "trash-open")}>
-            <Trash2 aria-hidden="true" />
-          </span>
-        </span>
-        <span>{over ? `Soltar para excluir ${LABEL[drag?.kind ?? "task"]}` : drag ? "Solte aqui para excluir" : "Lixeira"}</span>
-      </SidebarMenuButton>
-    </SidebarMenuItem>
+      <TrashCan over={over} gulp={gulp} />
+      {drag && (
+        <span className="text-sm font-medium whitespace-nowrap">{over ? `Soltar para excluir ${what}` : "Solte aqui"}</span>
+      )}
+    </button>
   );
 }

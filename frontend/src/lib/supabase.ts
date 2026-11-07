@@ -14,7 +14,8 @@ export const cloudEnabled = supabase !== null;
  * - linkError: Supabase sends #error_code=otp_expired (or ?error_code=…) when a link expired or was already used.
  */
 const query = typeof location !== "undefined" ? new URLSearchParams(location.search) : new URLSearchParams();
-const hashQuery = typeof location !== "undefined" ? new URLSearchParams(location.hash.replace(/^#\/?/, "")) : new URLSearchParams();
+const hashQuery =
+  typeof location !== "undefined" ? new URLSearchParams(location.hash.replace(/^#\/?/, "")) : new URLSearchParams();
 export const authLink = {
   recovery: query.get("tipo") === "recuperar" || query.get("type") === "recovery",
   tokenHash: query.get("type") === "recovery" ? query.get("token_hash") : null,

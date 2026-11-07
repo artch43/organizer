@@ -1,3 +1,4 @@
+import { Mascot, type MascotPose } from "./components/brand/Brand";
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import { immer } from "zustand/middleware/immer";
@@ -6,13 +7,17 @@ import { toast as sonner } from "sonner";
 import type { Area, CalendarEvent, Color, Group, Item, Note, PropValue, Todo, Workspace } from "./lib/types";
 import { template, mkDb, DEFAULT_STATUS } from "./lib/template";
 import { applyStatusChange, childrenOf, runReviews, statusProp, streakOf } from "./lib/model";
-import { DEFAULT_LIST_ICON, addDays, diffDays, emojiOf, fmtDate, parseD, today, uid } from "./lib/util";
+import { DEFAULT_LIST_ICON, addDays, diffDays, fmtDate, parseD, today, uid } from "./lib/util";
 import { dailyBody, uniqueTitle } from "./lib/notes";
 import { STORAGE_KEY, workspaceStorage } from "./lib/storage";
 import { normalizeWorkspace } from "./lib/migrate";
 import { pushRoute } from "./lib/backClose";
 
-export type Modal = "search" | "settings" | "trash" | "newBoard" | null;
+export type Modal = "search" | "settings" | "trash" | "newBoard" | "newTask" | "shortcuts" | null;
+/** Configurações is a page (not a window): its address. */
+export const SETTINGS_ROUTE = "configuracoes";
+/** The progress page (statistics). */
+export const PROGRESS_ROUTE = "progresso";
 export interface UI {
   route: string;
   peek: string | null;
@@ -26,7 +31,8 @@ export interface UI {
   /** Open event dialog: an event id, or a new event on a day. */
   eventDialog: { id: string | null; date?: string; start?: string } | null;
   statusDialog: string | null;
-  calendar: { view: "month" | "week"; anchor: string; showTasks: boolean };
+  /** `selected`: the day shown in the calendar's day panel (today when missing). */
+  calendar: { view: "month" | "week"; anchor: string; showTasks: boolean; selected?: string };
   noteId: string | null;
   noteTag: string | null;
   notesTab: "list" | "note" | "side";
@@ -59,7 +65,7 @@ const defaultUi: UI = {
   noteTag: null,
   notesTab: "list",
   notesList: true,
-  notesSide: false,
+  notesSide: true,
   dismissedNoteTitles: {},
 };
 
@@ -90,6 +96,8 @@ export const useStore = create<Store>()(
             viewByDb: s.ui.viewByDb,
             notesList: s.ui.notesList,
             notesSide: s.ui.notesSide,
+            // The side panel (Sumário, Tags, Tarefa ligada) now starts open; saves from before this start with it open once.
+            notesSideV: 2,
             dismissedNoteTitles: s.ui.dismissedNoteTitles,
             area: s.ui.area,
             calendar: { view: s.ui.calendar.view, showTasks: s.ui.calendar.showTasks },
@@ -99,6 +107,7 @@ export const useStore = create<Store>()(
         const p = persisted as Partial<Store> | undefined;
         const ui = { ...current.ui, ...(p?.ui ?? {}) } as UI;
         ui.calendar = { ...current.ui.calendar, ...(p?.ui?.calendar ?? {}), anchor: today() };
+        if ((p?.ui as { notesSideV?: number } | undefined)?.notesSideV !== 2) ui.notesSide = true;
         return { ...current, ws: p?.ws ? normalizeWorkspace(p.ws) : current.ws, ui };
       },
     },
@@ -115,11 +124,16 @@ export function toast(msg: string, undo?: () => void) {
   if (undo) sonner(msg, { action: { label: "Desfazer", onClick: undo }, duration: 6000 });
   else sonner(msg);
 }
-/** A friendly confirmation after creating something: emoji badge, title and an optional detail line. */
-export function celebrate(title: string, description?: string, emoji = "✨") {
+/** A friendly confirmation after creating something: the mascot (in a pose that matches), title and an optional detail line. */
+export function celebrate(title: string, description?: string, pose: MascotPose = "acena", undo?: () => void) {
   sonner.success(title, {
     description,
-    icon: createElement("span", { className: "toast-emoji", "aria-hidden": true }, emoji),
+    action: undo ? { label: "Desfazer", onClick: undo } : undefined,
+    icon: createElement(
+      "span",
+      { className: "toast-mascot mascot-pop", "aria-hidden": true },
+      createElement(Mascot, { pose, size: 40 }),
+    ),
     duration: 3500,
   });
 }
@@ -201,11 +215,7 @@ function announceFresh() {
   const page = ws().pages.find((p) => p.id === it.db);
   const d = typeof it.props.date === "string" ? it.props.date : "";
   const when = d ? fmtDate(d.slice(0, 10)).toLowerCase() + (d.slice(11, 16) ? " às " + d.slice(11, 16) : "") : "";
-  celebrate(
-    `Tarefa “${it.title.trim()}” criada`,
-    [page && `${emojiOf(page.icon)} ${page.title}`.trim(), when && `para ${when}`].filter(Boolean).join(" · "),
-    "✅",
-  );
+  celebrate(`Tarefa “${it.title.trim()}” criada`, [page?.title, when && `para ${when}`].filter(Boolean).join(" · "), "checklist");
 }
 export function openPeek(id: string, focus = false) {
   if (useStore.getState().ui.peek !== id) announceFresh();
@@ -220,10 +230,18 @@ export const closePeek = () => {
     u.peek = null;
   });
 };
-export const openModal = (m: Modal) =>
+/** Opens a window. Configurações is a page now, so asking for it goes there (keeps every old caller working). */
+export const openModal = (m: Modal) => {
+  if (m === "settings") {
+    setUi((u) => {
+      u.modal = null;
+    });
+    return go(SETTINGS_ROUTE);
+  }
   setUi((u) => {
     u.modal = m;
   });
+};
 
 /* ---------- tasks ---------- */
 export function setProp(itemId: string, propId: string, value: PropValue | null, opts: { quiet?: boolean } = {}) {
@@ -440,7 +458,7 @@ export function addBoard(title: string, icon: string, defaultArea?: string, fold
   celebrate(
     `Lista “${name}” criada`,
     folder ? `Na pasta ${folder.split("/").join(" › ")}` : "Adicione a primeira tarefa no quadro.",
-    emojiOf(icon, "🗂️"),
+    "checklist",
   );
   return id;
 }
@@ -492,11 +510,7 @@ export function setPageFolder(id: string, folder: string, announce = false) {
     else delete p.folder;
   });
   if (announce)
-    celebrate(
-      `“${before.title}” movida`,
-      folder ? `Para ${folder.split("/").join(" › ")}` : "Para fora das pastas",
-      emojiOf(before.icon, "🗂️"),
-    );
+    celebrate(`“${before.title}” movida`, folder ? `Para ${folder.split("/").join(" › ")}` : "Para fora das pastas", "acena");
 }
 
 /* ---------- task-list folders (sidebar) ---------- */
@@ -511,7 +525,7 @@ export function addBoardFolder(path: string) {
   celebrate(
     `Pasta “${clean.split("/").pop()}” criada`,
     at ? `Dentro de ${at.split("/").join(" › ")}` : "Arraste listas para dentro dela.",
-    "📁",
+    "pasta",
   );
   return clean;
 }
@@ -537,7 +551,11 @@ export function moveBoardFolder(path: string, into: string) {
   const dest = (into ? into + "/" : "") + name;
   if (dest === path || into === path || into.startsWith(path + "/")) return false;
   renameBoardFolder(path, dest);
-  celebrate(`Pasta “${name}” movida`, into ? `Agora dentro de ${into.split("/").join(" › ")}` : "Agora no topo das listas", "📂");
+  celebrate(
+    `Pasta “${name}” movida`,
+    into ? `Agora dentro de ${into.split("/").join(" › ")}` : "Agora no topo das listas",
+    "acena",
+  );
   return true;
 }
 /** Removes a folder with everything in it: subfolders, the lists inside and all their tasks (with undo). */
@@ -676,7 +694,7 @@ export function addArea(name: string, color: Area["color"]) {
   mut((w) => {
     w.settings.areas.push({ id, name: name.trim() || "Nova área", color });
   });
-  celebrate(`Área “${name.trim() || "Nova área"}” criada`, "Use-a para separar tarefas e eventos.", "🎨");
+  celebrate(`Área “${name.trim() || "Nova área"}” criada`, "Use-a para separar tarefas e eventos.", "acena");
   return id;
 }
 export function updateArea(id: string, patch: Partial<Omit<Area, "id">>) {
@@ -705,7 +723,7 @@ export function saveEvent(data: Omit<CalendarEvent, "id" | "created" | "updated"
   celebrate(
     id ? "Evento atualizado" : `Evento “${data.title || "Sem título"}” criado`,
     day + (data.allDay ? ", dia inteiro" : `, às ${data.start}`),
-    "📅",
+    "anota",
   );
   mut((w) => {
     const prev = w.events[eid];
@@ -832,7 +850,7 @@ export function toggleHabit(hid: string, day: string) {
     celebrate(
       `${h.name}: feito hoje!`,
       n > 1 ? `${n} dias seguidos. Continue assim!` : "Primeiro dia da sequência.",
-      n > 1 ? "🔥" : emojiOf(h.icon, "✅"),
+      n > 1 ? "comemora" : "checklist",
     );
   }
 }
@@ -865,7 +883,7 @@ export function createNote(init: Partial<Note> = {}) {
     };
   });
   openNotes(id);
-  if (!init.body) celebrate("Nota criada", init.folder ? `Em ${init.folder}` : "Comece pelo título.", "📝");
+  if (!init.body) celebrate("Nota criada", init.folder ? `Em ${init.folder}` : "Comece pelo título.", "anota");
   return id;
 }
 
@@ -888,7 +906,7 @@ export function openTaskNote(itemId: string) {
     const item = w.items[itemId];
     if (item) item.notes = "";
   });
-  if (it.notes.trim()) celebrate("Anotação criada", "O texto que estava na tarefa veio junto.", "📝");
+  if (it.notes.trim()) celebrate("Anotação criada", "O texto que estava na tarefa veio junto.", "anota");
   return id;
 }
 

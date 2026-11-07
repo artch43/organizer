@@ -144,17 +144,20 @@ export function eventsByDay(ws: Workspace, from: string, to: string, areaFilter 
   return out;
 }
 
-/** The 7 days (Sunday first) of the week that contains `day`. */
-export function weekOf(day: string) {
-  const start = addDays(day, -parseD(day).getDay());
+/** How many days back to the start of the week (`weekStart`: 0 = Sunday, 1 = Monday). */
+const back = (day: string, weekStart: number) => (parseD(day).getDay() - weekStart + 7) % 7;
+
+/** The 7 days of the week that contains `day` (Monday first by default). */
+export function weekOf(day: string, weekStart = 1) {
+  const start = addDays(day, -back(day, weekStart));
   return Array.from({ length: 7 }, (_, i) => addDays(start, i));
 }
 
 /** The 5 or 6 weeks shown in a month grid for the month of `day`. */
-export function monthGrid(day: string) {
+export function monthGrid(day: string, weekStart = 1) {
   const d = parseD(day);
   const first = ymd(new Date(d.getFullYear(), d.getMonth(), 1));
-  const start = addDays(first, -parseD(first).getDay());
+  const start = addDays(first, -back(first, weekStart));
   const days = Array.from({ length: 42 }, (_, i) => addDays(start, i));
   return parseD(days[35]).getMonth() !== d.getMonth() ? days.slice(0, 35) : days;
 }

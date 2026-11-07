@@ -55,12 +55,12 @@
   padding: 1px 3px;
 }
 .cm-link-preview a[href] {
-  color: var(--primary);
+  color: var(--primary-strong);
   text-decoration: underline;
   cursor: pointer;
 }
 .cm-tag {
-  color: var(--primary);
+  color: var(--primary-strong);
   background: color-mix(in oklab, var(--primary) 12%, transparent);
   border-radius: 4px;
   padding: 0 3px;
@@ -152,12 +152,12 @@
   margin: 1.4em 0;
 }
 .md a {
-  color: var(--primary);
+  color: var(--primary-strong);
   text-decoration: underline;
   text-underline-offset: 3px;
 }
 .md li input[type="checkbox"] {
-  accent-color: var(--primary);
+  accent-color: var(--primary-strong);
   margin-right: 6px;
 }
 /* Attached images and PDFs (editor and reader). */
@@ -206,7 +206,7 @@
   height: 1em;
   margin: 0 0.45em 0 0.1em;
   vertical-align: -0.12em;
-  accent-color: var(--primary);
+  accent-color: var(--primary-strong);
   cursor: pointer;
 }
 .note-editor .cm-task-done {
@@ -216,7 +216,7 @@
 .note-editor .cm-bullet {
   display: inline-block;
   width: 1em;
-  color: var(--primary);
+  color: var(--primary-strong);
   font-weight: 700;
 }
 

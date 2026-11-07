@@ -6,6 +6,7 @@ import {
   ChevronRight,
   ChevronUp,
   Circle,
+  Flame,
   History as HistoryIcon,
   MoreHorizontal,
   Pencil,
@@ -29,7 +30,8 @@ import { celebrate, deleteHabit, toggleHabit, useStore } from "@/store";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
-import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyTitle } from "@/components/ui/empty";
+import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty";
+import { Mascot } from "@/components/brand/Brand";
 import { useToday } from "./common";
 import { IconPicker } from "./IconPicker";
 
@@ -46,12 +48,18 @@ export function Habits() {
     mut((w) => {
       w.habits.push({ id: uid(), name: clean, icon: DEFAULT_HABIT_ICON, created: T });
     });
-    celebrate(`Hábito “${clean}” criado`, "Toque em Marcar hoje quando fizer.", "🌱");
+    celebrate(`Hábito “${clean}” criado`, "Toque em Marcar hoje quando fizer.", "acena");
     setAdding(false);
   };
   return (
-    <div className="flex w-full max-w-3xl flex-col gap-6 px-4 py-6 md:px-8 md:py-8">
+    <div className="mx-auto flex w-full max-w-3xl flex-col gap-6 px-4 pt-6 pb-28 md:px-8 md:pt-8">
       <div className="flex flex-wrap items-center gap-3">
+        {/* The mascot waters a sprout; with every habit done today, he cheers. */}
+        <Mascot
+          pose={habits.length && doneToday === habits.length ? "comemora" : "rega"}
+          size={54}
+          className="mascot-pop -my-2"
+        />
         <div className="mr-auto">
           <h1 className="text-3xl font-extrabold tracking-tight md:text-4xl">Hábitos</h1>
           <p className="text-base text-muted-foreground">
@@ -80,6 +88,9 @@ export function Habits() {
       ) : (
         <Empty className="border">
           <EmptyHeader>
+            <EmptyMedia>
+              <Mascot pose="checklist" size={80} className="mascot-pop" />
+            </EmptyMedia>
             <EmptyTitle>Nenhum hábito ainda</EmptyTitle>
             <EmptyDescription>Comece com algo pequeno, como ler 10 minutos por dia.</EmptyDescription>
           </EmptyHeader>
@@ -151,7 +162,10 @@ function HabitRow({ h, T, i }: { h: Habit; T: string; i: number }) {
           <span className="px-1 text-sm text-muted-foreground">
             {streak ? (
               <>
-                🔥 <b key={streak} className="streak-bump inline-block font-semibold text-foreground tabular-nums">{streak}</b>{" "}
+                <Flame className="inline size-4 -translate-y-px text-warning" aria-hidden="true" />{" "}
+                <b key={streak} className="streak-bump inline-block font-semibold text-foreground tabular-nums">
+                  {streak}
+                </b>{" "}
                 {streak === 1 ? "dia seguido" : "dias seguidos"}
               </>
             ) : (
@@ -170,7 +184,7 @@ function HabitRow({ h, T, i }: { h: Habit; T: string; i: number }) {
               "h-11 min-w-24 shrink-0 text-base sm:min-w-36",
               on
                 ? "pop bg-success text-white hover:bg-success/90 dark:text-background"
-                : "border-primary/45 text-primary-strong hover:border-primary hover:bg-primary/8 hover:text-primary-strong",
+                : "border-primary-strong/45 text-primary-strong hover:border-primary-strong hover:bg-primary/8 hover:text-primary-strong",
             )}
             onClick={() => toggleHabit(h.id, T)}
           >
@@ -292,7 +306,7 @@ function DayDot({
           : missed
             ? "border-2 border-dashed border-(--tag-red-fg)/70 text-(--tag-red-fg) hover:bg-(--tag-red-bg)/60"
             : "bg-muted text-muted-foreground hover:bg-accent",
-        isToday && "ring-2 ring-primary ring-offset-2 ring-offset-card",
+        isToday && "ring-2 ring-primary-strong ring-offset-2 ring-offset-card",
       )}
     >
       {parseD(day).getDate()}
@@ -312,7 +326,7 @@ function NewHabit({ onAdd, onCancel }: { onAdd: (name: string) => void; onCancel
   const [name, setName] = useState("");
   return (
     <form
-      className="flex flex-col gap-3 rounded-2xl border border-primary/40 bg-card p-4 shadow-card sm:flex-row sm:items-end"
+      className="flex flex-col gap-3 rounded-2xl border border-primary-strong/40 bg-card p-4 shadow-card sm:flex-row sm:items-end"
       onSubmit={(e) => {
         e.preventDefault();
         onAdd(name);
@@ -418,7 +432,10 @@ function History({
         ))}
         {days.map((d) =>
           d > T ? (
-            <span key={d} className="flex size-8 items-center justify-center rounded-full text-xs text-muted-foreground/50 tabular-nums sm:size-9">
+            <span
+              key={d}
+              className="flex size-8 items-center justify-center rounded-full text-xs text-muted-foreground/50 tabular-nums sm:size-9"
+            >
               {parseD(d).getDate()}
             </span>
           ) : (

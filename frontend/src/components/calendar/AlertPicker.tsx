@@ -35,6 +35,15 @@ export function AlertPicker({
   const emailAlerts = useStore((s) => s.ws.settings.emailAlerts);
   const phone = useStore((s) => s.ws.settings.whatsapp);
   const presets = ALERT_PRESETS.map((p) => String(p.minutes));
+  const setAlerts = (next: number[]) => {
+    if (!value.length && next.length)
+      celebrate(
+        "Alarme marcado",
+        channel === "whatsapp" ? "Vou te avisar no WhatsApp na hora certa." : "Vou te avisar por e-mail na hora certa.",
+        "email",
+      );
+    onChange(next);
+  };
   const custom = value.filter((m) => !ALERT_PRESETS.some((p) => p.minutes === m));
   const hint = !cloudEnabled
     ? "Os avisos precisam de uma conta. Você pode escolher agora; eles começam a valer quando você entrar."
@@ -90,7 +99,7 @@ export function AlertPicker({
             // "Sem alarme" clears the rest; picking a time takes "Sem alarme" away.
             v.includes(NONE) && value.length
               ? onChange([])
-              : onChange([...v.filter((x) => x !== NONE).map(Number), ...custom].sort((a, b) => a - b))
+              : setAlerts([...v.filter((x) => x !== NONE).map(Number), ...custom].sort((a, b) => a - b))
           }
         >
           <ToggleGroupItem value={NONE} className="px-2.5">
@@ -117,7 +126,7 @@ export function AlertPicker({
               </button>
             </Badge>
           ))}
-          <CustomAlert what={what} onAdd={(m) => onChange([...new Set([...value, m])].sort((a, b) => a - b))} />
+          <CustomAlert what={what} onAdd={(m) => setAlerts([...new Set([...value, m])].sort((a, b) => a - b))} />
         </div>
       </FieldSet>
     </div>
@@ -137,7 +146,7 @@ export function WhatsAppNumber({ phone }: { phone?: string }) {
     });
     setBad(false);
     setEditing(false);
-    celebrate("WhatsApp salvo", `Os avisos vão para ${formatPhone(n)}`, "💬");
+    celebrate("WhatsApp salvo", `Os avisos vão para ${formatPhone(n)}`, "email");
   };
   if (!editing && phone)
     return (

@@ -178,6 +178,8 @@ export interface Settings {
   wallpaper?: { kind: "none" | "preset" | "image"; preset?: string; strength?: number };
   /** Sidebar look: the default, a tint of the accent, or frosted glass over the wallpaper. */
   sidebarStyle?: "solid" | "accent" | "glass";
+  /** The page background (Settings → Aparência): drifting gradient (default), the same gradient still, or plain. */
+  backdrop?: "animated" | "static" | "plain";
   /** The person chose to keep exploring with the example data: the welcome banner stays hidden. */
   examplesDismissed?: boolean;
 }

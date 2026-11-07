@@ -18,7 +18,7 @@ export async function installNativeBars() {
     const dark = root.classList.contains("dark");
     void StatusBar.setStyle({ style: dark ? Style.Dark : Style.Light }).catch(() => {});
     if (Capacitor.getPlatform() === "android")
-      void StatusBar.setBackgroundColor({ color: dark ? "#14171D" : "#F7F8FA" }).catch(() => {});
+      void StatusBar.setBackgroundColor({ color: dark ? "#1A1B1E" : "#FFFFFF" }).catch(() => {});
   };
   sync();
   const watch = new MutationObserver(sync);

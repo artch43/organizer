@@ -6,9 +6,12 @@
 
 import { openFilesDb } from "./rename";
 
-export const DEFAULT_ACCENT = "#1f7a8c";
+export const DEFAULT_ACCENT = "#c6ff3d";
+/** The default before the lime palette: picked by nobody on purpose, so it now means the default. */
+const OLD_DEFAULT_ACCENT = "#1f7a8c";
 
 export const ACCENTS: { name: string; hex: string }[] = [
+  { name: "Padrão (lima no escuro, rosa no claro)", hex: "#c6ff3d" },
   { name: "Petróleo", hex: "#1f7a8c" },
   { name: "Azul", hex: "#2563eb" },
   { name: "Índigo", hex: "#4f46e5" },
@@ -53,7 +56,15 @@ export const WALLPAPERS: { id: string; name: string; css: string }[] = [
 type RGB = [number, number, number];
 export const isHex = (s: string) => /^#[0-9a-f]{6}$/i.test(s);
 const parse = (hex: string): RGB => [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16)) as RGB;
-const toHex = (c: RGB) => "#" + c.map((v) => Math.round(Math.min(255, Math.max(0, v))).toString(16).padStart(2, "0")).join("");
+const toHex = (c: RGB) =>
+  "#" +
+  c
+    .map((v) =>
+      Math.round(Math.min(255, Math.max(0, v)))
+        .toString(16)
+        .padStart(2, "0"),
+    )
+    .join("");
 const mix = (a: RGB, b: RGB, t: number): RGB => [0, 1, 2].map((i) => a[i] + (b[i] - a[i]) * t) as RGB;
 const lum = ([r, g, b]: RGB) => {
   const f = (v: number) => {
@@ -77,8 +88,8 @@ function until(hex: string, to: string, against: string[], min: number) {
   return toHex(c);
 }
 
-const LIGHT = { bg: "#f3f5f7", card: "#ffffff", ink: "#14181f" };
-const DARK = { bg: "#12151a", card: "#1b1f27", ink: "#0c1b1f" };
+const LIGHT = { bg: "#ffffff", card: "#ffffff", ink: "#0b1d51" };
+const DARK = { bg: "#1a1b1e", card: "#222327", ink: "#0a0a0a" };
 
 /** All the CSS variables that follow the accent, for light and dark mode. */
 export function accentVars(accent: string) {
@@ -131,7 +142,7 @@ const css = (sel: string, v: Record<string, string>) =>
 export function applyAccent(accent: string | undefined) {
   const id = "accent-vars";
   let tag = document.getElementById(id) as HTMLStyleElement | null;
-  if (!accent || accent.toLowerCase() === DEFAULT_ACCENT) {
+  if (!accent || [DEFAULT_ACCENT, OLD_DEFAULT_ACCENT].includes(accent.toLowerCase())) {
     tag?.remove();
     return;
   }
@@ -141,7 +152,7 @@ export function applyAccent(accent: string | undefined) {
     tag.id = id;
     document.head.appendChild(tag);
   }
-  tag.textContent = css(":root", v.light) + css(".dark", v.dark);
+  tag.textContent = css(":root", v.light) + css(".dark,.ink", v.dark);
 }
 
 /* ---------- the wallpaper picture (kept on this device) ---------- */
@@ -198,11 +209,4 @@ export async function applyWallpaper(w: Wallpaper | undefined) {
   root.classList.add("has-wallpaper");
   root.style.setProperty("--wallpaper", value);
   root.style.setProperty("--wallpaper-veil", String(1 - Math.min(0.7, Math.max(0.1, w?.strength ?? 0.35))));
-}
-
-/** Sidebar look (Settings → Aparência). */
-export function applySidebarStyle(style: "solid" | "accent" | "glass" | undefined) {
-  const root = document.documentElement;
-  root.classList.toggle("sidebar-tint", style === "accent");
-  root.classList.toggle("sidebar-glass", style === "glass");
 }

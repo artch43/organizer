@@ -57,19 +57,24 @@ describe("eventos e alertas", () => {
     expect(eventsByDay(ws, "2026-10-01", "2026-10-31", "pessoal")["2026-10-30"].map((e) => e.id)).toEqual(["b", "a"]);
   });
 
-  it("monta a semana e o mês começando no domingo", () => {
+  it("monta a semana e o mês começando na segunda", () => {
     expect(weekOf("2026-10-28")).toEqual([
-      "2026-10-25",
       "2026-10-26",
       "2026-10-27",
       "2026-10-28",
       "2026-10-29",
       "2026-10-30",
       "2026-10-31",
+      "2026-11-01",
     ]);
+    // A Sunday belongs to the week that started on the Monday before it.
+    expect(weekOf("2026-11-01")[0]).toBe("2026-10-26");
     const m = monthGrid("2026-10-15");
-    expect(m[0]).toBe("2026-09-27");
+    expect(m[0]).toBe("2026-09-28");
     expect(m.length % 7).toBe(0);
+    // Sunday first is still available.
+    expect(weekOf("2026-10-28", 0)[0]).toBe("2026-10-25");
+    expect(monthGrid("2026-10-15", 0)[0]).toBe("2026-09-27");
     expect(startOf(ev({})).getHours()).toBe(15);
   });
 });
