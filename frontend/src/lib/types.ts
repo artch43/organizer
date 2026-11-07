@@ -184,9 +184,9 @@ export interface Settings {
   };
   /** Sidebar look: the default, a tint of the accent, or frosted glass over the wallpaper. */
   sidebarStyle?: "solid" | "accent" | "glass";
-  /** The page background (Settings → Aparência): softly moving dots (default), the moving gradient, or plain.
-   * "static" (the old still gradient) now shows the dots. */
-  backdrop?: "dots" | "animated" | "static" | "plain";
+  /** The page background (Settings → Aparência): a soft diagonal gradient (default, "sweep"), softly moving
+   * dots, the moving gradient, or plain. "static" (the old still gradient) shows the default. */
+  backdrop?: "sweep" | "dots" | "animated" | "static" | "plain";
   /** The little 3D mascot in the corner of the app (Settings → Aparência); shown unless false. */
   companion?: boolean;
   /** The person chose to keep exploring with the example data: the welcome banner stays hidden. */

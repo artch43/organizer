@@ -866,13 +866,55 @@ html.dark:not(.has-wallpaper) [data-app-root] {
   --column: rgb(31 32 35 / 0.7);
 }
 /* Over the dots, cards stay (almost) solid: dots inside them would be noise behind the text. */
-html[data-backdrop="dots"]:not(.dark):not(.has-wallpaper) [data-app-root] {
+html:is([data-backdrop="dots"], [data-backdrop="sweep"]):not(.dark):not(.has-wallpaper) [data-app-root] {
   --card: rgb(255 255 255 / 0.97);
 }
-html[data-backdrop="dots"].dark:not(.has-wallpaper) [data-app-root] {
+html:is([data-backdrop="dots"], [data-backdrop="sweep"]).dark:not(.has-wallpaper) [data-app-root] {
   --card: rgb(34 35 39 / 0.96);
   --column: rgb(31 32 35 / 0.9);
 }
+/* The default background: one soft diagonal sweep of light. Deepest in the bottom left, brightening
+   toward the top right, with a lighter band across the top. Palette only: black, white and lime. */
+/* Light mode: the reference's own blues (sampled from it). */
+.backdrop-sweep {
+  position: absolute;
+  inset: 0;
+  background:
+    /* a lighter band along the top, around the center */
+    radial-gradient(40% 38% at 48% 0%, rgb(76 124 240 / 0.75), transparent 75%),
+    /* the deepest corner, bottom left */
+    radial-gradient(60% 65% at 0% 100%, rgb(3 63 173 / 0.9), transparent 72%),
+    linear-gradient(100deg, #0549bb 0%, #0757cf 28%, #166bec 52%, #3f8ff8 74%, #62a8fd 88%, #62a8fd 100%);
+}
+.dark .backdrop-sweep {
+  background:
+    /* a softer lime light, only in the top right corner */
+    radial-gradient(45% 60% at 100% 0%, rgb(170 220 60 / 0.32), rgb(120 170 30 / 0.12) 45%, transparent 75%),
+    radial-gradient(40% 35% at 30% 0%, rgb(170 230 50 / 0.06), transparent 72%),
+    /* black takes most of the page */
+    radial-gradient(90% 90% at 0% 100%, rgb(0 0 0 / 0.9), transparent 75%),
+    linear-gradient(115deg, #060706 0%, #080a06 40%, #0f1608 65%, #1f2e0c 88%, #33480f 100%);
+}
+
+/* Light mode over the blue sweep: text straight on the page turns white, like in the reference.
+   Surfaces (cards, columns, inputs, menus, windows) bring the normal colors back. */
+html[data-backdrop="sweep"]:not(.dark):not(.has-wallpaper) main {
+  --foreground: #ffffff;
+  --muted-foreground: rgb(255 255 255 / 0.82);
+  --primary-strong: #ffffff;
+  --warning: #ffd27a;
+  color: var(--foreground);
+}
+html[data-backdrop="sweep"]:not(.dark):not(.has-wallpaper)
+  main
+  :is([class*="bg-card"], .bg-background, .bg-popover, .bg-muted, [data-slot="card"], [role="dialog"]) {
+  --foreground: #0b1d51;
+  --muted-foreground: #4a5578;
+  --primary-strong: #c21a6b;
+  --warning: #985a00;
+  color: var(--foreground);
+}
+
 /* The default background: dots in the palette, with three soft lights drifting slowly behind them
    (only transforms move; the dot grid itself is a static mask). */
 .backdrop-dots {

@@ -52,28 +52,29 @@ const CUBES = [
 ];
 
 /** Little pixel cubes drifting up, and a glow when a task is done (only while the background moves). */
-function BackdropFx() {
+function BackdropFx({ cubes = true }: { cubes?: boolean }) {
   const beat = useCompanion((s) => s.beat);
   const kind = useCompanion((s) => s.reaction);
   return (
     <>
-      {CUBES.map((q, i) => (
-        <span
-          key={i}
-          className="backdrop-cube"
-          style={
-            {
-              left: `${q.x}%`,
-              "--s": `${q.s}px`,
-              "--c": q.c,
-              "--d": `${q.d}s`,
-              "--delay": `${q.delay}s`,
-              "--sway": `${q.sway}px`,
-              "--o": q.o,
-            } as CSSProperties
-          }
-        />
-      ))}
+      {cubes &&
+        CUBES.map((q, i) => (
+          <span
+            key={i}
+            className="backdrop-cube"
+            style={
+              {
+                left: `${q.x}%`,
+                "--s": `${q.s}px`,
+                "--c": q.c,
+                "--d": `${q.d}s`,
+                "--delay": `${q.delay}s`,
+                "--sway": `${q.sway}px`,
+                "--o": q.o,
+              } as CSSProperties
+            }
+          />
+        ))}
       {beat > 0 && <div key={beat} className="backdrop-pulse" data-kind={kind ?? "hop"} />}
     </>
   );
@@ -94,7 +95,8 @@ function Dots({ still }: { still: boolean }) {
 
 /**
  * The page's background (Settings → Aparência → Fundo):
- * - "dots" (default): the dotted grid, lightly animated;
+ * - "sweep" (default): a soft diagonal gradient, deep in the bottom left and lit in the top right;
+ * - "dots": the dotted grid, lightly animated;
  * - "animated": a liquid gradient in the brand palette (ShaderGradient), over a plain gradient in the same
  *   colors that shows while it loads or where WebGL isn't available;
  * - "plain": just the page color.
@@ -115,6 +117,7 @@ export function AppBackdrop() {
   const shader = mode === "animated" && webgl;
   return (
     <div aria-hidden="true" className="app-backdrop" data-mode={mode}>
+      {mode === "sweep" && <div className="backdrop-sweep" />}
       {mode === "dots" && <Dots still={reduced} />}
       {shader && (
         <Quiet>
@@ -123,7 +126,8 @@ export function AppBackdrop() {
           </Suspense>
         </Quiet>
       )}
-      {!reduced && <BackdropFx />}
+      {/* The soft gradient stays clean: no cubes, only the glow when a task is done. */}
+      {!reduced && <BackdropFx cubes={mode !== "sweep"} />}
     </div>
   );
 }

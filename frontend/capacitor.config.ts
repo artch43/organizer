@@ -6,7 +6,7 @@ const config: CapacitorConfig = {
   appName: "Organizer",
   webDir: "dist",
   plugins: {
-    SplashScreen: { launchAutoHide: true, launchShowDuration: 600, backgroundColor: "#1A1B1E", showSpinner: false },
+    SplashScreen: { launchAutoHide: true, launchShowDuration: 600, backgroundColor: "#08090A", showSpinner: false },
   },
 };
 

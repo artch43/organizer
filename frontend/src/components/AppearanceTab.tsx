@@ -143,8 +143,11 @@ export function AppearanceTab() {
           className="flex-wrap"
           aria-label="Fundo"
           value={backdropMode(st.backdrop)}
-          onValueChange={(v) => v && set("backdrop", v === "dots" ? undefined : (v as Settings["backdrop"]))}
+          onValueChange={(v) => v && set("backdrop", v === "sweep" ? undefined : (v as Settings["backdrop"]))}
         >
+          <ToggleGroupItem value="sweep" className="px-3">
+            Degradê suave
+          </ToggleGroupItem>
           <ToggleGroupItem value="dots" className="px-3">
             Pontilhado
           </ToggleGroupItem>

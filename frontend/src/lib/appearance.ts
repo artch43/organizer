@@ -38,9 +38,9 @@ export type WallpaperSlot = "light" | "dark";
 export const showsWallpaper = (p: WallpaperPick) =>
   p.kind === "image" || (p.kind === "preset" && WALLPAPERS.some((w) => w.id === p.preset));
 
-/** The page background chosen in Settings, with the retired "still gradient" shown as the dots. */
-export const backdropMode = (b: string | undefined): "dots" | "animated" | "plain" =>
-  b === "animated" || b === "plain" ? b : "dots";
+/** The page background chosen in Settings; nothing chosen (or the retired "still gradient") is the soft gradient. */
+export const backdropMode = (b: string | undefined): "sweep" | "dots" | "animated" | "plain" =>
+  b === "dots" || b === "animated" || b === "plain" ? b : "sweep";
 
 /** The picture shown in this mode. */
 export function wallpaperFor(w: Wallpaper | undefined, dark: boolean): WallpaperPick {
