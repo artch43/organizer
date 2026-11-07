@@ -15,9 +15,9 @@ import {
 } from "lucide-react";
 import { useRef, useState } from "react";
 import { cn } from "@/lib/utils";
-import type { AlertChannel, Area } from "@/lib/types";
+import type { AlertChannel, Area, Option } from "@/lib/types";
 import { eventsByDay, inArea } from "@/lib/events";
-import { dateOf, firstOptInGroup, groupOf, statusProp, streakOf } from "@/lib/model";
+import { dateOf, firstOptInGroup, groupOf, optOf, statusProp, streakOf } from "@/lib/model";
 import { addDays, fmtDate, parseD, today } from "@/lib/util";
 import { alarmTimes, alarmsBetween, beforeLabel, CHANNEL, dayOfMs, hhmm, untilLabel, type Alarm } from "@/lib/alarms";
 import { boardFolderList } from "@/lib/notes";
@@ -57,7 +57,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Mascot, UiIcon } from "./brand/Brand";
 import { EmptyState } from "./EmptyState";
-import { areaVar, greeting, useAreas, useToday } from "./common";
+import { OptionBadge, areaVar, greeting, useAreas, useToday } from "./common";
 import { Glyph } from "./icons";
 import { AreaSwitcher } from "./app/Topbar";
 import { useNow } from "./app/AppHeader";
@@ -79,6 +79,8 @@ interface Entry {
   title: string;
   /** The task's list name. */
   list?: string;
+  /** The task's priority (from the list's "Prioridade" column), when it has one. */
+  priority?: Option;
   /** The folder the list is in (top level name, full path and its icon), when it is in one. */
   folder?: { name: string; path: string; icon?: string };
   area?: Area;
@@ -164,6 +166,10 @@ export function Home() {
       time,
       title: it.title || "Sem título",
       list: page?.title,
+      priority: optOf(
+        db.props.find((p) => p.id === "prio"),
+        it.props.prio,
+      ),
       folder: page?.folder
         ? {
             name: page.folder.split("/")[0],
@@ -837,13 +843,22 @@ function Row({ e, i, T }: { e: Entry; i: number; T: string }) {
           <FolderGlyph icon={e.folder.icon} />
         </span>
       )}
-      <span
-        className={cn(
-          "line-clamp-2 min-w-0 flex-1 text-base break-words md:truncate md:text-[17px]",
-          e.done && "text-muted-foreground line-through",
+      <span className="flex min-w-0 flex-1 items-center gap-2">
+        <span
+          className={cn(
+            "line-clamp-2 min-w-0 text-base break-words md:truncate md:text-[17px]",
+            e.done && "text-muted-foreground line-through",
+          )}
+        >
+          {e.title}
+        </span>
+        {/* The task's priority, right after its name. */}
+        {e.priority && (
+          <span className="flex max-w-[40%] min-w-0 shrink-0" title={`Prioridade: ${e.priority.name}`}>
+            <span className="sr-only">Prioridade: </span>
+            <OptionBadge opt={e.priority} />
+          </span>
         )}
-      >
-        {e.title}
       </span>
       {/* The list, in its area's color, with the icon of the folder it is in (when it is in one). */}
       {e.list && (
