@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { CalendarDays, CheckSquare, FileText } from "lucide-react";
+import { CalendarDays, CheckSquare, FileText, NotebookPen } from "lucide-react";
 import { go, openEvent, openNotes, openPeek, useStore } from "@/store";
 import {
   Command,
@@ -16,6 +16,7 @@ import { REPEAT_LABELS } from "@/lib/events";
 import { plainSnippet } from "@/lib/notes";
 import { emojiOf } from "@/lib/util";
 import { Glyph } from "./icons";
+import { EmptyState } from "./EmptyState";
 
 /** Ctrl/Cmd + K: find pages, tasks, events and notes. Each result has a second line so look-alike names can be told apart. */
 export function Search() {
@@ -44,7 +45,9 @@ export function Search() {
       <Command>
         <CommandInput placeholder="Buscar páginas, tarefas, eventos e anotações…" value={q} onValueChange={setQ} />
         <CommandList>
-          <CommandEmpty>Nada encontrado.</CommandEmpty>
+          <CommandEmpty>
+            <EmptyState compact pose="dorme" title="Nada encontrado" text="Tente outra palavra, ou parte do nome." />
+          </CommandEmpty>
           <CommandGroup heading="Páginas">
             {ws.pages.map((p) => (
               <CommandItem key={p.id} value={"pagina " + p.title} onSelect={run(() => go(p.id))}>
@@ -53,8 +56,8 @@ export function Search() {
               </CommandItem>
             ))}
             <CommandItem value="pagina anotacoes" onSelect={run(() => openNotes(null))}>
-              <FileText />
-              📓 Anotações
+              <NotebookPen />
+              Anotações
             </CommandItem>
           </CommandGroup>
           <CommandGroup heading="Tarefas">

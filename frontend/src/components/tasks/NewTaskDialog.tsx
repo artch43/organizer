@@ -4,6 +4,8 @@ import { celebrate, newItem, openPeek, useStore } from "@/store";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Field, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Glyph } from "../icons";
 import { Button } from "@/components/ui/button";
 
 /**
@@ -12,16 +14,23 @@ import { Button } from "@/components/ui/button";
  * (status, area, priority, alarm, notes).
  */
 export function NewTaskDialog({
-  dbId,
-  defaults,
+  dbId: fixedDb,
+  startDb,
+  defaults = {},
   date: startDate = "",
   onClose,
 }: {
-  dbId: string;
-  defaults: Record<string, PropValue>;
+  /** The list it goes to; without it (the "Criar" button) the form asks, starting at `startDb`. */
+  dbId?: string;
+  startDb?: string;
+  defaults?: Record<string, PropValue>;
   date?: string;
   onClose: () => void;
 }) {
+  const pages = useStore((s) => s.ws.pages);
+  const lists = pages.filter((p) => p.type === "db" && !p.archived);
+  const [chosen, setChosen] = useState(() => fixedDb ?? (lists.some((p) => p.id === startDb) ? startDb! : (lists[0]?.id ?? "")));
+  const dbId = fixedDb ?? chosen;
   const page = useStore((s) => s.ws.pages.find((p) => p.id === dbId));
   const [title, setTitle] = useState("");
   const [date, setDate] = useState(startDate.slice(0, 10));
@@ -36,10 +45,11 @@ export function NewTaskDialog({
       nameRef.current?.focus();
       return;
     }
+    if (!dbId) return;
     const props: Record<string, PropValue> = { ...defaults };
     if (date) props.date = date + (time ? "T" + time : "");
     const id = newItem(dbId, props, name);
-    if (!date) celebrate(`Tarefa “${name}” criada`, page ? `Em ${page.title}` : undefined, "✅");
+    if (!date) celebrate(`Tarefa “${name}” criada`, page ? `Em ${page.title}` : undefined, "checklist");
     onClose();
     if (more) openPeek(id);
   };
@@ -53,7 +63,7 @@ export function NewTaskDialog({
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>Nova tarefa</DialogTitle>
-          <DialogDescription>{page ? `Em ${page.title}. ` : ""}Só o nome é obrigatório.</DialogDescription>
+          <DialogDescription>{page && fixedDb ? `Em ${page.title}. ` : ""}Só o nome é obrigatório.</DialogDescription>
         </DialogHeader>
         <form onSubmit={submit} className="flex flex-col gap-5">
           <FieldGroup>
@@ -79,6 +89,27 @@ export function NewTaskDialog({
                 </p>
               )}
             </Field>
+            {!fixedDb && (
+              <Field>
+                <FieldLabel htmlFor="new-task-list">Lista</FieldLabel>
+                <Select value={chosen} onValueChange={setChosen}>
+                  <SelectTrigger id="new-task-list" className="w-full">
+                    <SelectValue placeholder="Escolha a lista" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectGroup>
+                      {lists.map((p) => (
+                        <SelectItem key={p.id} value={p.id}>
+                          <Glyph icon={p.icon} size="xs" />
+                          {p.title || "Sem título"}
+                          {p.folder ? <span className="text-muted-foreground"> · {p.folder.split("/").pop()}</span> : null}
+                        </SelectItem>
+                      ))}
+                    </SelectGroup>
+                  </SelectContent>
+                </Select>
+              </Field>
+            )}
             <Field>
               <FieldLabel htmlFor="new-task-date">Prazo (opcional)</FieldLabel>
               <div className="flex gap-2">

@@ -1,6 +1,9 @@
+import { Mascot } from "@/components/brand/Brand";
 import { useEffect, useRef, useState } from "react";
 import { withMotion } from "@/lib/motion";
-import { ChevronLeft, ChevronRight, Plus, Repeat } from "lucide-react";
+import { ChevronLeft, ChevronRight, Mail, MessageCircle, Plus, Repeat, SlidersHorizontal } from "lucide-react";
+import { motion } from "motion/react";
+import { alarmTimes, CHANNEL, hhmm } from "@/lib/alarms";
 import { cn } from "@/lib/utils";
 import type { Workspace } from "@/lib/types";
 import { eventsByDay, inArea, minutesOf, monthGrid, weekOf } from "@/lib/events";
@@ -10,13 +13,14 @@ import { go, moveEvent, openEvent, openPeek, setProp, useStore } from "@/store";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
-import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { DRAG_TYPE, EntryChip, MonthView, type Entry } from "./MonthView";
 import { areaVar } from "../common";
+import { AreaSwitcher } from "../app/Topbar";
 
 type Dropped = { kind: Entry["kind"]; id: string; from?: string };
 
-/** Events (each repeat on its own day), plus dated tasks and to-dos when shown, for each day between `from` and `to`. */
+/** Events (each repeat on its own day), plus dated tasks when shown, for each day between `from` and `to`. */
 function collect(ws: Workspace, from: string, to: string, area: string, showTasks: boolean) {
   const areaOf = (id?: string) => ws.settings.areas.find((a) => a.id === id);
   const byDay: Record<string, Entry[]> = {};
@@ -29,8 +33,11 @@ function collect(ws: Workspace, from: string, to: string, area: string, showTask
       title: e.title,
       date: d,
       time: e.allDay ? undefined : e.start,
+      end: e.allDay ? undefined : e.end,
       area: areaOf(e.area),
       repeat: !!e.repeat && e.repeat !== "none",
+      alerts: e.alerts,
+      channel: e.alertChannel,
     }));
   if (showTasks) {
     for (const it of Object.values(ws.items)) {
@@ -38,6 +45,7 @@ function collect(ws: Workspace, from: string, to: string, area: string, showTask
       const d = db ? dateOf(db, it) : "";
       const day = d.slice(0, 10);
       if (!d || day < from || day > to || !inArea(it.area, area)) continue;
+      const done = groupOf(db, it) === "done";
       (byDay[day] ??= []).push({
         key: "t" + it.id,
         id: it.id,
@@ -46,19 +54,22 @@ function collect(ws: Workspace, from: string, to: string, area: string, showTask
         date: day,
         time: d.slice(11, 16) || undefined,
         area: areaOf(it.area),
-        done: groupOf(db, it) === "done",
+        done,
+        alerts: done ? undefined : it.alerts,
+        channel: it.alertChannel,
       });
     }
   }
+  // In time order; things without a time (all day) first.
   for (const d in byDay)
     byDay[d].sort(
-      (a, b) => Number(b.kind === "event") - Number(a.kind === "event") || (a.time ?? "").localeCompare(b.time ?? ""),
+      (a, b) => (a.time ?? "").localeCompare(b.time ?? "") || Number(b.kind === "event") - Number(a.kind === "event"),
     );
   return byDay;
 }
 
 function openEntry(e: Entry) {
-  if (e.kind === "event") openEvent(e.id);
+  if (e.kind === "event") openEvent(e.id, e.date);
   else if (e.kind === "task") openPeek(e.id);
   else go("home");
 }
@@ -82,7 +93,11 @@ function moveEntry(e: Dropped, date: string, minutes?: number) {
     const cur = ws.items[e.id]?.props.date;
     // Dropped on an hour of the week view: that hour too. On a day (or the all-day row): keeps its time.
     const time =
-      minutes !== undefined ? "T" + pad(Math.floor(minutes / 60) % 24) + ":" + pad(minutes % 60) : typeof cur === "string" ? cur.slice(10) : "";
+      minutes !== undefined
+        ? "T" + pad(Math.floor(minutes / 60) % 24) + ":" + pad(minutes % 60)
+        : typeof cur === "string"
+          ? cur.slice(10)
+          : "";
     setProp(e.id, "date", date + time);
   }
 }
@@ -94,6 +109,9 @@ const parseDrop = (dt: DataTransfer): Dropped | null => {
   }
 };
 
+const SEG =
+  "relative flex h-9 items-center rounded-lg px-3.5 text-[15px] font-medium transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none";
+
 export function CalendarPage() {
   const ws = useStore((s) => s.ws);
   const area = useStore((s) => s.ui.area);
@@ -103,9 +121,11 @@ export function CalendarPage() {
     setUi((u) => {
       Object.assign(u.calendar, p);
     });
+  const T = today();
   const anchor = cal.anchor;
   const d = parseD(anchor);
   const days = cal.view === "month" ? monthGrid(anchor) : weekOf(anchor);
+  const selected = cal.selected && days.includes(cal.selected) ? cal.selected : days.includes(T) ? T : anchor;
   const byDay = collect(ws, days[0], days[days.length - 1], area, cal.showTasks);
   // Which way the last move went, so the new month/week slides in from that side.
   const [dir, setDir] = useState<"next" | "prev" | "none">("none");
@@ -120,73 +140,211 @@ export function CalendarPage() {
     w6 = parseD(week[6]);
   const label =
     cal.view === "month"
-      ? `${MONTHS[d.getMonth()]} ${d.getFullYear()}`
+      ? `${MONTHS[d.getMonth()]} de ${d.getFullYear()}`
       : `${w0.getDate()} ${MONTHS[w0.getMonth()].slice(0, 3)} – ${w6.getDate()} ${MONTHS[w6.getMonth()].slice(0, 3)} ${w6.getFullYear()}`;
-  const newEventDay = cal.view === "month" && anchor.slice(0, 7) !== today().slice(0, 7) ? anchor : today();
 
   return (
-    <div className="flex flex-col gap-5 px-4 py-6 md:px-8 md:py-8">
-      <div className="flex flex-wrap items-center gap-3">
-        <h1 className="mr-auto text-3xl font-extrabold tracking-tight capitalize md:text-4xl">{label}</h1>
-        <Button onClick={() => openEvent(null, newEventDay)}>
-          <Plus data-icon="inline-start" />
-          Novo evento
-        </Button>
+    <div className="mx-auto grid w-full max-w-[90rem] items-start gap-6 px-4 pt-5 pb-28 md:px-10 md:pt-7 xl:grid-cols-[minmax(0,1fr)_minmax(20rem,24rem)]">
+      <div className="flex min-w-0 flex-col gap-5">
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-3">
+          <div className="mr-auto flex min-w-0 items-center gap-4">
+            {/* The mascot flips the page of a tear-off calendar. */}
+            <Mascot pose="calendario" size={56} className="mascot-pop -my-2 shrink-0 max-sm:size-11!" />
+            <h1 className="text-[1.75rem] leading-tight font-extrabold tracking-tight first-letter:uppercase sm:text-3xl md:text-[2.5rem]">
+              {label}
+            </h1>
+          </div>
+          <CalendarOptions showTasks={cal.showTasks} onShowTasks={(v) => set({ showTasks: v })} />
+          <div className="flex items-center gap-1.5">
+            <Button variant="ghost" size="icon" className="size-10" aria-label="Anterior" onClick={() => shift(-1)}>
+              <ChevronLeft />
+            </Button>
+            <Button
+              variant="outline"
+              className="h-10 rounded-xl px-4 text-[15px]"
+              onClick={() => set({ anchor: T, selected: T })}
+            >
+              Hoje
+            </Button>
+            <Button variant="ghost" size="icon" className="size-10" aria-label="Próximo" onClick={() => shift(1)}>
+              <ChevronRight />
+            </Button>
+          </div>
+          <div role="radiogroup" aria-label="Visão" className="flex rounded-xl border bg-card/50 p-0.5">
+            {(
+              [
+                ["month", "Mês"],
+                ["week", "Semana"],
+              ] as const
+            ).map(([v, name]) => (
+              <button
+                key={v}
+                role="radio"
+                aria-checked={cal.view === v}
+                onClick={() => set({ view: v })}
+                className={cn(SEG, cal.view === v ? "text-foreground" : "text-muted-foreground hover:text-foreground")}
+              >
+                {cal.view === v && (
+                  <motion.span
+                    aria-hidden="true"
+                    layoutId="cal-view"
+                    transition={{ type: "spring", duration: 0.3, bounce: 0.1 }}
+                    className="absolute inset-0 rounded-lg bg-muted shadow-card"
+                  />
+                )}
+                <span className="relative">{name}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+        <div key={cal.view + (cal.view === "month" ? anchor.slice(0, 7) : week[0])} className="cal-enter" data-dir={dir}>
+          {cal.view === "month" ? (
+            <MonthView
+              anchor={anchor}
+              byDay={byDay}
+              onOpen={openEntry}
+              onAdd={(date) => openEvent(null, date)}
+              onMove={(e, date) => moveEntry(e, date)}
+              selected={selected}
+              onSelect={(day) => set({ selected: day })}
+            />
+          ) : (
+            <WeekView days={week} byDay={byDay} />
+          )}
+        </div>
+        <p className="text-sm text-muted-foreground max-xl:hidden">
+          Clique num dia para ver a agenda dele ao lado; clique duas vezes para criar um evento. Arraste para remarcar. Na semana,
+          clique duas vezes num horário para criar um evento.
+        </p>
       </div>
-      <div className="flex flex-wrap items-center gap-2">
-        <Button variant="outline" size="icon" aria-label="Anterior" onClick={() => shift(-1)}>
+      <DayPanel day={selected} entries={byDay[selected] ?? []} onPick={(day) => set({ selected: day, anchor: day })} />
+    </div>
+  );
+}
+
+/** Area filter and whether tasks show, in one small menu. */
+function CalendarOptions({ showTasks, onShowTasks }: { showTasks: boolean; onShowTasks: (v: boolean) => void }) {
+  const area = useStore((s) => s.ui.area);
+  const areas = useStore((s) => s.ws.settings.areas);
+  const current = areas.find((a) => a.id === area);
+  return (
+    <Popover>
+      <PopoverTrigger asChild>
+        <Button variant="outline" className="h-10 gap-2 rounded-xl px-3.5 text-[15px]">
+          {current ? (
+            <span className="size-2.5 rounded-full bg-(--area)" style={areaVar(current)} aria-hidden="true" />
+          ) : (
+            <SlidersHorizontal data-icon="inline-start" />
+          )}
+          {current ? current.name : "Todas as áreas"}
+          {!showTasks && <span className="text-muted-foreground">· sem tarefas</span>}
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent align="end" className="flex w-80 flex-col gap-4">
+        <div className="flex flex-col gap-1.5">
+          <span className="text-xs font-medium text-muted-foreground">Área (vale para todo o site)</span>
+          <AreaSwitcher className="min-w-0" />
+        </div>
+        <div className="flex items-center justify-between gap-3 border-t pt-3">
+          <Label htmlFor="show-tasks">Mostrar tarefas no calendário</Label>
+          <Switch id="show-tasks" checked={showTasks} onCheckedChange={onShowTasks} />
+        </div>
+      </PopoverContent>
+    </Popover>
+  );
+}
+
+/** The chosen day: its events and tasks in time order, with their alarms, and "Novo evento neste dia". */
+function DayPanel({ day, entries, onPick }: { day: string; entries: Entry[]; onPick: (d: string) => void }) {
+  const now = Date.now();
+  const title = parseD(day)
+    .toLocaleDateString("pt-BR", { weekday: "long", day: "numeric", month: "long" })
+    .replace("-feira", "")
+    .replace(/^./, (c) => c.toUpperCase());
+  return (
+    <section
+      aria-labelledby="day-panel"
+      aria-live="polite"
+      className="flex flex-col gap-4 rounded-2xl border bg-card p-5 shadow-card xl:sticky xl:top-24 xl:mt-[4.25rem] md:p-6"
+    >
+      <div className="flex items-center gap-1">
+        <h2 id="day-panel" className="mr-auto text-xl font-bold tracking-tight">
+          {title}
+        </h2>
+        <Button variant="ghost" size="icon-sm" aria-label="Dia anterior" onClick={() => onPick(addDays(day, -1))}>
           <ChevronLeft />
         </Button>
-        <Button variant="outline" onClick={() => set({ anchor: today() })}>
-          Hoje
-        </Button>
-        <Button variant="outline" size="icon" aria-label="Próximo" onClick={() => shift(1)}>
+        <Button variant="ghost" size="icon-sm" aria-label="Próximo dia" onClick={() => onPick(addDays(day, 1))}>
           <ChevronRight />
         </Button>
-        <ToggleGroup
-          type="single"
-          variant="outline"
-          value={cal.view}
-          onValueChange={(v) => v && set({ view: v as "month" | "week" })}
-          aria-label="Visão"
-        >
-          <ToggleGroupItem value="month" className="px-3">
-            Mês
-          </ToggleGroupItem>
-          <ToggleGroupItem value="week" className="px-3">
-            Semana
-          </ToggleGroupItem>
-        </ToggleGroup>
-        <div className="ml-auto flex items-center gap-2">
-          <Switch id="show-tasks" checked={cal.showTasks} onCheckedChange={(v) => set({ showTasks: v })} />
-          <Label htmlFor="show-tasks">Mostrar tarefas</Label>
-        </div>
       </div>
-      <div key={cal.view + (cal.view === "month" ? anchor.slice(0, 7) : week[0])} className="cal-enter" data-dir={dir}>
-      {cal.view === "month" ? (
-        <MonthView
-          anchor={anchor}
-          byDay={byDay}
-          onOpen={openEntry}
-          onAdd={(date) => openEvent(null, date)}
-          onMove={(e, date) => moveEntry(e, date)}
-        />
+      {entries.length ? (
+        <ul className="flex flex-col gap-2.5">
+          {entries.map((e) => {
+            const times = e.alerts?.length ? alarmTimes(day, !e.time, e.time ?? "", e.alerts) : [];
+            const next = times.find((t) => t.at >= now - 60_000);
+            const last = times.at(-1);
+            const Icon = e.channel === "whatsapp" ? MessageCircle : Mail;
+            return (
+              <li key={e.key}>
+                <button
+                  type="button"
+                  data-del={e.fixed ? undefined : `${e.kind}:${e.id}`}
+                  onClick={() => openEntry(e)}
+                  style={areaVar(e.area)}
+                  className="flex w-full items-start gap-4 rounded-xl border bg-background/40 p-4 text-left transition-colors hover:border-primary-strong/40 hover:bg-muted/50 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+                >
+                  <span className="w-12 shrink-0 pt-0.5 text-[15px] font-semibold tabular-nums">{e.time ?? "Dia"}</span>
+                  <span className="flex min-w-0 flex-1 flex-col gap-1.5">
+                    <span
+                      className={cn(
+                        "flex items-center gap-2 text-base font-semibold",
+                        e.done && "text-muted-foreground line-through",
+                      )}
+                    >
+                      <span className="size-2.5 shrink-0 rounded-full bg-(--area,var(--muted-foreground))" aria-hidden="true" />
+                      <span className="truncate">{e.title || "Sem título"}</span>
+                    </span>
+                    {next ? (
+                      <span className="flex items-center gap-1.5 text-sm font-medium text-primary-strong">
+                        <Icon className="size-4" aria-hidden="true" />
+                        {CHANNEL[e.channel ?? "email"]} às {hhmm(next.at)}
+                      </span>
+                    ) : last ? (
+                      <span className="flex items-center gap-1.5 text-sm text-muted-foreground">
+                        <Icon className="size-4" aria-hidden="true" />
+                        Enviado às {hhmm(last.at)}
+                      </span>
+                    ) : (
+                      <span className="text-sm text-muted-foreground">
+                        {e.kind === "event"
+                          ? e.end
+                            ? `Até ${e.end}`
+                            : e.time
+                              ? "Evento"
+                              : "Dia todo"
+                          : e.done
+                            ? "Tarefa feita"
+                            : "Tarefa"}
+                      </span>
+                    )}
+                  </span>
+                </button>
+              </li>
+            );
+          })}
+        </ul>
       ) : (
-        <WeekView days={week} byDay={byDay} />
+        <div className="flex flex-col items-center gap-2 py-6 text-center">
+          <Mascot pose="dorme" size={56} />
+          <p className="text-sm text-muted-foreground">Nada marcado neste dia.</p>
+        </div>
       )}
-      </div>
-      <p className="text-sm text-muted-foreground">
-          {/* Touch screens and mouse/keyboard get the instructions that apply to them. */}
-          <span className="pointer-fine:hidden">
-            Toque num dia para ver a agenda dele. Para remarcar, segure um item e arraste até outro dia, ou abra-o e mude a
-            data. Para criar, use Novo evento.
-          </span>
-          <span className="pointer-coarse:hidden">
-            Arraste para remarcar, ou abra o item (Enter) e mude a data. Eventos aparecem com fundo colorido e horário; tarefas,
-            com uma caixinha de marcar. Na semana, clique duas vezes num horário para criar um evento, ou use Novo evento.
-          </span>
-        </p>
-    </div>
+      <Button variant="outline" className="h-11 rounded-xl text-[15px]" onClick={() => openEvent(null, day)}>
+        <Plus data-icon="inline-start" />
+        Novo evento neste dia
+      </Button>
+    </section>
   );
 }
 

@@ -3,7 +3,15 @@ import { Check, ImagePlus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import type { Settings } from "@/lib/types";
-import { ACCENTS, DEFAULT_ACCENT, WALLPAPERS, applyWallpaper, isHex, removeWallpaperImage, saveWallpaperImage } from "@/lib/appearance";
+import {
+  ACCENTS,
+  DEFAULT_ACCENT,
+  WALLPAPERS,
+  applyWallpaper,
+  isHex,
+  removeWallpaperImage,
+  saveWallpaperImage,
+} from "@/lib/appearance";
 import { useStore } from "@/store";
 import { Field, FieldDescription, FieldGroup, FieldLabel, FieldSet, FieldLegend } from "@/components/ui/field";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
@@ -41,7 +49,12 @@ export function AppearanceTab() {
     <FieldGroup>
       <Field>
         <FieldLabel>Tema</FieldLabel>
-        <ToggleGroup type="single" variant="outline" value={st.theme} onValueChange={(v) => v && set("theme", v as Settings["theme"])}>
+        <ToggleGroup
+          type="single"
+          variant="outline"
+          value={st.theme}
+          onValueChange={(v) => v && set("theme", v as Settings["theme"])}
+        >
           <ToggleGroupItem value="system" className="px-3">
             Automático
           </ToggleGroupItem>
@@ -56,7 +69,9 @@ export function AppearanceTab() {
 
       <FieldSet>
         <FieldLegend variant="label">Cor de destaque</FieldLegend>
-        <FieldDescription>Botões, links e o item aberto no menu. Os tons são ajustados para o texto ficar sempre legível.</FieldDescription>
+        <FieldDescription>
+          Botões, links e o item aberto no menu. Os tons são ajustados para o texto ficar sempre legível.
+        </FieldDescription>
         <div className="flex flex-wrap items-center gap-2" role="radiogroup" aria-label="Cor de destaque">
           {ACCENTS.map((a) => {
             const on = accent === a.hex;
@@ -82,7 +97,7 @@ export function AppearanceTab() {
           {/* Any color: the native picker. */}
           <label
             className={cn(
-              "relative flex h-10 cursor-pointer items-center gap-2 rounded-full border px-3 text-sm font-medium focus-within:ring-2 focus-within:ring-ring",
+              "relative flex h-9 cursor-pointer items-center gap-2 rounded-full border px-3 text-sm font-medium focus-within:ring-2 focus-within:ring-ring",
               !ACCENTS.some((a) => a.hex === accent) && "ring-2 ring-foreground ring-offset-2 ring-offset-background",
             )}
           >
@@ -99,31 +114,30 @@ export function AppearanceTab() {
         </div>
       </FieldSet>
 
-      <Field>
-        <FieldLabel>Barra lateral</FieldLabel>
+      <FieldSet>
+        <FieldLegend variant="label">Fundo</FieldLegend>
+        <FieldDescription>
+          Um degradê com as cores do Organizer atrás das páginas. Um papel de parede, se escolhido, fica no lugar dele.
+        </FieldDescription>
         <ToggleGroup
           type="single"
           variant="outline"
           className="flex-wrap"
-          value={st.sidebarStyle ?? "solid"}
-          onValueChange={(v) => v && set("sidebarStyle", v === "solid" ? undefined : (v as Settings["sidebarStyle"]))}
+          aria-label="Fundo"
+          value={st.backdrop ?? "animated"}
+          onValueChange={(v) => v && set("backdrop", v === "animated" ? undefined : (v as Settings["backdrop"]))}
         >
-          <ToggleGroupItem value="solid" className="px-3">
-            Padrão
+          <ToggleGroupItem value="animated" className="px-3">
+            Animado
           </ToggleGroupItem>
-          <ToggleGroupItem value="accent" className="px-3">
-            Cor de destaque
+          <ToggleGroupItem value="static" className="px-3">
+            Degradê parado
           </ToggleGroupItem>
-          <ToggleGroupItem value="glass" className="px-3">
-            Acompanhar o papel de parede
+          <ToggleGroupItem value="plain" className="px-3">
+            Liso
           </ToggleGroupItem>
         </ToggleGroup>
-        <FieldDescription>
-          {st.sidebarStyle === "glass" && (st.wallpaper?.kind ?? "none") === "none"
-            ? "Escolha um papel de parede abaixo para ver o efeito de vidro."
-            : "“Acompanhar o papel de parede” deixa a barra translúcida, com o fundo desfocado."}
-        </FieldDescription>
-      </Field>
+      </FieldSet>
 
       <FieldSet>
         <FieldLegend variant="label">Papel de parede</FieldLegend>
@@ -231,7 +245,7 @@ function WallpaperChoice({
       <span
         className={cn(
           "relative block aspect-[4/3] w-full overflow-hidden rounded-xl border transition-shadow group-focus-visible:ring-2 group-focus-visible:ring-ring",
-          selected && "ring-2 ring-primary ring-offset-2 ring-offset-background",
+          selected && "ring-2 ring-primary-strong ring-offset-2 ring-offset-background",
         )}
       >
         {children}

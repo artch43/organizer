@@ -1,24 +1,34 @@
+import { Logo, Mascot } from "./brand/Brand";
 import { useState } from "react";
-import { Download, KeyRound, Loader2, LogOut, Plus, Trash2, Upload } from "lucide-react";
+import { motion } from "motion/react";
+import {
+  Bell,
+  CalendarClock,
+  Database,
+  Download,
+  KeyRound,
+  Loader2,
+  LogOut,
+  Mail,
+  MessageCircle,
+  Palette,
+  Plus,
+  Sparkles,
+  Tag,
+  Trash2,
+  Upload,
+  UserRound,
+} from "lucide-react";
+import { cn } from "@/lib/utils";
+import { alarmsBetween } from "@/lib/alarms";
 import type { AreaColor, Settings as S, Workspace } from "@/lib/types";
 import { NONE, WhatsAppNumber } from "./calendar/AlertPicker";
-import { ALERT_PRESETS } from "@/lib/events";
+import { ALERT_PRESETS, whenLabel } from "@/lib/events";
 import { downloadBackup, parseBackup } from "@/lib/backup";
 import { cloudEnabled, supabase } from "@/lib/supabase";
 import { deleteAllMyData, signOut, useSync } from "@/lib/sync";
 import { addArea, deleteArea, exampleData, notify, removeExamples, replaceWorkspace, toast, updateArea, useStore } from "@/store";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import {
-  Field,
-  FieldContent,
-  FieldDescription,
-  FieldGroup,
-  FieldLabel,
-  FieldSeparator,
-  FieldSet,
-  FieldLegend,
-} from "@/components/ui/field";
+import { Field, FieldContent, FieldDescription, FieldGroup, FieldLabel, FieldSeparator } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
@@ -40,113 +50,280 @@ import { PasswordInput } from "./Auth";
 import { passwordProblem } from "@/lib/password";
 import { PasswordRules } from "./PasswordRules";
 
-export function Settings() {
+type Tab = "conta" | "aparencia" | "areas" | "alertas" | "dados";
+const TABS: { id: Tab; label: string; icon: typeof UserRound }[] = [
+  { id: "conta", label: "Conta", icon: UserRound },
+  { id: "aparencia", label: "Aparência", icon: Palette },
+  { id: "areas", label: "Áreas", icon: Tag },
+  { id: "alertas", label: "Alertas", icon: Bell },
+  { id: "dados", label: "Dados", icon: Database },
+];
+const TAB_KEY = "organizer:settings-tab";
+
+/** A block of settings: a card with an icon and a title (and an optional control on the right). */
+function SCard({
+  icon: Icon,
+  title,
+  action,
+  className,
+  children,
+}: {
+  icon?: typeof UserRound;
+  title?: string;
+  action?: React.ReactNode;
+  className?: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <section className={cn("flex flex-col gap-4 rounded-2xl border bg-card p-5 shadow-card md:p-6", className)}>
+      {title && (
+        <div className="flex items-center gap-3">
+          {Icon && <Icon className="size-5 shrink-0" aria-hidden="true" />}
+          <h2 className="text-lg font-bold">{title}</h2>
+          {action && <div className="ml-auto">{action}</div>}
+        </div>
+      )}
+      {children}
+    </section>
+  );
+}
+
+/** Configurações: a page with tabs (Conta, Aparência, Áreas, Alertas, Dados). */
+export function SettingsPage() {
+  const [tab, setTabState] = useState<Tab>(() => {
+    try {
+      const t = sessionStorage.getItem(TAB_KEY) as Tab | null;
+      return t && TABS.some((x) => x.id === t) ? t : "conta";
+    } catch {
+      return "conta";
+    }
+  });
+  const setTab = (t: Tab) => {
+    setTabState(t);
+    try {
+      sessionStorage.setItem(TAB_KEY, t);
+    } catch {
+      /* private mode */
+    }
+  };
+  return (
+    <div className="mx-auto flex w-full max-w-[90rem] flex-col gap-6 px-4 py-6 pb-28 md:px-8 md:py-8">
+      <div className="flex flex-wrap items-center gap-x-8 gap-y-4">
+        <h1 className="text-4xl font-extrabold tracking-tight md:text-5xl">Configurações</h1>
+        <div
+          role="tablist"
+          aria-label="Seções"
+          className="no-scrollbar flex max-w-full gap-0.5 overflow-x-auto rounded-2xl border bg-card/50 p-1"
+        >
+          {TABS.map((t) => (
+            <button
+              key={t.id}
+              role="tab"
+              type="button"
+              id={"set-tab-" + t.id}
+              aria-selected={tab === t.id}
+              aria-controls="set-panel"
+              onClick={() => setTab(t.id)}
+              className={cn(
+                "relative flex h-9 shrink-0 items-center gap-2 rounded-xl px-3.5 text-[15px] font-medium transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none",
+                tab === t.id ? "text-foreground" : "text-muted-foreground hover:text-foreground",
+              )}
+            >
+              {tab === t.id && (
+                <motion.span
+                  aria-hidden="true"
+                  layoutId="settings-tab"
+                  transition={{ type: "spring", duration: 0.3, bounce: 0.1 }}
+                  className="absolute inset-0 rounded-xl bg-muted shadow-card"
+                />
+              )}
+              <t.icon className={cn("relative size-[18px]", tab === t.id && "text-primary-strong")} aria-hidden="true" />
+              <span className="relative">{t.label}</span>
+            </button>
+          ))}
+        </div>
+      </div>
+      <div id="set-panel" role="tabpanel" aria-labelledby={"set-tab-" + tab} key={tab} className="page-enter">
+        {tab === "conta" && <AccountTab />}
+        {tab === "aparencia" && (
+          <SCard className="max-w-3xl">
+            <AppearanceTab />
+          </SCard>
+        )}
+        {tab === "areas" && (
+          <SCard className="max-w-3xl">
+            <AreasTab />
+          </SCard>
+        )}
+        {tab === "alertas" && <AlertsTab />}
+        {tab === "dados" && <DataTab />}
+      </div>
+    </div>
+  );
+}
+
+/** Alertas: what the alarms are, the switches, and a preview of the e-mail that arrives. */
+function AlertsTab() {
   const ws = useStore((s) => s.ws);
-  const setUi = useStore((s) => s.setUi);
   const mut = useStore((s) => s.mut);
+  const user = useSync((s) => s.user);
   const st = ws.settings;
   const set = <K extends keyof S>(k: K, v: S[K]) =>
     mut((w) => {
       w.settings[k] = v;
     });
-  const close = () =>
-    setUi((u) => {
-      u.modal = null;
-    });
+  const now = Date.now();
+  const next = alarmsBetween(ws, "all", now, now + 30 * 864e5)[0];
+  const sample = next
+    ? { title: next.title, when: whenLabel({ date: next.day, allDay: false, start: next.start }) }
+    : { title: "Enviar relatório semanal", when: "hoje, às 17:00" };
   return (
-    <Dialog open onOpenChange={(o) => !o && close()}>
-      <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-xl">
-        <DialogHeader>
-          <DialogTitle>Configurações</DialogTitle>
-          <DialogDescription>Ajuste o site do seu jeito.</DialogDescription>
-        </DialogHeader>
-        <Tabs defaultValue="geral" className="gap-5">
-          <TabsList className="w-full">
-            <TabsTrigger value="geral">Geral</TabsTrigger>
-            <TabsTrigger value="aparencia">Aparência</TabsTrigger>
-            <TabsTrigger value="areas">Áreas</TabsTrigger>
-            <TabsTrigger value="alertas">Alertas</TabsTrigger>
-            <TabsTrigger value="conta">Conta</TabsTrigger>
-          </TabsList>
-
-          <TabsContent value="geral">
-            <FieldGroup>
-              <NameField value={st.name} onSave={(v) => set("name", v)} />
-              <p className="text-sm text-muted-foreground">Tema, cores e papel de parede ficam em Aparência.</p>
-              <ExamplesField />
-            </FieldGroup>
-          </TabsContent>
-
-          <TabsContent value="aparencia">
-            <AppearanceTab />
-          </TabsContent>
-
-          <TabsContent value="areas">
-            <AreasTab />
-          </TabsContent>
-
-          <TabsContent value="alertas">
-            <FieldGroup>
-              <Field orientation="horizontal">
-                <FieldContent>
-                  <FieldLabel htmlFor="set-email">Avisos de eventos e tarefas</FieldLabel>
-                  <FieldDescription>
-                    {cloudEnabled
-                      ? "Chegam no e-mail da sua conta ou no WhatsApp, conforme você escolher em cada evento ou tarefa."
-                      : "Precisa de uma conta. Com o site salvando só neste navegador, nenhum aviso é enviado."}
-                  </FieldDescription>
-                </FieldContent>
-                <Switch id="set-email" checked={st.emailAlerts} onCheckedChange={(v) => set("emailAlerts", v)} />
-              </Field>
-              <FieldSeparator />
+    <div className="grid items-start gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(22rem,30rem)]">
+      <div className="flex min-w-0 flex-col gap-5">
+        <div className="flex items-center gap-5 rounded-2xl border border-primary-strong/40 bg-primary/12 p-5 md:gap-7 md:p-7">
+          <Mascot pose="email" size={88} className="mascot-pop shrink-0 max-sm:hidden" />
+          <div className="flex flex-col gap-1.5">
+            <h2 className="text-2xl font-extrabold tracking-tight md:text-3xl">Eu te aviso na hora certa.</h2>
+            <p className="max-w-xl text-base text-foreground/85">
+              Escolha um alarme numa tarefa ou evento e o aviso chega no seu e-mail ou no WhatsApp.
+            </p>
+          </div>
+        </div>
+        <div className="grid gap-5 md:grid-cols-2">
+          <SCard
+            icon={Mail}
+            title="Avisos de eventos e tarefas"
+            action={
+              <Switch
+                id="set-email"
+                aria-label="Avisos de eventos e tarefas"
+                checked={st.emailAlerts}
+                onCheckedChange={(v) => set("emailAlerts", v)}
+              />
+            }
+          >
+            <p className="text-[15px] text-muted-foreground">
+              {cloudEnabled
+                ? "Chegam no e-mail da sua conta ou no WhatsApp, conforme você escolher em cada evento ou tarefa."
+                : "Precisa de uma conta. Com o site salvando só neste navegador, nenhum aviso é enviado."}
+            </p>
+            {cloudEnabled && (
               <Field>
-                <FieldLabel>Número do WhatsApp</FieldLabel>
-                <FieldDescription>Usado nos avisos marcados como WhatsApp.</FieldDescription>
-                <WhatsAppNumber phone={st.whatsapp} />
+                <FieldLabel htmlFor="set-account-email">E-mail da conta</FieldLabel>
+                <Input id="set-account-email" readOnly value={user?.email ?? ""} />
               </Field>
-              <FieldSeparator />
-              <FieldSet>
-                <FieldLegend variant="label">Alarme já marcado em eventos novos</FieldLegend>
-                <ToggleGroup
-                  type="multiple"
-                  variant="outline"
-                  size="sm"
-                  spacing={2}
-                  className="flex-wrap"
-                  value={st.defaultAlerts.length ? st.defaultAlerts.map(String) : [NONE]}
-                  onValueChange={(v) =>
-                    set(
-                      "defaultAlerts",
-                      v.includes(NONE) && st.defaultAlerts.length
-                        ? []
-                        : v
-                            .filter((x) => x !== NONE)
-                            .map(Number)
-                            .sort((a, b) => a - b),
-                    )
-                  }
-                >
-                  <ToggleGroupItem value={NONE} className="px-2.5">
-                    Sem alarme
-                  </ToggleGroupItem>
-                  {ALERT_PRESETS.map((p) => (
-                    <ToggleGroupItem key={p.minutes} value={String(p.minutes)} className="px-2.5">
-                      {p.label}
-                    </ToggleGroupItem>
-                  ))}
-                </ToggleGroup>
-              </FieldSet>
-            </FieldGroup>
-          </TabsContent>
+            )}
+          </SCard>
+          <SCard icon={MessageCircle} title="Número do WhatsApp">
+            <p className="text-[15px] text-muted-foreground">Usado nos avisos marcados como WhatsApp.</p>
+            <Field>
+              <FieldLabel>Número</FieldLabel>
+              <WhatsAppNumber phone={st.whatsapp} />
+            </Field>
+          </SCard>
+        </div>
+        <SCard icon={CalendarClock} title="Alarme já marcado em eventos novos">
+          <ToggleGroup
+            type="multiple"
+            variant="outline"
+            spacing={2}
+            aria-label="Alarme já marcado em eventos novos"
+            className="flex-wrap"
+            value={st.defaultAlerts.length ? st.defaultAlerts.map(String) : [NONE]}
+            onValueChange={(v) =>
+              set(
+                "defaultAlerts",
+                v.includes(NONE) && st.defaultAlerts.length
+                  ? []
+                  : v
+                      .filter((x) => x !== NONE)
+                      .map(Number)
+                      .sort((a, b) => a - b),
+              )
+            }
+          >
+            <ToggleGroupItem value={NONE} className={PILL}>
+              Sem alarme
+            </ToggleGroupItem>
+            {ALERT_PRESETS.map((p) => (
+              <ToggleGroupItem key={p.minutes} value={String(p.minutes)} className={PILL}>
+                {p.label}
+              </ToggleGroupItem>
+            ))}
+          </ToggleGroup>
+        </SCard>
+      </div>
 
-          <TabsContent value="conta">
-            <AccountTab onClose={close} />
-          </TabsContent>
-        </Tabs>
-      </DialogContent>
-    </Dialog>
+      {/* How the e-mail arrives: a preview, and what the alarm looks like in a task or event. */}
+      <section aria-labelledby="mail-preview" className="flex flex-col gap-5 rounded-2xl border bg-card p-5 shadow-card md:p-6">
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 border-b pb-4">
+          <h2 id="mail-preview" className="text-lg font-bold">
+            Como o e-mail chega
+          </h2>
+          <span className="flex min-w-0 items-center gap-1.5 text-sm text-muted-foreground sm:ml-auto">
+            <Mail className="size-4 shrink-0" aria-hidden="true" />
+            <span className="truncate">Lembrete: {sample.title}</span>
+          </span>
+        </div>
+        <div aria-hidden="true" className="flex flex-col gap-5 rounded-2xl bg-white p-6 text-[#0b1d51] shadow-lift">
+          <div className="flex items-center gap-2.5 text-sm text-[#4a5578]">
+            <Logo size={24} />
+            Lembrete do Organizer
+          </div>
+          <div className="flex items-center gap-4">
+            <div className="min-w-0 flex-1">
+              <p className="text-2xl leading-tight font-extrabold tracking-tight">{sample.title}</p>
+              <p className="mt-1.5 text-base text-[#4a5578] first-letter:uppercase">{sample.when}</p>
+            </div>
+            <Mascot pose="email" size={72} className="shrink-0" />
+          </div>
+          <span className="w-fit rounded-xl bg-[#C6FF3D] px-5 py-3 text-base font-bold text-[#0a0a0a]">Abrir o calendário</span>
+        </div>
+        <p className="text-sm text-muted-foreground">
+          Você recebeu este e-mail porque ativou alertas para este item. Para parar, desligue os avisos nas Configurações.
+        </p>
+        <div className="flex flex-col gap-3 pt-2">
+          <h3 className="text-base font-bold">Em cada tarefa ou evento</h3>
+          <div aria-hidden="true" className="flex flex-col gap-4 rounded-2xl border bg-background/50 p-4">
+            <div className="flex flex-wrap items-center gap-3">
+              <span className="flex items-center gap-2 font-semibold">
+                <Bell className="size-4" />
+                Alarme
+              </span>
+              <span className="ml-auto flex rounded-xl border p-0.5 text-sm">
+                <span className="flex items-center gap-1.5 rounded-lg bg-muted px-2.5 py-1 font-medium">
+                  <Mail className="size-3.5" />
+                  E-mail
+                </span>
+                <span className="flex items-center gap-1.5 px-2.5 py-1 text-muted-foreground">
+                  <MessageCircle className="size-3.5" />
+                  WhatsApp
+                </span>
+              </span>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {ALERT_PRESETS.slice(0, 5).map((p) => (
+                <span
+                  key={p.minutes}
+                  className={cn(
+                    "rounded-full border px-3.5 py-1.5 text-sm",
+                    p.minutes === 30 && "border-primary-strong bg-primary/14 font-medium text-foreground",
+                  )}
+                >
+                  {p.label}
+                </span>
+              ))}
+            </div>
+          </div>
+          <p className="text-sm text-muted-foreground">Abra uma tarefa ou evento e escolha quando e por onde ser avisado.</p>
+        </div>
+      </section>
+    </div>
   );
 }
+
+const PILL =
+  "h-10 rounded-full! border px-4 text-[15px] data-[state=on]:border-primary-strong data-[state=on]:bg-primary/14 data-[state=on]:text-foreground";
 
 /** Starter examples: listed, removed only after confirming, and recoverable (Desfazer, and the Lixeira with an account). */
 function ExamplesField() {
@@ -403,8 +580,70 @@ function ChangePassword({ email }: { email: string }) {
   );
 }
 
-function AccountTab({ onClose }: { onClose: () => void }) {
+/** Conta: name, the account (sign out, password) and the starter examples. */
+function AccountTab() {
   const user = useSync((s) => s.user);
+  const name = useStore((s) => s.ws.settings.name);
+  const mut = useStore((s) => s.mut);
+  return (
+    <div className="grid items-start gap-5 lg:grid-cols-2">
+      <SCard icon={UserRound} title="Perfil">
+        <NameField
+          value={name}
+          onSave={(v) =>
+            mut((w) => {
+              w.settings.name = v;
+            })
+          }
+        />
+      </SCard>
+      <SCard icon={KeyRound} title="Conta">
+        <FieldGroup>
+          {cloudEnabled ? (
+            <Field orientation="horizontal">
+              <FieldContent>
+                <FieldLabel>E-mail</FieldLabel>
+                <FieldDescription>
+                  Conectado como <b className="text-foreground">{user?.email}</b>. Seus dados ficam salvos na nuvem.
+                </FieldDescription>
+              </FieldContent>
+              <Button
+                variant="outline"
+                onClick={() =>
+                  signOut().catch((e: Error) =>
+                    notify(e.message, { label: "Sair e descartar", onClick: () => void signOut(true) }),
+                  )
+                }
+              >
+                <LogOut data-icon="inline-start" />
+                Sair
+              </Button>
+            </Field>
+          ) : (
+            <Alert>
+              <AlertTitle>Sem conta</AlertTitle>
+              <AlertDescription>
+                Seus dados ficam salvos apenas neste navegador. Baixe um backup de vez em quando (em Dados).
+              </AlertDescription>
+            </Alert>
+          )}
+          {cloudEnabled && user && (
+            <>
+              <FieldSeparator />
+              <ChangePassword email={user.email} />
+            </>
+          )}
+        </FieldGroup>
+      </SCard>
+      <SCard icon={Sparkles} title="Exemplos do início" className="lg:col-span-2">
+        <ExamplesField />
+      </SCard>
+    </div>
+  );
+}
+
+/** Dados: backup, restore and erasing everything. */
+function DataTab() {
   const [pending, setPending] = useState<Workspace | null>(null);
   const [err, setErr] = useState("");
   const [confirm, setConfirm] = useState("");
@@ -419,115 +658,86 @@ function AccountTab({ onClose }: { onClose: () => void }) {
     }
   };
   return (
-    <FieldGroup>
-      {cloudEnabled ? (
-        <Field orientation="horizontal">
-          <FieldContent>
-            <FieldLabel>Conta</FieldLabel>
-            <FieldDescription>
-              Conectado como <b className="text-foreground">{user?.email}</b>. Seus dados ficam salvos na nuvem.
-            </FieldDescription>
-          </FieldContent>
-          <Button
-            variant="outline"
-            onClick={() =>
-              signOut().catch((e: Error) => notify(e.message, { label: "Sair e descartar", onClick: () => void signOut(true) }))
-            }
-          >
-            <LogOut data-icon="inline-start" />
-            Sair
-          </Button>
+    <SCard icon={Database} title="Seus dados" className="max-w-3xl">
+      <FieldGroup>
+        <Field>
+          <FieldLabel>Backup</FieldLabel>
+          <FieldDescription>Uma cópia de tudo: listas, tarefas, eventos, anotações e hábitos.</FieldDescription>
+          <div className="flex flex-wrap gap-2">
+            <Button variant="outline" onClick={() => downloadBackup(useStore.getState().ws)}>
+              <Download data-icon="inline-start" />
+              Baixar backup
+            </Button>
+            <Button variant="outline" asChild>
+              <label htmlFor="backup-file" className="cursor-pointer">
+                <Upload data-icon="inline-start" />
+                Restaurar backup
+              </label>
+            </Button>
+            <input
+              id="backup-file"
+              type="file"
+              accept="application/json,.json"
+              hidden
+              onChange={(e) => {
+                onFile(e.target.files?.[0]);
+                e.target.value = "";
+              }}
+            />
+          </div>
+          {err && <p className="text-sm text-destructive">{err}</p>}
+          {pending && (
+            <Alert>
+              <AlertTitle>Substituir tudo pelo backup?</AlertTitle>
+              <AlertDescription className="flex flex-col gap-3">
+                {pending.pages.length} páginas e {Object.keys(pending.items).length} tarefas. O que está no site agora será
+                trocado.
+                <div className="flex gap-2">
+                  <Button
+                    size="sm"
+                    onClick={() => {
+                      replaceWorkspace(pending);
+                      setPending(null);
+                      toast("Backup restaurado");
+                    }}
+                  >
+                    Substituir
+                  </Button>
+                  <Button size="sm" variant="outline" onClick={() => setPending(null)}>
+                    Cancelar
+                  </Button>
+                </div>
+              </AlertDescription>
+            </Alert>
+          )}
         </Field>
-      ) : (
-        <Alert>
-          <AlertTitle>Sem conta</AlertTitle>
-          <AlertDescription>Seus dados ficam salvos apenas neste navegador. Baixe um backup de vez em quando.</AlertDescription>
-        </Alert>
-      )}
-      {cloudEnabled && user && (
-        <>
-          <FieldSeparator />
-          <ChangePassword email={user.email} />
-        </>
-      )}
-      <FieldSeparator />
-      <Field>
-        <FieldLabel>Backup</FieldLabel>
-        <FieldDescription>Uma cópia de tudo: listas, tarefas, eventos, anotações e hábitos.</FieldDescription>
-        <div className="flex flex-wrap gap-2">
-          <Button variant="outline" onClick={() => downloadBackup(useStore.getState().ws)}>
-            <Download data-icon="inline-start" />
-            Baixar backup
-          </Button>
-          <Button variant="outline" asChild>
-            <label htmlFor="backup-file" className="cursor-pointer">
-              <Upload data-icon="inline-start" />
-              Restaurar backup
-            </label>
-          </Button>
-          <input
-            id="backup-file"
-            type="file"
-            accept="application/json,.json"
-            hidden
-            onChange={(e) => {
-              onFile(e.target.files?.[0]);
-              e.target.value = "";
-            }}
-          />
-        </div>
-        {err && <p className="text-sm text-destructive">{err}</p>}
-        {pending && (
-          <Alert>
-            <AlertTitle>Substituir tudo pelo backup?</AlertTitle>
-            <AlertDescription className="flex flex-col gap-3">
-              {pending.pages.length} páginas e {Object.keys(pending.items).length} tarefas. O que está no site agora será trocado.
+        {cloudEnabled && (
+          <>
+            <FieldSeparator />
+            <Field>
+              <FieldLabel htmlFor="erase">Apagar todos os meus dados</FieldLabel>
+              <FieldDescription>
+                Apaga para sempre tudo o que está na nuvem e sai da conta. Digite APAGAR para confirmar.
+              </FieldDescription>
               <div className="flex gap-2">
+                <Input id="erase" className="max-w-40" value={confirm} onChange={(e) => setConfirm(e.target.value)} />
                 <Button
-                  size="sm"
-                  onClick={() => {
-                    replaceWorkspace(pending);
-                    setPending(null);
-                    onClose();
-                    toast("Backup restaurado");
-                  }}
+                  variant="destructive"
+                  disabled={confirm.trim().toUpperCase() !== "APAGAR"}
+                  onClick={() => deleteAllMyData().catch((e: Error) => setErr(e.message))}
                 >
-                  Substituir
-                </Button>
-                <Button size="sm" variant="outline" onClick={() => setPending(null)}>
-                  Cancelar
+                  Apagar tudo
                 </Button>
               </div>
-            </AlertDescription>
-          </Alert>
+            </Field>
+          </>
         )}
-      </Field>
-      {cloudEnabled && (
-        <>
-          <FieldSeparator />
-          <Field>
-            <FieldLabel htmlFor="erase">Apagar todos os meus dados</FieldLabel>
-            <FieldDescription>
-              Apaga para sempre tudo o que está na nuvem e sai da conta. Digite APAGAR para confirmar.
-            </FieldDescription>
-            <div className="flex gap-2">
-              <Input id="erase" className="max-w-40" value={confirm} onChange={(e) => setConfirm(e.target.value)} />
-              <Button
-                variant="destructive"
-                disabled={confirm.trim().toUpperCase() !== "APAGAR"}
-                onClick={() => deleteAllMyData().catch((e: Error) => setErr(e.message))}
-              >
-                Apagar tudo
-              </Button>
-            </div>
-          </Field>
-        </>
-      )}
-      <p className="text-xs text-muted-foreground">
-        <a className="underline underline-offset-2" href="/privacidade.html" target="_blank" rel="noopener">
-          Privacidade e termos de uso
-        </a>
-      </p>
-    </FieldGroup>
+        <p className="text-xs text-muted-foreground">
+          <a className="underline underline-offset-2" href="/privacidade.html" target="_blank" rel="noopener">
+            Privacidade e termos de uso
+          </a>
+        </p>
+      </FieldGroup>
+    </SCard>
   );
 }

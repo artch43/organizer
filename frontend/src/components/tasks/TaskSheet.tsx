@@ -281,7 +281,7 @@ function TaskNote({ itemId, oldText }: { itemId: string; oldText: string }) {
         type="button"
         onClick={() => openTaskNote(itemId)}
         className={cn(
-          "group flex w-full items-start gap-3 rounded-xl border p-3.5 text-left transition-[background-color,border-color,transform] hover:-translate-y-0.5 hover:border-primary/50 hover:bg-primary/5 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none active:scale-[0.99]",
+          "group flex w-full items-start gap-3 rounded-xl border p-3.5 text-left transition-[background-color,border-color,transform] hover:-translate-y-0.5 hover:border-primary-strong/50 hover:bg-primary/5 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none active:scale-[0.99]",
           !note && "border-dashed",
         )}
       >
@@ -289,9 +289,7 @@ function TaskNote({ itemId, oldText }: { itemId: string; oldText: string }) {
           {note ? <NotebookText className="size-5" aria-hidden="true" /> : <NotebookPen className="size-5" aria-hidden="true" />}
         </span>
         <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-          <span className="font-semibold">
-            {note ? note.title : oldText.trim() ? "Mover para Anotações" : "Criar anotação"}
-          </span>
+          <span className="font-semibold">{note ? note.title : oldText.trim() ? "Mover para Anotações" : "Criar anotação"}</span>
           <span className={cn("text-sm text-muted-foreground", preview ? "line-clamp-2" : "")}>
             {preview || "Abre na aba Anotações, ligada a esta tarefa: com títulos, listas, fórmulas, imagens e PDF."}
           </span>

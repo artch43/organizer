@@ -141,8 +141,7 @@ export function autoSort(db: Database, list: Item[]) {
   const cmp = (x: string, y: string) => (x < y ? -1 : x > y ? 1 : 0);
   // Day first; within a day, priority; then the time (untimed after timed); then the order they were placed.
   return [...list].sort(
-    (a, b) =>
-      cmp(day(a), day(b)) || rank(a) - rank(b) || cmp(time(a), time(b)) || (a.order || 0) - (b.order || 0),
+    (a, b) => cmp(day(a), day(b)) || rank(a) - rank(b) || cmp(time(a), time(b)) || (a.order || 0) - (b.order || 0),
   );
 }
 

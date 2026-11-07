@@ -74,7 +74,11 @@ describe("filtros e ordenação", () => {
         { prop: "status", op: "is" as const, val: optId("estudos", "review") },
       ],
     };
-    expect(applyFilters(ws, "estudos", v, "").map((i) => i.title).sort()).toEqual(["Funções do 2º grau", "Logaritmos"]);
+    expect(
+      applyFilters(ws, "estudos", v, "")
+        .map((i) => i.title)
+        .sort(),
+    ).toEqual(["Funções do 2º grau", "Logaritmos"]);
   });
 
   it("filtra datas atrasadas ignorando concluídos", () => {

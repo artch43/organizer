@@ -89,7 +89,7 @@ export const GUIDE_BODY_V4 = [
   "- [ ] Criar uma anotação",
   "",
   "## 4. Hábitos",
-  "Toque em **Hoje** quando fizer. A 🔥 conta os dias seguidos, e o **Histórico** mostra o mês.",
+  "Toque em **Hoje** quando fizer. A sequência conta os dias seguidos, e o **Histórico** mostra o mês.",
   "",
   "---",
   "Pronto! Para apagar os exemplos: **Configurações → Remover exemplos**. Dica: **Ctrl/⌘ + K** busca em tudo.",
@@ -162,7 +162,7 @@ export function examples(T = today()) {
     log: [],
   });
   const items = [
-    item("ex-toque", P, dbP, "👋 Toque em mim para ver os detalhes", { date: T, prio: opt(dbP, "prio", "Alta") }),
+    item("ex-toque", P, dbP, "Toque em mim para ver os detalhes", { date: T, prio: opt(dbP, "prio", "Alta") }),
     item("ex-arraste", P, dbP, "Arraste este cartão para “Fazendo”", { date: T }),
     item("ex-nova", P, dbP, "Crie a sua primeira tarefa em “Nova tarefa”", {}),
     item("ex-lixeira", P, dbP, "Arraste esta tarefa até a Lixeira para excluir", {}),

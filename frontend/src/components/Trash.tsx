@@ -5,7 +5,8 @@ import { toast, useStore } from "@/store";
 import { cloudEnabled } from "@/lib/supabase";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from "@/components/ui/empty";
+import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty";
+import { Mascot } from "@/components/brand/Brand";
 import { Skeleton } from "@/components/ui/skeleton";
 import { emojiOf } from "@/lib/util";
 
@@ -37,9 +38,7 @@ export function Trash() {
     r.kind === "page"
       ? (rows ?? []).filter(
           // Only this list's own board and tasks (a folder deletion removes several lists at once).
-          (x) =>
-            sameBatch(x.deleted_at, r.deleted_at) &&
-            (x.id === r.id || (x.kind === "item" && (x.data as Item).db === r.id)),
+          (x) => sameBatch(x.deleted_at, r.deleted_at) && (x.id === r.id || (x.kind === "item" && (x.data as Item).db === r.id)),
         )
       : [r];
   const visible = (rows ?? []).filter((r) => {
@@ -85,6 +84,9 @@ export function Trash() {
         {rows && !visible.length && (
           <Empty>
             <EmptyHeader>
+              <EmptyMedia>
+                <Mascot pose="dorme" size={72} className="mascot-pop" />
+              </EmptyMedia>
               <EmptyTitle>A lixeira está vazia</EmptyTitle>
               <EmptyDescription>Nada foi excluído nos últimos 30 dias.</EmptyDescription>
             </EmptyHeader>

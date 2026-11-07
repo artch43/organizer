@@ -4,7 +4,10 @@ import {
   CalendarClock,
   ChevronLeft,
   ChevronRight,
+  Mail,
+  MessageCircle,
   MoreHorizontal,
+  NotebookPen,
   Palette,
   Pencil,
   Plus,
@@ -30,6 +33,7 @@ import {
   setProp,
   setStatusColor,
   setStatusGroup,
+  taskNoteOf,
   useStore,
 } from "@/store";
 import { Button } from "@/components/ui/button";
@@ -103,8 +107,8 @@ export function Board({ page, db, view, list }: { page: Page; db: Database; view
             style={{ "--i": ci } as React.CSSProperties}
             className={cn(
               // Columns share the width on big screens (so four fit side by side), but stay readable: 16–22rem.
-              "flex w-72 shrink-0 flex-col gap-2 rounded-2xl border border-border/60 bg-column p-2 transition-colors max-sm:w-full xl:w-auto xl:max-w-88 xl:min-w-64 xl:flex-1",
-              drop?.col === o.id && "bg-primary/8 ring-2 ring-primary/30",
+              "flex w-72 shrink-0 flex-col gap-2.5 rounded-2xl border bg-card/55 p-3 shadow-card transition-colors max-sm:w-full xl:w-auto xl:max-w-88 xl:min-w-64 xl:flex-1",
+              drop?.col === o.id && "bg-primary/8 ring-2 ring-primary-strong/30",
             )}
             onDragOver={(e) => {
               if (!drag) return;
@@ -126,7 +130,7 @@ export function Board({ page, db, view, list }: { page: Page; db: Database; view
               setDrop(null);
             }}
           >
-            <header className="flex items-center gap-1.5 px-1 pt-0.5">
+            <header className="flex items-center gap-2 px-1 pt-0.5 pb-1">
               <span aria-hidden="true" data-color={o.color} className="swatch-color size-2.5 shrink-0 rounded-full" />
               {editing === o.id ? (
                 <ColumnName
@@ -138,14 +142,14 @@ export function Board({ page, db, view, list }: { page: Page; db: Database; view
                 />
               ) : (
                 <button
-                  className="min-w-0 truncate rounded-md px-1 py-0.5 text-left text-[15px] font-semibold hover:bg-background"
+                  className="min-w-0 truncate rounded-md px-1 py-0.5 text-left text-base font-bold hover:bg-background"
                   title="Clique para renomear"
                   onClick={() => setEditing(o.id)}
                 >
                   {o.name}
                 </button>
               )}
-              <span className="text-xs tabular-nums text-muted-foreground">{items.length}</span>
+              <span className="text-sm tabular-nums text-muted-foreground">{items.length}</span>
               <ColumnMenu
                 dbId={page.id}
                 optId={o.id}
@@ -196,7 +200,7 @@ export function Board({ page, db, view, list }: { page: Page; db: Database; view
             <QuickAdd
               onAdd={(title) => {
                 newItem(page.id, { [sp.id]: o.id }, title);
-                celebrate("Tarefa adicionada", `“${title}” em ${o.name}`, "✅");
+                celebrate("Tarefa adicionada", `“${title}” em ${o.name}`, "checklist");
               }}
             />
           </section>
@@ -207,7 +211,7 @@ export function Board({ page, db, view, list }: { page: Page; db: Database; view
         variant="ghost"
         aria-label="Nova coluna"
         title="Nova coluna"
-        className="h-24 w-12 shrink-0 rounded-2xl border-2 border-dashed border-border text-muted-foreground hover:border-primary/50 hover:bg-primary/5 hover:text-primary-strong max-sm:h-12 max-sm:w-full"
+        className="h-28 w-14 shrink-0 rounded-2xl border-2 border-dashed border-border text-muted-foreground hover:border-primary-strong/50 hover:bg-primary/5 hover:text-primary-strong max-sm:h-12 max-sm:w-full"
         onClick={() => {
           const id = addStatus(page.id);
           setEditing(id);
@@ -359,6 +363,10 @@ function Card({
     )
     .filter(Boolean);
   const review = db.srs && it.review?.next && groupOf(db, it) === "done";
+  const isDone = groupOf(db, it) === "done";
+  // An alarm marked (by e-mail or WhatsApp) and a linked note show as small chips.
+  const hasAlarm = !!date && !isDone && !!it.alerts?.length;
+  const hasNote = useStore((s) => !!taskNoteOf(s.ws.notes, it.id));
   // A card that just appeared pops in, so it's easy to see where the new task went.
   const [isNew] = useState(() => isJustCreated(it.id));
   return (
@@ -373,7 +381,7 @@ function Card({
       style={{ ...areaVar(area), viewTransitionName: vtName("card", it.id) }}
       aria-label={it.title || "Sem título"}
       className={cn(
-        "area-stripe lift group flex cursor-pointer select-none flex-col gap-2 rounded-xl border border-border/70 bg-card py-3 pr-3 pl-4 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none",
+        "lift group flex cursor-pointer flex-col gap-2.5 rounded-xl border bg-card p-3.5 select-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none",
         dragging && "opacity-40",
         isNew && "card-new",
       )}
@@ -399,7 +407,9 @@ function Card({
       }}
     >
       <div className="flex items-start gap-2">
-        <span className="min-w-0 flex-1 text-[15px] font-medium break-words">
+        <span
+          className={cn("min-w-0 flex-1 text-base font-semibold break-words", isDone && "text-muted-foreground line-through")}
+        >
           {it.title || <span className="text-muted-foreground">Sem título</span>}
         </span>
         <DropdownMenu>
@@ -416,7 +426,10 @@ function Card({
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
             <DropdownMenuLabel>Mover para</DropdownMenuLabel>
-            <DropdownMenuRadioGroup value={String(it.props[sp.id] ?? "")} onValueChange={(v) => withMotion(() => setProp(it.id, sp.id, v))}>
+            <DropdownMenuRadioGroup
+              value={String(it.props[sp.id] ?? "")}
+              onValueChange={(v) => withMotion(() => setProp(it.id, sp.id, v))}
+            >
               {sp.options!.map((o) => (
                 <DropdownMenuRadioItem key={o.id} value={o.id}>
                   {o.name}
@@ -426,26 +439,52 @@ function Card({
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
-      {(date || prio || tags.length > 0 || review) && (
+      {(prio || tags.length > 0) && (
         <div className="flex flex-wrap items-center gap-1.5">
-          {date && (
-            <span
-              className={cn(
-                "flex items-center gap-1 text-[13px] tabular-nums",
-                late ? "font-medium text-destructive" : "text-muted-foreground",
-              )}
-            >
-              <CalendarClock className="size-3.5" />
-              {fmtDate(date)}
-            </span>
-          )}
           {prio && <OptionBadge opt={prio} />}
           {tags.map((t) => (
             <OptionBadge key={t!.id} opt={t!} />
           ))}
+        </div>
+      )}
+      {(date || review || hasAlarm || hasNote) && (
+        <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1.5 text-[13px]">
+          {area && (
+            <span className="size-2 shrink-0 rounded-full bg-(--area)" title={area.name} aria-label={`Área: ${area.name}`} />
+          )}
+          {date && (
+            <span
+              className={cn(
+                "flex items-center gap-1.5 tabular-nums",
+                late ? "font-medium text-destructive" : "text-muted-foreground",
+              )}
+            >
+              <CalendarClock className="size-3.5" aria-hidden="true" />
+              {fmtDate(date)}
+            </span>
+          )}
+          {hasAlarm && (
+            <span
+              className="flex items-center gap-1 rounded-md bg-primary/14 px-1.5 py-0.5 font-semibold text-primary-strong"
+              title="Alarme marcado"
+            >
+              {it.alertChannel === "whatsapp" ? (
+                <MessageCircle className="size-3.5" aria-hidden="true" />
+              ) : (
+                <Mail className="size-3.5" aria-hidden="true" />
+              )}
+              {it.alertChannel === "whatsapp" ? "WhatsApp" : "e-mail"}
+            </span>
+          )}
+          {hasNote && (
+            <span className="flex items-center gap-1 text-muted-foreground" title="Tem uma nota ligada">
+              <NotebookPen className="size-3.5" aria-hidden="true" />
+              Nota
+            </span>
+          )}
           {review && (
-            <span className="flex items-center gap-1 text-[13px] text-primary-strong">
-              <RotateCcw className="size-3" />
+            <span className="flex items-center gap-1 text-primary-strong">
+              <RotateCcw className="size-3" aria-hidden="true" />
               revisar {fmtDate(it.review!.next!).toLowerCase()}
             </span>
           )}

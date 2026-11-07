@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { ACCENTS, accentVars, contrast } from "./appearance";
 
-const LIGHT_BG = ["#f3f5f7", "#ffffff"],
-  DARK_BG = ["#12151a", "#1b1f27"];
+const LIGHT_BG = ["#ffffff", "#ffffff"],
+  DARK_BG = ["#1a1b1e", "#222327"];
 const tricky = ["#ffeb3b", "#f9a8d4", "#a3e635", "#fefefe", "#000000", "#7f7f7f", "#00ffff"];
 
 describe("cor de destaque", () => {
@@ -13,8 +13,10 @@ describe("cor de destaque", () => {
       expect(contrast(light["--primary-foreground"], light["--primary"])).toBeGreaterThanOrEqual(4.5);
       expect(contrast(dark["--primary-foreground"], dark["--primary"])).toBeGreaterThanOrEqual(4.5);
       // Accent-colored text on the page, cards and the highlighted menu item.
-      for (const bg of [...LIGHT_BG, light["--sidebar-accent"]]) expect(contrast(light["--primary-strong"], bg)).toBeGreaterThanOrEqual(4.5);
-      for (const bg of [...DARK_BG, dark["--sidebar-accent"]]) expect(contrast(dark["--primary-strong"], bg)).toBeGreaterThanOrEqual(4.5);
+      for (const bg of [...LIGHT_BG, light["--sidebar-accent"]])
+        expect(contrast(light["--primary-strong"], bg)).toBeGreaterThanOrEqual(4.5);
+      for (const bg of [...DARK_BG, dark["--sidebar-accent"]])
+        expect(contrast(dark["--primary-strong"], bg)).toBeGreaterThanOrEqual(4.5);
       // Focus ring / borders visible on the page (3:1 for non-text).
       for (const bg of LIGHT_BG) expect(contrast(light["--ring"], bg)).toBeGreaterThanOrEqual(3);
       for (const bg of DARK_BG) expect(contrast(dark["--ring"], bg)).toBeGreaterThanOrEqual(3);

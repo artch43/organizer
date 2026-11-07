@@ -4,7 +4,8 @@ import { groupOf, optOf } from "@/lib/model";
 import { fmtDate, today } from "@/lib/util";
 import { openPeek } from "@/store";
 import { Button } from "@/components/ui/button";
-import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyTitle } from "@/components/ui/empty";
+import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty";
+import { Mascot } from "@/components/brand/Brand";
 import { AreaDot, OptionBadge, useAreas } from "../common";
 
 export function TaskTable({ db, list, hasAny, onCreate }: { db: Database; list: Item[]; hasAny: boolean; onCreate: () => void }) {
@@ -14,6 +15,9 @@ export function TaskTable({ db, list, hasAny, onCreate }: { db: Database; list: 
     return (
       <Empty className="border">
         <EmptyHeader>
+          <EmptyMedia>
+            <Mascot pose="anota" size={72} className="mascot-pop" />
+          </EmptyMedia>
           <EmptyTitle>{hasAny ? "Nenhuma tarefa com esses filtros" : "Nenhuma tarefa ainda"}</EmptyTitle>
           <EmptyDescription>
             {hasAny ? "Troque a área no topo ou limpe os filtros." : "Crie a primeira tarefa desta lista."}

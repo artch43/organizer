@@ -1,6 +1,7 @@
 import { Suspense, lazy, useEffect, useState } from "react";
 import { ThemeProvider, useTheme } from "next-themes";
-import { checkReviews, closePeek, openModal, openNotes, scrollToTop, useStore } from "./store";
+import { MotionConfig } from "motion/react";
+import { PROGRESS_ROUTE, SETTINGS_ROUTE, checkReviews, closePeek, openModal, openNotes, scrollToTop, useStore } from "./store";
 import { GUIDE_ID, GUIDE_SEEN_KEY } from "./lib/template";
 import { authLink, clearAuthLink, cloudEnabled, supabase } from "./lib/supabase";
 import { installLocalTrash, startCloud, useSync } from "./lib/sync";
@@ -8,20 +9,25 @@ import { installDeleteShortcut } from "./lib/shortcuts";
 import { installTouchDnd } from "./lib/touchDnd";
 import { installNativeBars } from "./lib/native";
 import { useBackToClose } from "./lib/backClose";
-import { applyAccent, applySidebarStyle, applyWallpaper } from "./lib/appearance";
-import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
+import { applyAccent, applyWallpaper } from "./lib/appearance";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { Toaster } from "@/components/ui/sonner";
-import { AppSidebar } from "./components/app/AppSidebar";
-import { Topbar } from "./components/app/Topbar";
+import { AppHeader } from "./components/app/AppHeader";
+import { AppBackdrop } from "./components/app/AppBackdrop";
+import { ShortcutsDialog, useKeyboardShortcuts } from "./components/app/Shortcuts";
+import { Progress } from "./components/Progress";
+import { CreateButton, GlobalNewTask } from "./components/app/CreateButton";
+import { ListsPanel, ListsSheet } from "./components/lists/ListsPanel";
+import { rememberList } from "./components/lists/state";
 import { MobileNav } from "./components/app/MobileNav";
 import { TrashDrops } from "./components/app/TrashDropZone";
 import { BoardDialog } from "./components/app/BoardDialog";
 import { Search } from "./components/Search";
-import { Settings } from "./components/Settings";
+import { SettingsPage } from "./components/Settings";
 import { Trash } from "./components/Trash";
 import { Auth, ChooseStart, Loading, NewPassword } from "./components/Auth";
 import { LoadBoundary } from "./components/LoadBoundary";
+import { afterCelebration } from "./components/auth3d/mood";
 import { Home } from "./components/Home";
 import { Habits } from "./components/Habits";
 import { DbPage } from "./components/tasks/DbPage";
@@ -29,8 +35,6 @@ import { TaskSheet } from "./components/tasks/TaskSheet";
 import { StatusDialog } from "./components/tasks/StatusDialog";
 import { CalendarPage } from "./components/calendar/CalendarPage";
 import { EventDialog } from "./components/calendar/EventDialog";
-import { NotebookPen } from "lucide-react";
-import { Glyph } from "./components/icons";
 
 const NotesView = lazy(() => import("./components/notes/NotesView"));
 /** The page shown on opening: always Início (the old "Abrir em" setting is no longer offered). */
@@ -52,6 +56,13 @@ function routeFromHash() {
     });
     return true;
   }
+  if (id === SETTINGS_ROUTE || id === PROGRESS_ROUTE) {
+    setUi((u) => {
+      u.route = id;
+      u.peek = null;
+    });
+    return true;
+  }
   if (id && ws.pages.some((p) => p.id === id))
     setUi((u) => {
       u.route = id;
@@ -62,12 +73,14 @@ function routeFromHash() {
 
 export default function App() {
   return (
-    <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
-      <TooltipProvider>
-        {cloudEnabled ? <CloudGate /> : <Workspace />}
-        <Toaster position="bottom-center" />
-      </TooltipProvider>
-    </ThemeProvider>
+    <MotionConfig reducedMotion="user">
+      <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
+        <TooltipProvider>
+          {cloudEnabled ? <CloudGate /> : <Workspace />}
+          <Toaster position="bottom-center" />
+        </TooltipProvider>
+      </ThemeProvider>
+    </MotionConfig>
   );
 }
 
@@ -81,7 +94,11 @@ function CloudGate() {
   const [error, setError] = useState("");
 
   useEffect(() => {
-    const begin = (user: Parameters<typeof startCloud>[0]) => startCloud(user).catch((e: Error) => setError(e.message));
+    // After signing in here, the mascot's little celebration plays out before the app opens.
+    const begin = (user: Parameters<typeof startCloud>[0]) =>
+      afterCelebration()
+        .then(() => startCloud(user))
+        .catch((e: Error) => setError(e.message));
     (async () => {
       // A password-reset link that works on any device (token in the link, no code kept in this browser).
       if (authLink.tokenHash) {
@@ -122,9 +139,7 @@ function ThemeSync() {
   const wallpaper = useStore((s) => s.ws.settings.wallpaper);
   const { setTheme } = useTheme();
   useEffect(() => setTheme(theme), [theme]);
-  const sidebarStyle = useStore((s) => s.ws.settings.sidebarStyle);
   useEffect(() => applyAccent(accent), [accent]);
-  useEffect(() => applySidebarStyle(sidebarStyle), [sidebarStyle]);
   useEffect(() => {
     void applyWallpaper(wallpaper);
   }, [wallpaper?.kind, wallpaper?.preset, wallpaper?.strength]);
@@ -135,7 +150,6 @@ function Workspace() {
   const route = useStore((s) => s.ui.route);
   const modal = useStore((s) => s.ui.modal);
   const page = useStore((s) => s.ws.pages.find((p) => p.id === s.ui.route));
-  const note = useStore((s) => (s.ui.route === "notes" && s.ui.noteId ? s.ws.notes[s.ui.noteId] : undefined));
   const setUi = useStore((s) => s.setUi);
   // Back closes the open window, the task panel or the event dialog before changing page.
   const peek = useStore((s) => s.ui.peek);
@@ -204,42 +218,44 @@ function Workspace() {
   const noteId = useStore((s) => s.ui.noteId);
   useEffect(() => scrollToTop(), [route, route === "notes" ? noteId : null]);
 
-  const title =
-    route === "notes" ? (
-      <span className="flex items-center gap-2">
-        <NotebookPen className="size-4 text-primary-strong" aria-hidden="true" />
-        Anotações{note ? <span className="text-muted-foreground"> / {note.title}</span> : null}
-      </span>
-    ) : page ? (
-      <span className="flex items-center gap-2">
-        <Glyph icon={page.icon} size="xs" />
-        {page.title || "Sem título"}
-      </span>
-    ) : null;
-  const current = page ?? (route === "notes" ? null : useStore.getState().ws.pages.find((p) => p.type === "home"));
+  const settings = route === SETTINGS_ROUTE;
+  const progress = route === PROGRESS_ROUTE;
+  const current =
+    page ?? (route === "notes" || settings || progress ? null : useStore.getState().ws.pages.find((p) => p.type === "home"));
+  useKeyboardShortcuts();
+  // The folders and lists show beside a list only; the other pages use the tabs in the top bar.
+  const onList = current?.type === "db";
+  useEffect(() => {
+    if (onList && current) rememberList(current.id);
+  }, [onList, current?.id]);
 
   return (
-    <SidebarProvider defaultOpen={wideScreen}>
+    <div data-app-root className="flex min-h-svh w-full flex-col">
       <ThemeSync />
-      <AppSidebar />
+      <AppBackdrop />
       <a
         href="#conteudo"
         className="sr-only focus:not-sr-only focus:fixed focus:top-2 focus:left-2 focus:z-50 focus:rounded-md focus:bg-background focus:px-3 focus:py-2 focus:ring-2 focus:ring-ring"
       >
         Pular para o conteúdo
       </a>
-      <SidebarInset className="min-w-0" id="conteudo">
-        {/* Pages show their own big title; only Notes keeps the path in the top bar. */}
-        <Topbar title={route === "notes" ? title : null} showAreas={route !== "notes" && current?.type !== "habits"} />
+      <AppHeader />
+      <main id="conteudo" className="flex min-w-0 flex-1">
+        {onList && <ListsPanel />}
         {route === "notes" ? (
-          <LoadBoundary>
-            <Suspense fallback={<Loading text="Abrindo anotações…" />}>
-              <NotesView />
-            </Suspense>
-          </LoadBoundary>
+          // Notes scroll inside their own columns: the area is exactly the window below the top bar.
+          <div className="flex h-[calc(100dvh-4rem)] min-w-0 flex-1 max-md:h-[calc(100dvh-4rem-4.75rem-env(safe-area-inset-bottom))]">
+            <LoadBoundary>
+              <Suspense fallback={<Loading text="Abrindo notas…" inline />}>
+                <NotesView />
+              </Suspense>
+            </LoadBoundary>
+          </div>
         ) : (
-          <div data-scroll className="min-h-0 flex-1 overflow-y-auto">
-            <div key={current?.id} className="page-enter">
+          <div data-scroll className="min-w-0 flex-1">
+            <div key={settings || progress ? route : current?.id} className="page-enter">
+              {settings && <SettingsPage />}
+              {progress && <Progress />}
               {current?.type === "home" && <Home />}
               {current?.type === "calendar" && <CalendarPage />}
               {current?.type === "habits" && <Habits />}
@@ -247,18 +263,21 @@ function Workspace() {
             </div>
           </div>
         )}
-        <MobileNav />
-        <TrashDrops />
-      </SidebarInset>
+      </main>
+      <MobileNav />
+      <CreateButton />
+      <ListsSheet />
+      <TrashDrops />
       <TaskSheet />
       <EventDialog />
       <StatusDialog />
+      <GlobalNewTask />
+      <ShortcutsDialog />
       {modal === "search" && <Search />}
-      {modal === "settings" && <Settings />}
       {modal === "trash" && <Trash />}
       {modal === "newBoard" && <BoardDialog open onOpenChange={(o) => !o && openModal(null)} />}
       <EscToClose />
-    </SidebarProvider>
+    </div>
   );
 }
 
@@ -284,6 +303,3 @@ function EscToClose() {
   }, []);
   return null;
 }
-
-// Tablets start with the menu closed so the page gets the room; it opens from the button in the top bar.
-const wideScreen = typeof matchMedia === "undefined" || matchMedia("(min-width: 1024px)").matches;

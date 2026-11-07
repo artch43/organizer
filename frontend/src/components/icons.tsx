@@ -180,6 +180,8 @@ import {
   Zap,
   type LucideIcon,
 } from "lucide-react";
+import { PixelListIcon } from "./brand/Brand";
+import { PIXEL_ICONS } from "./brand/pixelIcons";
 import { cn } from "@/lib/utils";
 
 /**
@@ -455,8 +457,14 @@ const tile = (c: IconColor) =>
     ? { background: "color-mix(in oklab, var(--primary) 14%, transparent)", color: "var(--primary-strong)" }
     : { background: `var(--tag-${c}-bg)`, color: `var(--tag-${c}-fg)` };
 
-export type ParsedIcon = { kind: "lucide"; key: string; def?: Def; color: IconColor } | { kind: "emoji"; text: string };
+export type ParsedIcon =
+  { kind: "lucide"; key: string; def?: Def; color: IconColor } | { kind: "pixel"; key: string } | { kind: "emoji"; text: string };
+/** Pixel-art list icons are stored as "pixel:<key>" (see brand/pixelIcons.ts). */
+export const PIXEL = "pixel:";
+export const makePixelIcon = (key: string) => PIXEL + key;
 export function parseIcon(value: string | undefined): ParsedIcon {
+  if (value?.startsWith(PIXEL) && PIXEL_ICONS[value.slice(PIXEL.length)])
+    return { kind: "pixel", key: value.slice(PIXEL.length) };
   if (value?.startsWith(LUCIDE)) {
     const [key, color] = value.slice(LUCIDE.length).split(":");
     return {
@@ -470,6 +478,8 @@ export function parseIcon(value: string | undefined): ParsedIcon {
 }
 export const makeIcon = (key: string, color: IconColor = "teal") => `${LUCIDE}${key}${color === "teal" ? "" : ":" + color}`;
 
+/** Pixel icons fill most of their tile: a whole number of screen pixels per art pixel where possible. */
+const PIXEL_SIZES = { xs: 18, sm: 22, md: 26, lg: 38, xl: 46 } as const;
 const SIZES = {
   // "!" so containers that size every svg inside them (sidebar, buttons) don't stretch the icon on its tile.
   xs: { box: "size-5 rounded-[6px]", svg: "size-3!", emoji: "text-sm" },
@@ -494,6 +504,13 @@ export function Glyph({
 }) {
   const p = parseIcon(icon);
   const s = SIZES[size];
+  // Pixel art: no tile behind it (the drawing brings its own colors and outline), crisp at every size.
+  if (p.kind === "pixel")
+    return (
+      <span aria-hidden="true" className={cn("inline-flex shrink-0 items-center justify-center", s.box, className)}>
+        <PixelListIcon name={p.key} size={PIXEL_SIZES[size]} />
+      </span>
+    );
   if (p.kind === "emoji" && p.text)
     return (
       <span
