@@ -41,14 +41,14 @@ class Quiet extends Component<{ children: ReactNode }, { failed: boolean }> {
 
 // Brand palette: lime, pink, blue, cream. Fixed spots so they never jump around between visits.
 const CUBES = [
-  { x: 6, s: 10, c: "var(--primary)", d: 58, delay: -4, sway: 18, o: 0.55 },
-  { x: 17, s: 7, c: "#ff5fa2", d: 72, delay: -40, sway: -14, o: 0.5 },
-  { x: 29, s: 13, c: "#6b8cff", d: 66, delay: -22, sway: 22, o: 0.45 },
-  { x: 43, s: 8, c: "var(--primary)", d: 80, delay: -60, sway: -20, o: 0.45 },
-  { x: 57, s: 11, c: "var(--cube-neutral)", d: 62, delay: -12, sway: 16, o: 0.35 },
-  { x: 68, s: 7, c: "#ff5fa2", d: 76, delay: -50, sway: 12, o: 0.5 },
-  { x: 79, s: 12, c: "var(--primary)", d: 70, delay: -32, sway: -18, o: 0.5 },
-  { x: 91, s: 9, c: "#6b8cff", d: 64, delay: -2, sway: 14, o: 0.45 },
+  { x: 6, s: 10, c: "var(--primary)", d: 58, delay: -4, sway: 18, o: 0.28 },
+  { x: 17, s: 7, c: "#ff5fa2", d: 72, delay: -40, sway: -14, o: 0.25 },
+  { x: 29, s: 13, c: "#6b8cff", d: 66, delay: -22, sway: 22, o: 0.23 },
+  { x: 43, s: 8, c: "var(--primary)", d: 80, delay: -60, sway: -20, o: 0.23 },
+  { x: 57, s: 11, c: "var(--cube-neutral)", d: 62, delay: -12, sway: 16, o: 0.17 },
+  { x: 68, s: 7, c: "#ff5fa2", d: 76, delay: -50, sway: 12, o: 0.25 },
+  { x: 79, s: 12, c: "var(--primary)", d: 70, delay: -32, sway: -18, o: 0.25 },
+  { x: 91, s: 9, c: "#6b8cff", d: 64, delay: -2, sway: 14, o: 0.23 },
 ];
 
 /** Little pixel cubes drifting up, and a glow when a task is done (only while the background moves). */

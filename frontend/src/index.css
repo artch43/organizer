@@ -752,13 +752,13 @@ h3 {
   overflow: hidden;
   pointer-events: none;
   background:
-    radial-gradient(70% 60% at 15% 10%, rgb(255 156 198 / 0.55), transparent 70%),
-    radial-gradient(60% 60% at 90% 90%, rgb(185 200 255 / 0.6), transparent 70%), var(--background);
+    radial-gradient(70% 60% at 15% 10%, rgb(255 156 198 / 0.18), transparent 70%),
+    radial-gradient(60% 60% at 90% 90%, rgb(185 200 255 / 0.2), transparent 70%), var(--background);
 }
 .dark .app-backdrop {
   background:
-    radial-gradient(70% 60% at 15% 10%, rgb(127 174 28 / 0.35), transparent 70%),
-    radial-gradient(60% 60% at 90% 90%, rgb(47 75 184 / 0.35), transparent 70%), var(--background);
+    radial-gradient(70% 60% at 15% 10%, rgb(127 174 28 / 0.1), transparent 70%),
+    radial-gradient(60% 60% at 90% 90%, rgb(47 75 184 / 0.1), transparent 70%), var(--background);
 }
 .shader-backdrop {
   position: absolute;
@@ -885,7 +885,7 @@ html[data-backdrop="dots"].dark:not(.has-wallpaper) [data-app-root] {
   content: "";
   position: absolute;
   inset: 0;
-  background: radial-gradient(circle, color-mix(in oklab, var(--primary) 30%, transparent) 1.15px, transparent 1.75px) 0
+  background: radial-gradient(circle, color-mix(in oklab, var(--primary) 14%, transparent) 1.15px, transparent 1.75px) 0
     0 / 22px 22px;
 }
 /* Where a light passes, the dots glow in the palette colors. */
@@ -901,7 +901,7 @@ html[data-backdrop="dots"].dark:not(.has-wallpaper) [data-app-root] {
   width: 60vmax;
   height: 60vmax;
   border-radius: 50%;
-  opacity: 0.9;
+  opacity: 0.32;
   animation: backdrop-drift 46s ease-in-out infinite alternate;
 }
 .backdrop-dots-blob-1 {
