@@ -23,12 +23,30 @@ export const ACCENTS: { name: string; hex: string }[] = [
   { name: "Grafite", hex: "#475569" },
 ];
 
-export type Wallpaper = {
-  kind: "none" | "preset" | "image";
-  preset?: string;
+/** One picture: none, a preset or the person's own image. */
+export type WallpaperPick = { kind: "none" | "preset" | "image"; preset?: string };
+/** The light-mode picture (top level), the dark-mode one (`dark`, when different) and how strongly they show. */
+export type Wallpaper = WallpaperPick & {
   /** How strongly the wallpaper shows through (0.1–0.7). The rest is the page color, for legible text. */
   strength?: number;
+  /** A different picture for the dark mode; without it the light-mode one is used in both. */
+  dark?: WallpaperPick;
 };
+export type WallpaperSlot = "light" | "dark";
+
+/** Whether this picture shows anything (a preset that no longer exists shows nothing). */
+export const showsWallpaper = (p: WallpaperPick) =>
+  p.kind === "image" || (p.kind === "preset" && WALLPAPERS.some((w) => w.id === p.preset));
+
+/** The page background chosen in Settings, with the retired "still gradient" shown as the dots. */
+export const backdropMode = (b: string | undefined): "dots" | "animated" | "plain" =>
+  b === "animated" || b === "plain" ? b : "dots";
+
+/** The picture shown in this mode. */
+export function wallpaperFor(w: Wallpaper | undefined, dark: boolean): WallpaperPick {
+  if (!w) return { kind: "none" };
+  return dark && w.dark ? w.dark : { kind: w.kind, preset: w.preset };
+}
 
 export const WALLPAPERS: { id: string; name: string; css: string }[] = [
   { id: "aurora", name: "Aurora", css: "linear-gradient(135deg, #7dd3fc 0%, #a78bfa 50%, #f0abfc 100%)" },
@@ -44,11 +62,6 @@ export const WALLPAPERS: { id: string; name: string; css: string }[] = [
     id: "noite",
     name: "Noite",
     css: "radial-gradient(circle at 25% 20%, #4338ca, transparent 55%), radial-gradient(circle at 80% 80%, #0f766e, transparent 55%), #0b1020",
-  },
-  {
-    id: "pontos",
-    name: "Pontilhado",
-    css: "radial-gradient(circle, color-mix(in oklab, var(--primary) 55%, transparent) 1.2px, transparent 1.8px) 0 0 / 22px 22px",
   },
 ];
 
@@ -168,7 +181,8 @@ async function store<T>(mode: IDBTransactionMode, run: (s: IDBObjectStore) => ID
 
 const MAX_SIDE = 2400;
 /** Shrinks big photos (phones take 4000px+) so the page stays fast; saves a JPEG/WebP. */
-export async function saveWallpaperImage(file: File) {
+const imageKey = (slot: WallpaperSlot) => (slot === "dark" ? "wallpaper-dark" : "wallpaper");
+export async function saveWallpaperImage(file: File, slot: WallpaperSlot = "light") {
   if (!/^image\/(png|jpe?g|webp|gif|avif|heic|heif)$/i.test(file.type)) throw new Error("Escolha uma imagem (JPG, PNG, WebP…).");
   if (file.size > 25 * 1024 * 1024) throw new Error("A imagem passa de 25 MB.");
   let blob: Blob = file;
@@ -183,19 +197,27 @@ export async function saveWallpaperImage(file: File) {
   } catch {
     /* the browser can't decode it here (e.g. HEIC on some systems): keep the original */
   }
-  await store("readwrite", (s) => s.put(blob, "wallpaper"));
+  await store("readwrite", (s) => s.put(blob, imageKey(slot)));
 }
-export const loadWallpaperImage = () => store<Blob | undefined>("readonly", (s) => s.get("wallpaper")).catch(() => undefined);
-export const removeWallpaperImage = () => store("readwrite", (s) => s.delete("wallpaper")).catch(() => undefined);
+export const loadWallpaperImage = (slot: WallpaperSlot = "light") =>
+  store<Blob | undefined>("readonly", (s) => s.get(imageKey(slot))).catch(() => undefined);
+export const removeWallpaperImage = (slot: WallpaperSlot = "light") =>
+  store("readwrite", (s) => s.delete(imageKey(slot))).catch(() => undefined);
 
 let objectUrl: string | null = null;
-/** Shows (or clears) the wallpaper behind the pages. */
-export async function applyWallpaper(w: Wallpaper | undefined) {
+let applying = 0;
+/** Shows (or clears) the wallpaper of the current mode (light or dark) behind the pages. */
+export async function applyWallpaper(w: Wallpaper | undefined, dark: boolean) {
   const root = document.documentElement;
+  const run = ++applying;
+  const pick = wallpaperFor(w, dark);
   let value = "";
-  if (w?.kind === "preset") value = WALLPAPERS.find((p) => p.id === w.preset)?.css ?? "";
-  if (w?.kind === "image") {
-    const blob = await loadWallpaperImage();
+  if (pick.kind === "preset") value = WALLPAPERS.find((p) => p.id === pick.preset)?.css ?? "";
+  if (pick.kind === "image") {
+    // The dark-mode picture is only its own image when the dark slot has one.
+    const blob = await loadWallpaperImage(dark && w?.dark ? "dark" : "light");
+    // A newer call (theme switched while loading) wins.
+    if (run !== applying) return;
     if (objectUrl) URL.revokeObjectURL(objectUrl);
     objectUrl = blob ? URL.createObjectURL(blob) : null;
     value = objectUrl ? `url("${objectUrl}") center / cover no-repeat` : "";

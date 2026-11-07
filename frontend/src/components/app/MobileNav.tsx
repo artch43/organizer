@@ -29,7 +29,7 @@ export function MobileNav() {
   return (
     <nav
       aria-label="Navegação principal"
-      className="sticky bottom-0 z-20 grid grid-cols-5 items-end border-t bg-background/92 pb-[env(safe-area-inset-bottom)] backdrop-blur supports-backdrop-filter:bg-background/80 md:hidden"
+      className="sticky bottom-0 z-20 grid grid-cols-5 items-end border-t bg-chrome/95 pb-[env(safe-area-inset-bottom)] backdrop-blur supports-backdrop-filter:bg-chrome/85 md:hidden"
     >
       {items.map((it) =>
         it ? (

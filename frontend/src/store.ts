@@ -12,12 +12,11 @@ import { dailyBody, uniqueTitle } from "./lib/notes";
 import { STORAGE_KEY, workspaceStorage } from "./lib/storage";
 import { normalizeWorkspace } from "./lib/migrate";
 import { pushRoute } from "./lib/backClose";
+import { reactCompanion } from "./components/companion/reactions";
 
 export type Modal = "search" | "settings" | "trash" | "newBoard" | "newTask" | "shortcuts" | null;
 /** Configurações is a page (not a window): its address. */
 export const SETTINGS_ROUTE = "configuracoes";
-/** The progress page (statistics). */
-export const PROGRESS_ROUTE = "progresso";
 export interface UI {
   route: string;
   peek: string | null;
@@ -126,6 +125,9 @@ export function toast(msg: string, undo?: () => void) {
 }
 /** A friendly confirmation after creating something: the mascot (in a pose that matches), title and an optional detail line. */
 export function celebrate(title: string, description?: string, pose: MascotPose = "acena", undo?: () => void) {
+  // The corner mascot joins in: a hop for a task, a cheer when the day is cleared.
+  if (pose === "comemora") reactCompanion("cheer");
+  else if (pose === "checklist") reactCompanion("hop");
   sonner.success(title, {
     description,
     action: undo ? { label: "Desfazer", onClick: undo } : undefined,

@@ -1,4 +1,3 @@
-import { Mascot } from "@/components/brand/Brand";
 import { useRef, useState } from "react";
 import { NewTaskDialog } from "./NewTaskDialog";
 import { EmptyState } from "../EmptyState";
@@ -403,8 +402,6 @@ function PageTitle({ page, subtitle }: { page: Page; subtitle: string }) {
   };
   return (
     <div className="mr-auto flex min-w-0 items-center gap-4">
-      {/* The mascot files a card into his folder, next to the list's name. */}
-      <Mascot pose="organiza" size={56} className="mascot-pop shrink-0 max-sm:hidden" />
       <div className="flex min-w-0 flex-col">
         <h1 className="flex min-w-0 items-center text-3xl leading-tight font-extrabold tracking-tight md:text-[2.5rem]">
           {editing ? (

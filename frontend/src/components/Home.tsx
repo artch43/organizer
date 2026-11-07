@@ -5,8 +5,11 @@ import {
   CalendarClock,
   CalendarDays,
   Check,
+  ChevronDown,
   ChevronLeft,
   ChevronRight,
+  Circle,
+  CircleCheck,
   ExternalLink,
   Flame,
   Mail,
@@ -46,6 +49,8 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
+import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from "@/components/ui/empty";
+import { Progress } from "@/components/ui/progress";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -67,22 +72,15 @@ import { openLists } from "./lists/state";
 import { vtName, withMotion } from "@/lib/motion";
 import { focusPoint, pixelBurst } from "@/lib/pixelBurst";
 
-/** An alarm of a task: when it goes off (ms) and where it arrives. */
-interface RowAlarm {
-  at: number;
-  channel: AlertChannel;
-}
-
 interface Entry {
   key: string;
   time: string;
   title: string;
-  /** The task's list name. */
+  /** The task's list name and icon. */
   list?: string;
+  listIcon?: string;
   /** The task's priority (from the list's "Prioridade" column), when it has one. */
   priority?: Option;
-  /** The folder the list is in (top level name, full path and its icon), when it is in one. */
-  folder?: { name: string; path: string; icon?: string };
   area?: Area;
   done: boolean;
   order: number;
@@ -90,8 +88,6 @@ interface Entry {
   day: string;
   /** Say the day, not just the time (the list of all tasks mixes days). */
   showDay?: boolean;
-  /** The task's next alarm (or its last one, already sent). */
-  alarm?: RowAlarm;
   onOpen?: () => void;
   /** Mark done / not done (absent when the list has no "done" column). */
   onToggle?: () => void;
@@ -159,29 +155,20 @@ export function Home() {
     if (!shown && isDone) continue;
     const page = ws.pages.find((p) => p.id === it.db);
     const time = d.slice(11, 16);
-    const times = day ? alarmTimes(day, !time, time, it.alerts) : [];
-    const alarmAt = times.find((t) => t.at >= now - 60_000) ?? times.at(-1);
     const entry: Entry = {
       key: "t" + it.id,
       time,
       title: it.title || "Sem título",
       list: page?.title,
+      listIcon: page?.icon,
       priority: optOf(
         db.props.find((p) => p.id === "prio"),
         it.props.prio,
       ),
-      folder: page?.folder
-        ? {
-            name: page.folder.split("/")[0],
-            path: page.folder.split("/").join(" › "),
-            icon: ws.settings.boardFolderIcons?.[page.folder] ?? ws.settings.boardFolderIcons?.[page.folder.split("/")[0]],
-          }
-        : undefined,
       area: areaOf(it.area),
       done: isDone,
       order: it.created,
       day,
-      alarm: alarmAt ? { at: alarmAt.at, channel: it.alertChannel ?? "email" } : undefined,
       onOpen: page ? () => go(page.id) : undefined,
       onToggle: firstOptInGroup(db, "done") ? () => toggleItemDone(it.id) : undefined,
       onMove: (to) => moveItemDay(it.id, to),
@@ -194,9 +181,19 @@ export function Home() {
   const shownKeys = new Set(entries.map((e) => e.key));
   const others = allOpen.filter((e) => !shownKeys.has(e.key));
   const overdue = isToday ? entries.filter((e) => e.day < T).sort((a, b) => a.day.localeCompare(b.day) || byTime(a, b)) : [];
-  // The day's tasks in time order, done ones included (struck through), as in a checklist.
-  const todays = entries.filter((e) => e.day === D).sort(byTime);
-  const doneCount = todays.filter((e) => e.done).length;
+  const todays = entries.filter((e) => e.day === D);
+  const open = todays.filter((e) => !e.done).sort(byTime);
+  const done = todays.filter((e) => e.done).sort(byTime);
+  const summary = !isToday
+    ? open.length + done.length === 0
+      ? "Nenhuma tarefa neste dia."
+      : `${open.length + done.length} ${open.length + done.length === 1 ? "tarefa" : "tarefas"} neste dia${done.length ? `, ${done.length} ${done.length === 1 ? "feita" : "feitas"}` : ""}.`
+    : (open.length === 0
+        ? done.length
+          ? "Tudo feito por hoje."
+          : "Nenhuma tarefa com prazo para hoje."
+        : `${open.length} ${open.length === 1 ? "tarefa" : "tarefas"} para hoje${done.length ? `, ${done.length} já ${done.length === 1 ? "feita" : "feitas"}` : ""}.`) +
+      (overdue.length ? ` ${overdue.length} ${overdue.length === 1 ? "atrasada" : "atrasadas"}.` : "");
 
   const longDate = parseD(D)
     .toLocaleDateString("pt-BR", { weekday: "long", day: "numeric", month: "long" })
@@ -212,8 +209,6 @@ export function Home() {
       <WelcomeBanner />
       <header className="flex flex-wrap items-center justify-between gap-x-8 gap-y-4">
         <div className="flex min-w-0 items-center gap-3 md:gap-4">
-          {/* The mascot says hello next to the greeting. */}
-          <Mascot pose="acena" size={60} className="mascot-pop -my-1 shrink-0 max-md:size-12!" />
           <div className="flex min-w-0 flex-col">
             <p className="text-base text-muted-foreground">{greeting(ws.settings.name)}</p>
             <h1
@@ -233,109 +228,88 @@ export function Home() {
         </div>
       </header>
 
-      {/* Computer: "Hoje" is the big block on the left; the next alarm and the agenda on the right;
-          habits and lists in a smaller row below. Phone: alarm, Hoje, agenda, habits, lists. */}
+      {/* Two columns. Left: the day's tasks, as a list of cards (Atrasadas, the day's, the done ones folded
+          away, "Ver todas"). Right: the next alarm, the agenda, the habits and the lists, one under the other.
+          Phone: one column, tasks first. */}
       <div
         key={D}
         data-dir={dir ?? undefined}
-        className={cn(
-          "flex flex-col gap-5 lg:grid lg:grid-cols-[minmax(0,1.75fr)_minmax(20rem,1fr)] lg:grid-rows-[auto_1fr]",
-          dir && "cal-enter",
-        )}
+        className={cn("grid items-start gap-6 lg:grid-cols-[minmax(0,1.6fr)_minmax(20rem,1fr)] xl:gap-8", dir && "cal-enter")}
       >
-        <section
-          aria-labelledby="home-tasks"
-          className={cn(CARD, "flex min-w-0 flex-col gap-2 p-5 max-lg:order-2 md:p-6 lg:row-span-2")}
-        >
-          <div className="flex flex-col gap-4 pb-1">
-            <div className="flex items-baseline gap-3">
-              <h2 id="home-tasks" className="text-xl font-bold tracking-tight">
-                {isToday ? "Hoje" : fmtDate(D)}
-              </h2>
-              <span className="text-sm text-muted-foreground tabular-nums">
-                {todays.length
-                  ? `${doneCount} de ${todays.length} ${todays.length === 1 ? "feita" : "feitas"}`
-                  : isToday
-                    ? "nada com prazo"
-                    : "nenhuma tarefa"}
-              </span>
-              {others.length > 0 && (
-                <button
-                  type="button"
-                  aria-expanded={showAll}
-                  aria-controls="home-others"
-                  onClick={() => setShowAll(!showAll)}
-                  className="ml-auto rounded-md px-1 text-sm font-semibold text-primary-strong hover:underline focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
-                >
-                  {showAll ? "Esconder" : `Ver todas (${others.length})`}
-                </button>
-              )}
-            </div>
-            {todays.length > 0 && (
-              <div
-                role="progressbar"
-                aria-label="Feitas no dia"
-                aria-valuemin={0}
-                aria-valuemax={todays.length}
-                aria-valuenow={doneCount}
-                className="h-1.5 overflow-hidden rounded-full bg-muted"
-              >
-                <div
-                  className="h-full rounded-full bg-primary transition-[width] duration-500 ease-[cubic-bezier(0.23,1,0.32,1)]"
-                  style={{ width: `${(doneCount / todays.length) * 100}%` }}
-                />
-              </div>
-            )}
+        <section aria-labelledby="home-tasks" className="flex min-w-0 flex-col gap-3">
+          <div className="flex flex-col gap-1">
+            <h2 id="home-tasks" className="sr-only">
+              {isToday ? "Tarefas de hoje" : "Tarefas do dia"}
+            </h2>
+            <p className="text-lg text-muted-foreground">{summary}</p>
+            {/* How much of the day is done: a bar with an outlined track (visible even at 0%), the count, and a done state. */}
+            {todays.length > 0 && <DayProgress done={done.length} total={todays.length} />}
           </div>
-
-          {todays.length > 0 && <TaskList items={todays} T={T} label={isToday ? "Tarefas de hoje" : "Tarefas do dia"} />}
-          {!todays.length && !overdue.length && (
-            <div className="flex flex-1 flex-col items-center justify-center gap-2 px-4 py-10 text-center">
-              {/* A free day: the mascot naps. */}
-              <Mascot pose="dorme" size={80} className="mascot-pop" />
-              <p className="text-base font-semibold">Dia livre</p>
-              <p className="max-w-sm text-sm text-muted-foreground">
-                {isToday
-                  ? "Tarefas com prazo para hoje aparecem aqui. Dê uma data a elas nas listas."
-                  : "Nenhuma tarefa com prazo para este dia."}
-              </p>
-            </div>
-          )}
-          {todays.length > 0 && doneCount === todays.length && !overdue.length && (
-            <p className="flex items-center gap-2 px-1 pt-2 text-sm font-semibold text-primary-strong">
-              <Mascot pose="comemora" size={28} />
-              Tudo feito por hoje. Bom trabalho!
-            </p>
-          )}
           {overdue.length > 0 && (
-            <div className="flex flex-col pt-3">
-              <h3 className="flex items-center gap-1.5 px-1 pb-1 text-sm font-semibold text-destructive">
-                <AlertCircle className="size-4" aria-hidden="true" />
-                {overdue.length === 1 ? "Atrasada" : `Atrasadas (${overdue.length})`}
-              </h3>
-              <TaskList items={overdue} T={T} label="Tarefas atrasadas" />
-            </div>
+            <TaskGroup
+              title="Atrasadas"
+              count={overdue.length}
+              tone="warning"
+              hint="Ficaram de dias anteriores. Conclua ou remarque."
+              items={overdue}
+              T={T}
+            />
+          )}
+          {open.length > 0 && (
+            <TaskGroup title={isToday ? "Hoje" : "A fazer"} count={open.length} items={open} T={T} hideTitle={!overdue.length} />
+          )}
+          {!open.length && !overdue.length && (
+            <Empty className="border border-dashed bg-card/60">
+              <EmptyHeader>
+                <EmptyTitle>{done.length ? (isToday ? "Tudo feito por hoje" : "Tudo feito neste dia") : "Dia livre"}</EmptyTitle>
+                <EmptyDescription>
+                  {done.length
+                    ? "Bom trabalho! As concluídas estão logo abaixo."
+                    : isToday
+                      ? "Tarefas com prazo para hoje aparecem aqui. Dê uma data a elas nas listas."
+                      : "Nenhuma tarefa com prazo para este dia."}
+                </EmptyDescription>
+              </EmptyHeader>
+            </Empty>
+          )}
+          {done.length > 0 && <DoneGroup items={done} T={T} label={isToday ? "Concluídas hoje" : "Concluídas"} />}
+          {/* Every other open task (any day, or none), shown until hidden again. */}
+          {others.length > 0 && (
+            <Button
+              variant="ghost"
+              size="sm"
+              aria-expanded={showAll}
+              aria-controls="home-others"
+              onClick={() => setShowAll(!showAll)}
+              className="w-fit font-normal text-muted-foreground"
+            >
+              {showAll ? (
+                <ChevronDown data-icon="inline-start" aria-hidden="true" />
+              ) : (
+                <ChevronRight data-icon="inline-start" aria-hidden="true" />
+              )}
+              {showAll ? "Esconder as outras tarefas" : `Ver todas as tarefas (${others.length})`}
+            </Button>
           )}
           {showAll && others.length > 0 && (
-            <div id="home-others" className="flex flex-col pt-3">
-              <h3 className="px-1 pb-1 text-sm font-semibold text-muted-foreground">
-                {entries.length ? "Outras tarefas a fazer" : "Todas as tarefas a fazer"} ({others.length})
-              </h3>
-              <TaskList items={others} T={T} label="Outras tarefas a fazer" />
+            <div id="home-others">
+              <TaskGroup
+                title={entries.length ? "Outras tarefas a fazer" : "Todas as tarefas a fazer"}
+                count={others.length}
+                items={others}
+                T={T}
+                hideTitle
+              />
             </div>
           )}
         </section>
 
-        <div className="max-lg:order-1">{isToday ? <NextAlarm now={now} area={area} /> : <DayNote D={D} />}</div>
-        <div className="max-lg:order-3">
+        <aside className="flex min-w-0 flex-col gap-5" aria-label="Resumo do dia">
+          {isToday ? <NextAlarm now={now} area={area} /> : <DayNote D={D} />}
           <Agenda T={T} D={D} area={area} now={now} />
-        </div>
-      </div>
-
-      {/* The smaller row: habits and lists. */}
-      <div className="grid items-start gap-5 md:grid-cols-2">
-        {D <= T && <HabitsBlock D={D} isToday={isToday} />}
-        <ListsBlock />
+          {D <= T && <HabitsBlock D={D} isToday={isToday} />}
+          <ListsBlock />
+        </aside>
       </div>
     </div>
   );
@@ -357,15 +331,15 @@ function BlockHead({
 }) {
   return (
     <div className="flex items-baseline gap-3">
-      <h2 id={id} className="text-lg font-bold tracking-tight">
+      <h2 id={id} className="text-base font-bold tracking-tight">
         {title}
       </h2>
-      {meta && <span className="text-sm text-muted-foreground tabular-nums">{meta}</span>}
+      {meta && <span className="text-[13px] text-muted-foreground tabular-nums">{meta}</span>}
       {link && (
         <button
           type="button"
           onClick={link.run}
-          className="ml-auto rounded-md px-1 text-sm font-semibold text-primary-strong hover:underline focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+          className="ml-auto rounded-md px-1 text-[13px] font-semibold text-primary-strong hover:underline focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
         >
           {link.label}
         </button>
@@ -488,7 +462,7 @@ function Agenda({ T, D, area, now }: { T: string; D: string; area: string; now: 
     .flatMap((d) => byDay[d].map((e) => ({ ...e, day: d })))
     // Today's events that already ended are left out.
     .filter((e) => e.day !== T || e.allDay || (e.end || e.start) >= nowHM)
-    .slice(0, 4);
+    .slice(0, 3);
   const show = (day: string) => {
     if (!cal) return;
     setUi((u) => {
@@ -498,7 +472,7 @@ function Agenda({ T, D, area, now }: { T: string; D: string; area: string; now: 
     go(cal.id);
   };
   return (
-    <section aria-labelledby="home-agenda" className={cn(CARD, "flex h-full flex-col gap-3 p-5 md:p-6")}>
+    <section aria-labelledby="home-agenda" className={cn(CARD, "flex flex-col gap-1.5 px-4 py-3.5")}>
       <BlockHead id="home-agenda" title="Agenda" link={cal ? { label: "Calendário", run: () => show(D) } : undefined} />
       {list.length ? (
         <ul className="-mx-2 flex flex-col">
@@ -510,17 +484,17 @@ function Agenda({ T, D, area, now }: { T: string; D: string; area: string; now: 
               <li key={e.id + e.day} className={cn(i > 0 && "border-t border-border/70")}>
                 <button
                   onClick={() => show(e.day)}
-                  className="flex w-full items-center gap-4 rounded-xl px-2 py-2.5 text-left transition-colors hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+                  className="flex w-full items-center gap-3 rounded-xl px-2 py-1.5 text-left transition-colors hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
                 >
-                  <span className="flex size-12 shrink-0 flex-col items-center justify-center rounded-xl bg-muted leading-none">
-                    <span className="text-lg font-bold tabular-nums">{d.getDate()}</span>
-                    <span className="mt-0.5 text-[10px] font-semibold text-muted-foreground uppercase">
+                  <span className="flex size-9 shrink-0 flex-col items-center justify-center rounded-lg bg-muted leading-none">
+                    <span className="text-sm font-bold tabular-nums">{d.getDate()}</span>
+                    <span className="mt-0.5 text-[9px] font-semibold text-muted-foreground uppercase">
                       {d.toLocaleDateString("pt-BR", { weekday: "short" }).replace(".", "")}
                     </span>
                   </span>
-                  <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-                    <span className="truncate text-base font-medium">{e.title || "Evento"}</span>
-                    <span className="truncate text-sm text-muted-foreground">
+                  <span className="flex min-w-0 flex-1 flex-col">
+                    <span className="truncate text-sm font-medium">{e.title || "Evento"}</span>
+                    <span className="truncate text-xs text-muted-foreground">
                       {e.allDay ? "Dia todo" : e.start + (e.end ? `–${e.end}` : "")}
                       {a ? ` · ${a.name}` : ""}
                     </span>
@@ -557,7 +531,7 @@ function HabitsBlock({ D, isToday }: { D: string; isToday: boolean }) {
   if (!page) return null;
   if (!habits.length)
     return (
-      <section aria-label="Hábitos" className={cn(CARD, "p-5")}>
+      <section aria-label="Hábitos" className={cn(CARD, "px-4 py-3.5")}>
         <EmptyState
           compact
           pose="rega"
@@ -570,7 +544,7 @@ function HabitsBlock({ D, isToday }: { D: string; isToday: boolean }) {
   const doneIds = new Set(habitLog[D] ?? []);
   const done = habits.filter((h) => doneIds.has(h.id)).length;
   return (
-    <section aria-labelledby="home-habits" className={cn(CARD, "flex flex-col gap-3 p-5")}>
+    <section aria-labelledby="home-habits" className={cn(CARD, "flex flex-col gap-1.5 px-4 py-3.5")}>
       <BlockHead
         id="home-habits"
         title="Hábitos"
@@ -590,36 +564,34 @@ function HabitsBlock({ D, isToday }: { D: string; isToday: boolean }) {
                 title={on ? "Desmarcar" : "Marcar como feito"}
                 onClick={() => withMotion(() => toggleHabit(h.id, D))}
                 className={cn(
-                  "flex w-full items-center gap-3 rounded-xl py-2 text-left transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none sm:-mx-1 sm:px-1 sm:hover:bg-muted/60",
+                  "flex w-full items-center gap-2.5 rounded-xl py-1.5 text-left transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none sm:-mx-1 sm:px-1 sm:hover:bg-muted/60",
                   "max-sm:h-full max-sm:flex-col max-sm:items-start max-sm:gap-2 max-sm:border max-sm:bg-background/40 max-sm:p-3",
                   on && "max-sm:border-primary-strong max-sm:bg-primary/10",
                 )}
               >
                 <span
                   className={cn(
-                    "flex size-9 shrink-0 items-center justify-center rounded-xl transition-colors",
+                    "flex size-7 shrink-0 items-center justify-center rounded-lg transition-colors",
                     on ? "bg-primary text-primary-foreground" : "bg-muted text-foreground",
                   )}
                 >
                   {on ? (
-                    <Check className="pixel-hop size-5" strokeWidth={2.75} aria-hidden="true" />
+                    <Check className="pixel-hop size-4" strokeWidth={2.75} aria-hidden="true" />
                   ) : (
-                    <Glyph icon={h.icon} size="sm" />
+                    <Glyph icon={h.icon} size="xs" />
                   )}
                 </span>
-                <span
-                  className={cn("min-w-0 flex-1 text-[15px] font-medium sm:truncate", on && "font-semibold text-primary-strong")}
-                >
+                <span className={cn("min-w-0 flex-1 text-sm font-medium sm:truncate", on && "font-semibold text-primary-strong")}>
                   {h.name}
                 </span>
                 {streak > 0 && (
                   <span
                     className={cn(
-                      "flex shrink-0 items-center gap-1 text-sm tabular-nums",
+                      "flex shrink-0 items-center gap-1 text-[13px] tabular-nums",
                       on ? "font-semibold text-primary-strong" : "text-muted-foreground",
                     )}
                   >
-                    <Flame className="size-4" aria-hidden="true" />
+                    <Flame className="size-3.5" aria-hidden="true" />
                     {streak}
                     <span className="max-sm:hidden"> {streak === 1 ? "dia" : "dias"}</span>
                   </span>
@@ -640,7 +612,7 @@ function ListsBlock() {
   const lists = ws.pages.filter((p) => p.type === "db" && !p.archived);
   if (!lists.length)
     return (
-      <section aria-label="Listas" className={cn(CARD, "p-5")}>
+      <section aria-label="Listas" className={cn(CARD, "px-4 py-3.5")}>
         <EmptyState
           compact
           pose="organiza"
@@ -666,7 +638,7 @@ function ListsBlock() {
     rows.push({
       key: "f" + f,
       depth: 0,
-      icon: <FolderGlyph icon={icons[f]} className="size-6!" />,
+      icon: <FolderGlyph icon={icons[f]} className="size-5!" />,
       name: f,
       count: ls.reduce((n, p) => n + (open.get(p.id) ?? 0), 0),
       run: () => (ls[0] ? go(ls[0].id) : openLists()),
@@ -690,9 +662,9 @@ function ListsBlock() {
       count: open.get(p.id) ?? 0,
       run: () => go(p.id),
     });
-  const MAX = 7;
+  const MAX = 5;
   return (
-    <section aria-labelledby="home-lists" className={cn(CARD, "flex flex-col gap-3 p-5")}>
+    <section aria-labelledby="home-lists" className={cn(CARD, "flex flex-col gap-1.5 px-4 py-3.5")}>
       <BlockHead
         id="home-lists"
         title="Listas"
@@ -703,9 +675,9 @@ function ListsBlock() {
           aria-label="Criar nova pasta"
           title="Criar nova pasta"
           onClick={() => setNewFolder(true)}
-          className="ml-auto flex size-8 items-center justify-center self-center rounded-lg transition-colors hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+          className="ml-auto flex size-7 items-center justify-center self-center rounded-lg transition-colors hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
         >
-          <UiIcon name="newFolder" size={24} />
+          <UiIcon name="newFolder" size={20} />
         </button>
       </BlockHead>
       <ul className="-mx-1 flex flex-col">
@@ -715,13 +687,13 @@ function ListsBlock() {
               type="button"
               onClick={r.run}
               className={cn(
-                "flex w-full items-center gap-3 rounded-xl px-1 py-1.5 text-left transition-colors hover:bg-muted/60 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none",
-                r.depth && "pl-9",
+                "flex w-full items-center gap-2.5 rounded-lg px-1 py-1 text-left transition-colors hover:bg-muted/60 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none",
+                r.depth && "pl-8",
               )}
             >
-              <span className="flex size-6 shrink-0 items-center justify-center">{r.icon}</span>
-              <span className={cn("min-w-0 flex-1 truncate", r.depth ? "text-[15px]" : "text-base font-semibold")}>{r.name}</span>
-              {r.count > 0 && <span className="shrink-0 text-sm text-muted-foreground tabular-nums">{r.count}</span>}
+              <span className="flex size-5 shrink-0 items-center justify-center">{r.icon}</span>
+              <span className={cn("min-w-0 flex-1 truncate", r.depth ? "text-[13px]" : "text-sm font-semibold")}>{r.name}</span>
+              {r.count > 0 && <span className="shrink-0 text-xs text-muted-foreground tabular-nums">{r.count}</span>}
             </button>
           </li>
         ))}
@@ -730,7 +702,7 @@ function ListsBlock() {
         <button
           type="button"
           onClick={openLists}
-          className="w-fit rounded-md px-1 text-sm font-semibold text-primary-strong hover:underline focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+          className="w-fit rounded-md px-1 text-[13px] font-semibold text-primary-strong hover:underline focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
         >
           Ver todas as listas
         </button>
@@ -793,7 +765,15 @@ function DayPicker({ D, T, onPick }: { D: string; T: string; onPick: (d: string)
 }
 
 /** The alarm on a row: when it goes off, or "Enviado" once it went. */
-function AlarmChip({ alarm, sameDay, compact }: { alarm: RowAlarm; sameDay: boolean; compact?: boolean }) {
+function AlarmChip({
+  alarm,
+  sameDay,
+  compact,
+}: {
+  alarm: { at: number; channel: AlertChannel };
+  sameDay: boolean;
+  compact?: boolean;
+}) {
   const sent = alarm.at < Date.now() - 60_000;
   const Icon = alarm.channel === "whatsapp" ? MessageCircle : Mail;
   const time = hhmm(alarm.at);
@@ -814,132 +794,180 @@ function AlarmChip({ alarm, sameDay, compact }: { alarm: RowAlarm; sameDay: bool
   );
 }
 
-/** Task rows separated by thin lines; a row lights up on hover. */
-function TaskList({ items, T, label }: { items: Entry[]; T: string; label: string }) {
+function DayProgress({ done, total }: { done: number; total: number }) {
+  const complete = done === total;
   return (
-    <ol aria-label={label} className="stagger -mx-2 flex flex-col">
-      {items.map((e, i) => (
-        <Row key={e.key} e={e} i={i} T={T} />
-      ))}
-    </ol>
+    <div className="mt-2 flex max-w-md items-center gap-3">
+      <Progress
+        value={(done / total) * 100}
+        aria-label={`${done} de ${total} feitas`}
+        className="h-2.5 flex-1 bg-transparent ring-1 ring-(--input) ring-inset [&>[data-slot=progress-indicator]]:rounded-full [&>[data-slot=progress-indicator]]:bg-success"
+      />
+      <span
+        className={cn(
+          "flex shrink-0 items-center gap-1 text-sm font-semibold",
+          complete ? "text-success" : "text-muted-foreground",
+        )}
+      >
+        {complete && <CircleCheck className="size-4" aria-hidden="true" />}
+        {complete ? "Tudo feito!" : `${done}/${total}`}
+      </span>
+    </div>
   );
 }
 
+/** A titled group of task rows (Atrasadas, Hoje). */
+function TaskGroup({
+  title,
+  count,
+  items,
+  T,
+  tone,
+  hint,
+  hideTitle,
+}: {
+  title: string;
+  count: number;
+  items: Entry[];
+  T: string;
+  tone?: "warning";
+  hint?: string;
+  hideTitle?: boolean;
+}) {
+  const id = "grp-" + title;
+  return (
+    <section aria-labelledby={id} className="flex flex-col gap-2.5">
+      <h2
+        id={id}
+        className={cn(
+          "flex items-baseline gap-2 text-sm font-semibold",
+          tone === "warning" ? "text-warning" : "text-muted-foreground",
+          hideTitle && "sr-only",
+        )}
+      >
+        {tone === "warning" && <AlertCircle className="size-4 self-center" aria-hidden="true" />}
+        {title}
+        <span className="font-normal">({count})</span>
+        {hint && <span className="font-normal text-muted-foreground max-sm:hidden">· {hint}</span>}
+      </h2>
+      <ol className="stagger flex flex-col gap-2.5">
+        {items.map((e, i) => (
+          <Row key={e.key} e={e} i={i} T={T} />
+        ))}
+      </ol>
+    </section>
+  );
+}
+
+/** Done on the day: folded away by default, one click to see them. */
+function DoneGroup({ items, T, label }: { items: Entry[]; T: string; label: string }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <section className="flex flex-col gap-2.5">
+      <button
+        aria-expanded={open}
+        onClick={() => setOpen(!open)}
+        className="flex w-fit items-center gap-1.5 rounded-md px-1 py-1 text-sm font-semibold text-muted-foreground hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+      >
+        <ChevronRight className={cn("size-4 transition-transform", open && "rotate-90")} aria-hidden="true" />
+        {label} <span className="font-normal">({items.length})</span>
+      </button>
+      {open && (
+        <ol className="flex flex-col gap-2.5">
+          {items.map((e, i) => (
+            <Row key={e.key} e={e} i={i} T={T} />
+          ))}
+        </ol>
+      )}
+    </section>
+  );
+}
+
+/** One task: a card with its area's stripe, done in one tap, the time on the left and "remarcar" on the right. */
 function Row({ e, i, T }: { e: Entry; i: number; T: string }) {
   const late = !!e.day && e.day < T;
   const when = !e.day
     ? "Sem data"
     : late || (e.showDay && e.day !== T)
-      ? late && e.day === addDays(T, -1)
-        ? "Ontem"
-        : fmtDate(e.day)
-      : e.time || (e.showDay ? "Hoje" : "");
-  const sameDay = !!e.alarm && dayOfMs(e.alarm.at) === e.day;
+      ? fmtDate(e.day)
+      : e.time || (e.showDay ? "Hoje" : "Dia todo");
+  const sub = e.list ? (
+    <span className="inline-flex items-center gap-1.5">
+      <Glyph icon={e.listIcon} size="xs" />
+      {e.list}
+    </span>
+  ) : undefined;
   const body = (
     <>
-      {/* Phones: the folder's icon before the title (the list's name doesn't fit there). */}
-      {e.folder && (
-        <span className="-mr-2 shrink-0 md:hidden" title={`Na pasta ${e.folder.path}`}>
-          <FolderGlyph icon={e.folder.icon} />
-        </span>
-      )}
-      <span className="flex min-w-0 flex-1 items-center gap-2">
-        <span
-          className={cn(
-            "line-clamp-2 min-w-0 text-base break-words md:truncate md:text-[17px]",
-            e.done && "text-muted-foreground line-through",
-          )}
-        >
-          {e.title}
-        </span>
-        {/* The task's priority, right after its name. */}
-        {e.priority && (
-          <span className="flex max-w-[40%] min-w-0 shrink-0" title={`Prioridade: ${e.priority.name}`}>
-            <span className="sr-only">Prioridade: </span>
-            <OptionBadge opt={e.priority} />
-          </span>
+      {/* The left column says when: the time today, or the day for overdue ones. */}
+      <span
+        className={cn(
+          "flex w-16 shrink-0 flex-col text-base leading-tight max-sm:hidden",
+          e.time && !late ? "font-semibold" : "text-sm text-muted-foreground",
+          late && "font-medium text-warning",
+          e.done && "text-muted-foreground",
         )}
+      >
+        {when}
       </span>
-      {/* The list, in its area's color, with the icon of the folder it is in (when it is in one). */}
-      {e.list && (
-        <span
-          className="flex max-w-[34%] min-w-0 items-center gap-2 text-sm text-muted-foreground max-md:hidden"
-          title={e.folder ? `Na pasta ${e.folder.path} › ${e.list}` : `Lista ${e.list}`}
-        >
-          <span className="size-2 shrink-0 rounded-full bg-(--area,var(--muted-foreground))" aria-hidden="true" />
-          {e.folder && <FolderGlyph icon={e.folder.icon} />}
-          <span className="truncate">{e.list}</span>
-          {e.folder && <span className="sr-only">, na pasta {e.folder.path}</span>}
-        </span>
-      )}
-      {e.alarm && (
-        <>
-          <span className="max-md:hidden">
-            <AlarmChip alarm={e.alarm} sameDay={sameDay} />
-          </span>
-          <span className="md:hidden">
-            <AlarmChip alarm={e.alarm} sameDay={sameDay} compact />
-          </span>
-        </>
-      )}
-      {when && (
-        <span
-          className={cn(
-            "min-w-12 shrink-0 text-right text-base tabular-nums",
-            late ? "font-medium text-destructive" : e.time ? "font-semibold" : "text-sm text-muted-foreground",
-            e.done && "font-normal text-muted-foreground",
+      <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+        <span className="flex min-w-0 items-center gap-2">
+          <span className={cn("truncate text-base font-medium", e.done && "text-muted-foreground line-through")}>{e.title}</span>
+          {e.priority && (
+            <span className="flex max-w-[40%] min-w-0 shrink-0" title={`Prioridade: ${e.priority.name}`}>
+              <span className="sr-only">Prioridade: </span>
+              <OptionBadge opt={e.priority} />
+            </span>
           )}
-        >
-          {when}
         </span>
-      )}
+        {/* Phones: "when" moves under the title, so the title gets the width. */}
+        <span className="flex min-w-0 items-center gap-1.5 truncate text-sm text-muted-foreground">
+          <span className={cn("shrink-0 sm:hidden", late && "font-medium text-warning")}>
+            {when}
+            {sub ? " ·" : ""}
+          </span>
+          {sub}
+        </span>
+      </span>
+      {e.onOpen && <ChevronRight className="size-5 shrink-0 text-muted-foreground" aria-hidden="true" />}
     </>
   );
   return (
     <li
       style={{ ...areaVar(e.area), "--i": Math.min(i, 12), viewTransitionName: vtName("home", e.key) } as React.CSSProperties}
       className={cn(
-        "group/row relative flex items-center rounded-xl pr-1 pl-2 transition-colors focus-within:bg-muted/60 hover:bg-muted/60",
-        // A thin line between rows (hidden around the highlighted one).
-        "after:pointer-events-none after:absolute after:inset-x-3 after:top-0 after:h-px after:bg-border/70 first:after:hidden hover:after:opacity-0 [&:hover+li]:after:opacity-0",
+        "area-stripe flex items-center gap-1 rounded-2xl border border-border/70 bg-card py-1.5 pr-1.5 pl-3 shadow-card transition-colors focus-within:border-primary/40 hover:border-primary/40",
+        e.done && "opacity-75",
       )}
     >
       {/* Done in one tap. */}
-      {e.onToggle ? (
+      {e.onToggle && (
         <button
           role="checkbox"
           aria-checked={e.done}
           aria-label={e.done ? `Reabrir “${e.title}”` : `Concluir “${e.title}”`}
           title={e.done ? "Reabrir" : "Concluir"}
           onClick={e.onToggle}
-          className="group/check flex size-11 shrink-0 items-center justify-center rounded-full focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+          className={cn(
+            "flex size-11 shrink-0 items-center justify-center rounded-full transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none",
+            e.done ? "text-success" : "text-muted-foreground hover:text-success",
+          )}
         >
-          <span
-            className={cn(
-              "flex size-[22px] items-center justify-center rounded-full border-2 transition-colors",
-              e.done
-                ? "border-primary bg-primary text-primary-foreground"
-                : "border-muted-foreground/70 group-hover/check:border-primary-strong",
-            )}
-          >
-            {e.done && <Check className="pixel-hop size-3.5" strokeWidth={3} aria-hidden="true" />}
-          </span>
+          {e.done ? <CircleCheck className="pop size-6" /> : <Circle className="size-6" strokeWidth={1.75} />}
         </button>
-      ) : (
-        <span className="size-11 shrink-0" aria-hidden="true" />
       )}
       {e.onOpen ? (
         <button
           onClick={e.onOpen}
           title="Abrir a lista desta tarefa"
-          className="flex min-w-0 flex-1 items-center gap-4 rounded-lg py-3.5 pr-2 pl-1 text-left focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+          className="flex min-w-0 flex-1 items-center gap-3 rounded-xl py-2.5 pr-2 text-left focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
         >
           {body}
         </button>
       ) : (
-        <div className="flex min-w-0 flex-1 items-center gap-4 py-3.5 pr-2 pl-1">{body}</div>
+        <div className="flex min-w-0 flex-1 items-center gap-3 py-2.5 pr-2">{body}</div>
       )}
-      {/* Another day, without opening anything: shows on hover or focus. */}
+      {/* Another day, without opening anything. */}
       {!e.done && (
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
@@ -948,7 +976,7 @@ function Row({ e, i, T }: { e: Entry; i: number; T: string }) {
               size="icon"
               aria-label={`Remarcar “${e.title}”`}
               title="Remarcar"
-              className="size-9 shrink-0 text-muted-foreground opacity-0 transition-opacity group-focus-within/row:opacity-100 group-hover/row:opacity-100 focus-visible:opacity-100 data-[state=open]:opacity-100 pointer-coarse:opacity-100"
+              className="size-11 shrink-0 text-muted-foreground"
             >
               <CalendarClock />
             </Button>
@@ -971,8 +999,6 @@ function Row({ e, i, T }: { e: Entry; i: number; T: string }) {
           </DropdownMenuContent>
         </DropdownMenu>
       )}
-      {/* Keeps the times lined up with the rows that have the button. */}
-      {e.done && <span className="size-9 shrink-0 pointer-coarse:hidden" aria-hidden="true" />}
     </li>
   );
 }

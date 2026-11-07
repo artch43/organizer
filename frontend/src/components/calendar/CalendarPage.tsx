@@ -148,8 +148,6 @@ export function CalendarPage() {
       <div className="flex min-w-0 flex-col gap-5">
         <div className="flex flex-wrap items-center gap-x-4 gap-y-3">
           <div className="mr-auto flex min-w-0 items-center gap-4">
-            {/* The mascot flips the page of a tear-off calendar. */}
-            <Mascot pose="calendario" size={56} className="mascot-pop -my-2 shrink-0 max-sm:size-11!" />
             <h1 className="text-[1.75rem] leading-tight font-extrabold tracking-tight first-letter:uppercase sm:text-3xl md:text-[2.5rem]">
               {label}
             </h1>

@@ -2,7 +2,6 @@ import { motion } from "motion/react";
 import { useEffect, useState } from "react";
 import {
   Bell,
-  ChartColumn,
   Keyboard,
   CalendarDays,
   CloudOff,
@@ -23,7 +22,7 @@ import { cn } from "@/lib/utils";
 import { cloudEnabled } from "@/lib/supabase";
 import { signOut, useSync } from "@/lib/sync";
 import { alarmsBetween, CHANNEL, hhmm, untilLabel, type Alarm } from "@/lib/alarms";
-import { PROGRESS_ROUTE, SETTINGS_ROUTE, go, notify, openEvent, openModal, openNotes, openPeek, useStore } from "@/store";
+import { SETTINGS_ROUTE, go, notify, openEvent, openModal, openNotes, openPeek, useStore } from "@/store";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {
   DropdownMenu,
@@ -73,7 +72,7 @@ export function AppHeader() {
   ];
 
   return (
-    <header className="sticky top-0 z-30 flex h-16 shrink-0 items-center gap-3 border-b bg-background/90 px-4 backdrop-blur supports-backdrop-filter:bg-background/80 md:gap-4 md:px-5">
+    <header className="sticky top-0 z-30 flex h-16 shrink-0 items-center gap-3 border-b bg-chrome/95 px-4 backdrop-blur supports-backdrop-filter:bg-chrome/85 md:gap-4 md:px-5">
       <button
         type="button"
         onClick={() => home && go(home)}
@@ -118,14 +117,11 @@ export function AppHeader() {
         <button
           type="button"
           onClick={() => openModal("search")}
-          aria-label="Buscar (Ctrl ou ⌘ + K)"
+          aria-label="Buscar"
           className="flex h-10 min-w-10 items-center justify-center gap-2.5 rounded-xl text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none xl:mr-3 xl:w-[21rem] xl:justify-start xl:border xl:bg-card/50 xl:px-3"
         >
           <Search className="size-5 shrink-0 xl:size-[18px]" aria-hidden="true" />
           <span className="truncate text-[15px] max-xl:hidden">Buscar tarefas, notas e listas</span>
-          <kbd className="ml-auto rounded-md bg-muted px-1.5 py-0.5 font-sans text-[11px] font-semibold text-muted-foreground max-xl:hidden">
-            ⌘K
-          </kbd>
         </button>
         <AlarmsBell />
         <div className="flex items-center gap-1 max-md:hidden">
@@ -271,10 +267,6 @@ function AccountMenu({ habits }: { habits?: string }) {
           </DropdownMenuItem>
         </DropdownMenuGroup>
         <DropdownMenuGroup>
-          <DropdownMenuItem onSelect={() => go(PROGRESS_ROUTE)}>
-            <ChartColumn />
-            Progresso
-          </DropdownMenuItem>
           <DropdownMenuItem onSelect={() => openModal("settings")}>
             <Settings />
             Configurações

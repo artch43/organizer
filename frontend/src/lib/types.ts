@@ -174,12 +174,21 @@ export interface Settings {
   guideVersion?: number;
   /** Accent color (hex); missing = the default teal. */
   accent?: string;
-  /** Background behind the pages. A photo stays on each device; presets sync. */
-  wallpaper?: { kind: "none" | "preset" | "image"; preset?: string; strength?: number };
+  /** Background behind the pages: one for the light mode and, optionally, another for the dark mode.
+   * A photo stays on each device; presets sync. */
+  wallpaper?: {
+    kind: "none" | "preset" | "image";
+    preset?: string;
+    strength?: number;
+    dark?: { kind: "none" | "preset" | "image"; preset?: string };
+  };
   /** Sidebar look: the default, a tint of the accent, or frosted glass over the wallpaper. */
   sidebarStyle?: "solid" | "accent" | "glass";
-  /** The page background (Settings → Aparência): drifting gradient (default), the same gradient still, or plain. */
-  backdrop?: "animated" | "static" | "plain";
+  /** The page background (Settings → Aparência): softly moving dots (default), the moving gradient, or plain.
+   * "static" (the old still gradient) now shows the dots. */
+  backdrop?: "dots" | "animated" | "static" | "plain";
+  /** The little 3D mascot in the corner of the app (Settings → Aparência); shown unless false. */
+  companion?: boolean;
   /** The person chose to keep exploring with the example data: the welcome banner stays hidden. */
   examplesDismissed?: boolean;
 }

@@ -3,6 +3,7 @@ import { Canvas, useFrame, type ThreeEvent } from "@react-three/fiber";
 import * as THREE from "three";
 import { buildMascot, type VoxelGroup } from "./voxels";
 import { useAuthMood } from "./mood";
+import { useCompanion } from "../companion/reactions";
 
 /*
  * The sign-in screen's 3D mascot: the approved pixel-art mascot rebuilt as cubes (voxels).
@@ -241,7 +242,10 @@ function Platform({ accent }: { accent: string }) {
 
 /** Little cubes bursting out of him when he cheers. */
 const CONFETTI = 70;
-function Confetti({ beat, accent }: { beat: number; accent: string }) {
+/** `small`: a few cubes, a short hop high (the corner mascot). */
+function Confetti({ beat, accent, small }: { beat: number; accent: string; small?: boolean }) {
+  const N = small ? 16 : CONFETTI;
+  const k = small ? 0.45 : 1;
   const ref = useRef<THREE.InstancedMesh>(null);
   const parts = useRef<{ p: THREE.Vector3; v: THREE.Vector3; r: THREE.Euler; born: number }[]>([]);
   const o = useMemo(() => new THREE.Object3D(), []);
@@ -249,15 +253,15 @@ function Confetti({ beat, accent }: { beat: number; accent: string }) {
     const mesh = ref.current!;
     const palette = [accent, "#ff5fa2", "#8fa9ff", "#ffffff", "#ffd166"];
     const c = new THREE.Color();
-    for (let i = 0; i < CONFETTI; i++) mesh.setColorAt(i, c.set(palette[i % palette.length]));
+    for (let i = 0; i < N; i++) mesh.setColorAt(i, c.set(palette[i % palette.length]));
     if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
   }, [accent]);
   useEffect(() => {
     if (!beat) return;
     const now = performance.now();
-    parts.current = Array.from({ length: CONFETTI }, () => ({
+    parts.current = Array.from({ length: N }, () => ({
       p: new THREE.Vector3((Math.random() - 0.5) * 8, 26 + Math.random() * 4, (Math.random() - 0.5) * 4),
-      v: new THREE.Vector3((Math.random() - 0.5) * 34, 18 + Math.random() * 22, (Math.random() - 0.5) * 18),
+      v: new THREE.Vector3((Math.random() - 0.5) * 34 * k, (18 + Math.random() * 22) * k, (Math.random() - 0.5) * 18 * k),
       r: new THREE.Euler(Math.random() * 6, Math.random() * 6, 0),
       born: now,
     }));
@@ -267,13 +271,13 @@ function Confetti({ beat, accent }: { beat: number; accent: string }) {
     if (!mesh) return;
     const now = performance.now();
     const step = Math.min(dt, 0.05);
-    for (let i = 0; i < CONFETTI; i++) {
+    for (let i = 0; i < N; i++) {
       const q = parts.current[i];
       const life = q ? (now - q.born) / 1600 : 1;
       if (!q || life >= 1) {
         o.scale.setScalar(0);
       } else {
-        q.v.y -= 60 * step;
+        q.v.y -= 60 * k * step;
         q.p.addScaledVector(q.v, step);
         q.r.x += step * 6;
         q.r.y += step * 4;
@@ -287,17 +291,36 @@ function Confetti({ beat, accent }: { beat: number; accent: string }) {
     mesh.instanceMatrix.needsUpdate = true;
   });
   return (
-    <instancedMesh ref={ref} args={[CUBE, undefined, CONFETTI]} frustumCulled={false}>
+    <instancedMesh ref={ref} args={[CUBE, undefined, N]} frustumCulled={false}>
       <meshLambertMaterial />
     </instancedMesh>
   );
 }
 
 /** The mascot and everything that moves him. */
-function Mascot({ clock, accent, onReady, onPoke }: { clock: Clock; accent: string; onReady?: () => void; onPoke?: () => void }) {
+function Mascot({
+  clock,
+  accent,
+  onReady,
+  onPoke,
+  anchor,
+}: {
+  clock: Clock;
+  accent: string;
+  onReady?: () => void;
+  onPoke?: () => void;
+  /** Companion mode: the element he sits in; he looks at the pointer from there, and stays quiet. */
+  anchor?: React.RefObject<HTMLElement | null>;
+}) {
+  const companion = !!anchor;
   const parts = useMemo(() => buildMascot(), []);
-  const mood = useAuthMood((s) => s.mood);
-  const beat = useAuthMood((s) => s.beat);
+  const authMood = useAuthMood((s) => s.mood);
+  const authBeat = useAuthMood((s) => s.beat);
+  const reactionKind = useCompanion((s) => s.reaction);
+  const reactionBeat = useCompanion((s) => s.beat);
+  // The corner mascot doesn't follow the sign-in form.
+  const mood = companion ? "idle" : authMood;
+  const beat = companion ? 0 : authBeat;
   const root = useRef<THREE.Group>(null);
   const turn = useRef<THREE.Group>(null);
   const face = useRef<THREE.Group>(null);
@@ -313,23 +336,37 @@ function Mascot({ clock, accent, onReady, onPoke }: { clock: Clock; accent: stri
     blink: useRef<THREE.Group>(null),
     eyesClosed: useRef<THREE.Group>(null),
   };
-  // Where the pointer is, from -1 to 1 across the window.
-  const pointer = useRef({ x: 0, y: 0 });
+  // Where the pointer is, from -1 to 1: across the window, or (companion) relative to his corner.
+  const pointer = useRef({ x: 0, y: 0, near: false, at: performance.now() });
   useEffect(() => {
     const move = (e: PointerEvent) => {
-      pointer.current.x = (e.clientX / innerWidth) * 2 - 1;
-      pointer.current.y = (e.clientY / innerHeight) * 2 - 1;
+      const p = pointer.current;
+      p.at = performance.now();
+      const box = anchor?.current?.getBoundingClientRect();
+      if (box) {
+        const cx = box.left + box.width / 2,
+          cy = box.top + box.height / 2;
+        p.x = Math.max(-1, Math.min(1, ((e.clientX - cx) / innerWidth) * 2.2));
+        p.y = Math.max(-1, Math.min(1, ((e.clientY - cy) / innerHeight) * 2.2));
+        p.near = Math.hypot(e.clientX - cx, e.clientY - cy) < 130;
+      } else {
+        p.x = (e.clientX / innerWidth) * 2 - 1;
+        p.y = (e.clientY / innerHeight) * 2 - 1;
+      }
     };
+    const key = () => (pointer.current.at = performance.now());
+    addEventListener("keydown", key, { passive: true });
     addEventListener("pointermove", move, { passive: true });
     addEventListener("pointerdown", move, { passive: true });
     return () => {
       removeEventListener("pointermove", move);
       removeEventListener("pointerdown", move);
+      removeEventListener("keydown", key);
     };
   }, []);
 
   // Reactions: when one started, and which. A click on him is a cheer too (once per 1.2 s).
-  const reaction = useRef<{ kind: "cheer" | "shake"; at: number } | null>(null);
+  const reaction = useRef<{ kind: "cheer" | "shake" | "hop"; at: number } | null>(null);
   const [confetti, setConfetti] = useState(0);
   const cheer = () => {
     const now = performance.now();
@@ -341,8 +378,29 @@ function Mascot({ clock, accent, onReady, onPoke }: { clock: Clock; accent: stri
     if (mood === "success") cheer();
     if (mood === "error") reaction.current = { kind: "shake", at: performance.now() };
   }, [mood, beat]);
+  // Companion: a hop when a task is done, a cheer when the day is cleared.
+  useEffect(() => {
+    if (!companion || !reactionBeat) return;
+    if (reactionKind === "cheer") cheer();
+    else reaction.current = { kind: "hop", at: performance.now() };
+  }, [reactionBeat]);
 
-  const state = useRef({ ry: 0, rx: 0, tilt: 0, eyeX: 0, eyeY: 0, ready: false, nextBlink: 0, blinkUntil: 0, nextWave: 0 });
+  const state = useRef({
+    ry: 0,
+    rx: 0,
+    tilt: 0,
+    eyeX: 0,
+    eyeY: 0,
+    ready: false,
+    nextBlink: 0,
+    blinkUntil: 0,
+    nextWave: 0,
+    /** Companion: the next little antic (stretch, look around, yawn), and which one is playing. */
+    nextAntic: 0,
+    antic: null as null | { kind: "stretch" | "look" | "yawn"; at: number },
+    /** Companion: waves when the pointer comes near, at most every few seconds. */
+    nearWaveAt: 0,
+  });
 
   useFrame((_, dtRaw) => {
     const dt = Math.min(dtRaw, 0.05);
@@ -357,7 +415,8 @@ function Mascot({ clock, accent, onReady, onPoke }: { clock: Clock; accent: stri
     if (arrived && !s.ready) {
       s.ready = true;
       s.nextBlink = now + 900;
-      s.nextWave = now + 14000;
+      s.nextWave = companion ? Infinity : now + 14000;
+      s.nextAntic = now + 180000 + Math.random() * 120000;
       onReady?.();
     }
 
@@ -376,8 +435,13 @@ function Mascot({ clock, accent, onReady, onPoke }: { clock: Clock; accent: stri
 
     // Waving: right after landing, and again every so often while idle.
     const helloT = t - ASSEMBLE_MS - LAND_MS;
+    // Companion: waves back when the pointer comes close (every 6 s at most).
+    const p = pointer.current;
+    if (companion && s.ready && p.near && now - s.nearWaveAt > 6000) s.nearWaveAt = now;
+    const nearWave = companion && now - s.nearWaveAt < 1100;
     const waving =
-      !clock.reduced && ((helloT > 0 && helloT < HELLO_MS) || (s.ready && now > s.nextWave && now < s.nextWave + 1400));
+      !clock.reduced &&
+      ((helloT > 0 && helloT < HELLO_MS) || nearWave || (s.ready && now > s.nextWave && now < s.nextWave + 1400));
     if (s.ready && now > s.nextWave + 1400) s.nextWave = now + 12000 + Math.random() * 6000;
     const waveFrame = Math.floor(now / WAVE_FRAME_MS) % 2 === 0;
 
@@ -387,6 +451,26 @@ function Mascot({ clock, accent, onReady, onPoke }: { clock: Clock; accent: stri
     const cheering = r?.kind === "cheer" && rt < 1300;
     const shaking = r?.kind === "shake" && rt < 900;
     if (cheering && !clock.reduced) jump = Math.max(0, Math.sin(Math.min(1, rt / 650) * Math.PI)) * 7;
+    if (r?.kind === "hop" && rt < 420 && !clock.reduced) jump = Math.sin((rt / 420) * Math.PI) * 3.5;
+
+    // Companion antics, rare and short: a stretch, a look around, a yawn. Never while typing.
+    const idleFor = now - p.at;
+    const sleeping = companion && idleFor > 120000;
+    if (companion && s.ready && !clock.reduced && !s.antic && now > s.nextAntic && idleFor > 1500) {
+      const kinds = ["stretch", "look", "yawn"] as const;
+      s.antic = { kind: kinds[Math.floor(Math.random() * kinds.length)], at: now };
+    }
+    const at = s.antic ? now - s.antic.at : Infinity;
+    if (s.antic && at > 1800) {
+      s.antic = null;
+      s.nextAntic = now + 180000 + Math.random() * 120000;
+    }
+    const antic = s.antic?.kind;
+    if (antic === "stretch") {
+      const k = Math.sin(Math.min(1, at / 1400) * Math.PI);
+      sy *= 1 + 0.1 * k;
+      sx *= 1 - 0.05 * k;
+    }
 
     // Arms: resting, waving or cheering.
     show("cheerA", cheering && Math.floor(rt / 150) % 2 === 0);
@@ -397,7 +481,7 @@ function Mascot({ clock, accent, onReady, onPoke }: { clock: Clock; accent: stri
     show("armsRest", !cheering && !waving);
 
     // Eyes: shut on the password, a blink every few seconds, open otherwise.
-    const shut = mood === "password";
+    const shut = mood === "password" || sleeping || (antic === "yawn" && at > 200 && at < 1500);
     if (s.ready && now > s.nextBlink) {
       s.blinkUntil = now + 140;
       s.nextBlink = now + 2600 + Math.random() * 3400;
@@ -410,14 +494,16 @@ function Mascot({ clock, accent, onReady, onPoke }: { clock: Clock; accent: stri
     // Where he looks: the pointer, biased toward the form on the e-mail and away on the password.
     const px = clock.reduced ? 0 : pointer.current.x,
       py = clock.reduced ? 0 : pointer.current.y;
-    let ry = px * 0.45,
+    let ry = px * (companion ? 0.26 : 0.45),
       tilt = 0;
     const rx = py * 0.14;
+    if (antic === "look") ry = Math.sin((at / 1800) * Math.PI * 2) * 0.5;
+    if (sleeping) tilt = 0.12;
     if (mood === "email") {
       ry += 0.35;
       tilt = -0.1;
     }
-    if (shut) ry = -0.62;
+    if (shut && !companion) ry = -0.62;
     if (shaking && !clock.reduced) ry += Math.sin(rt / 55) * 0.28 * (1 - rt / 900);
     s.ry = damp(s.ry, ry, shaking ? 30 : 6, dt);
     s.rx = damp(s.rx, rx, 6, dt);
@@ -439,7 +525,9 @@ function Mascot({ clock, accent, onReady, onPoke }: { clock: Clock; accent: stri
         ? Math.sin(Math.min(1, rt / 500) * Math.PI)
         : helloT > 200 && helloT < 1700
           ? Math.sin(((helloT - 200) / 1500) * Math.PI)
-          : 0;
+          : antic === "stretch"
+            ? Math.sin(Math.min(1, at / 1400) * Math.PI)
+            : 0;
     cardRefs.forEach((c, i) => {
       const g = c.current;
       if (!g) return;
@@ -458,7 +546,9 @@ function Mascot({ clock, accent, onReady, onPoke }: { clock: Clock; accent: stri
   );
   const poke = (e: ThreeEvent<MouseEvent>) => {
     e.stopPropagation();
-    cheer();
+    // The corner mascot only hops (and says something); on the sign-in stage he cheers.
+    if (companion) reaction.current = { kind: "hop", at: performance.now() };
+    else cheer();
     onPoke?.();
   };
 
@@ -492,7 +582,8 @@ function Mascot({ clock, accent, onReady, onPoke }: { clock: Clock; accent: stri
           </group>
         </group>
       </group>
-      <Confetti beat={confetti} accent={accent} />
+      {!companion && <Confetti beat={confetti} accent={accent} />}
+      {companion && <Confetti beat={confetti} accent={accent} small />}
     </group>
   );
 }
@@ -512,7 +603,15 @@ export default function MascotScene({
   reduced,
   compact,
   onReady,
+  anchor,
+  assemble = true,
+  onPoke,
 }: {
+  onPoke?: () => void;
+  /** Companion mode (the small mascot in the app's corner): only him, framed tight, quiet. */
+  anchor?: React.RefObject<HTMLElement | null>;
+  /** Fly in from the cubes (off: he is already standing there). */
+  assemble?: boolean;
   /** Reduced motion: he is already standing there; only blinks and reactions to the form. */
   reduced: boolean;
   /** Phones: a smaller stage and a lower pixel ratio. */
@@ -521,15 +620,24 @@ export default function MascotScene({
 }) {
   const accent = useAccent();
   const visible = usePageVisible();
-  const clock = useMemo<Clock>(() => ({ start: performance.now(), reduced }), [reduced]);
+  // Without the arrival, the clock starts as if it had already played.
+  const clock = useMemo<Clock>(
+    () => ({ start: performance.now() - (assemble ? 0 : ASSEMBLE_MS + LAND_MS + HELLO_MS + 50), reduced }),
+    [reduced],
+  );
+  const companion = !!anchor;
   return (
     <Canvas
       flat
-      dpr={compact ? [1, 1.5] : [1, 1.75]}
+      dpr={compact || companion ? [1, 1.5] : [1, 1.75]}
       frameloop={visible ? "always" : "never"}
-      camera={{ position: [0, 17, compact ? 80 : 104], fov: 30, near: 1, far: 400 }}
-      gl={{ antialias: true, alpha: true, powerPreference: "high-performance" }}
-      onCreated={({ camera }) => camera.lookAt(0, 14, 0)}
+      camera={
+        companion
+          ? { position: [0, 19, 92], fov: 30, near: 1, far: 400 }
+          : { position: [0, 17, compact ? 80 : 104], fov: 30, near: 1, far: 400 }
+      }
+      gl={{ antialias: true, alpha: true, powerPreference: companion ? "low-power" : "high-performance" }}
+      onCreated={({ camera }) => camera.lookAt(0, companion ? 17 : 14, 0)}
       aria-hidden="true"
     >
       <ambientLight intensity={1.15} />
@@ -537,9 +645,9 @@ export default function MascotScene({
       <directionalLight position={[-30, 40, 50]} intensity={1.9} color="#fff6e8" />
       <directionalLight position={[35, 20, -30]} intensity={1.6} color={accent} />
       <group position={[0, 0, 0]}>
-        <Platform accent={accent} />
-        <Mascot clock={clock} accent={accent} onReady={onReady} />
-        <Orbiters accent={accent} clock={clock} />
+        {!companion && <Platform accent={accent} />}
+        <Mascot clock={clock} accent={accent} onReady={onReady} anchor={anchor} onPoke={onPoke} />
+        {!companion && <Orbiters accent={accent} clock={clock} />}
       </group>
     </Canvas>
   );

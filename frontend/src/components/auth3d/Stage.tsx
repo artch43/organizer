@@ -7,7 +7,7 @@ import { useAuthMood, type Mood } from "./mood";
 const MascotScene = lazy(() => import("./MascotScene"));
 
 const LINES: Record<Mood, string> = {
-  idle: "Oi! Que bom te ver por aqui.",
+  idle: "Oi! Eu sou o Clebinho.",
   email: "Prazer! Eu guardo tudo pra você.",
   password: "Não estou olhando! 🙈",
   error: "Ops… confere e tenta de novo?",

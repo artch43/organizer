@@ -323,7 +323,7 @@ export function Auth({ error: outer, startMode }: { error?: string; startMode?: 
               autoFocus={matchMedia("(min-width: 1024px)").matches}
               spellCheck={false}
               required
-              placeholder="voce@email.com"
+              placeholder="clebinho@gmail.com"
               className="h-11"
               value={email}
               aria-invalid={emailBad}

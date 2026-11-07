@@ -1,9 +1,8 @@
 import { useState } from "react";
-import { CalendarPlus, FilePlus2, Plus, SquareCheck } from "lucide-react";
+import { CalendarPlus, FilePlus2, SquareCheck } from "lucide-react";
 import { UiIcon } from "../brand/Brand";
-import { cn } from "@/lib/utils";
 import { today } from "@/lib/util";
-import { SETTINGS_ROUTE, createNote, openEvent, openModal, useStore } from "@/store";
+import { createNote, openEvent, openModal, useStore } from "@/store";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -56,29 +55,6 @@ export function CreateMenu({ children, side = "top" }: { children: React.ReactNo
       </DropdownMenu>
       {folder && <FolderDialog parent="" onClose={() => setFolder(false)} />}
     </>
-  );
-}
-
-/** The floating "+ Criar" at the bottom right (computer and tablet). */
-export function CreateButton() {
-  // Notas has its own "new" buttons and Configurações creates nothing: no floating button there.
-  const route = useStore((s) => s.ui.route);
-  if (route === "notes" || route === SETTINGS_ROUTE) return null;
-  return (
-    <div className="fixed right-6 bottom-6 z-30 max-md:hidden">
-      <CreateMenu>
-        <button
-          type="button"
-          className={cn(
-            "flex h-14 items-center gap-2.5 rounded-2xl bg-primary px-6 text-lg font-bold text-primary-foreground shadow-lift transition-[transform,background-color] duration-150 ease-out",
-            "hover:bg-primary/90 focus-visible:ring-4 focus-visible:ring-ring/40 focus-visible:outline-none active:scale-[0.97] data-[state=open]:scale-[0.97]",
-          )}
-        >
-          <Plus className="size-6" strokeWidth={2.5} aria-hidden="true" />
-          Criar
-        </button>
-      </CreateMenu>
-    </div>
   );
 }
 

@@ -8,10 +8,14 @@ import {
   DEFAULT_ACCENT,
   WALLPAPERS,
   applyWallpaper,
+  backdropMode,
   isHex,
+  type WallpaperPick,
+  type WallpaperSlot,
   removeWallpaperImage,
   saveWallpaperImage,
 } from "@/lib/appearance";
+import { useTheme } from "next-themes";
 import { useStore } from "@/store";
 import { Field, FieldDescription, FieldGroup, FieldLabel, FieldSet, FieldLegend } from "@/components/ui/field";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
@@ -26,19 +30,33 @@ export function AppearanceTab() {
       w.settings[k] = v;
     });
   const accent = (st.accent ?? DEFAULT_ACCENT).toLowerCase();
-  const wp = st.wallpaper ?? { kind: "none" as const };
+  const wp: NonNullable<Settings["wallpaper"]> = st.wallpaper ?? { kind: "none" };
   const strength = wp.strength ?? 0.35;
   const file = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState(false);
-  const setWp = (next: Settings["wallpaper"]) => set("wallpaper", next);
+  const { resolvedTheme } = useTheme();
+  const isDark = resolvedTheme === "dark";
+  // Which mode's picture is being chosen: starts at the mode on screen.
+  const [slot, setSlot] = useState<WallpaperSlot>(isDark ? "dark" : "light");
+  const lightPick: WallpaperPick = { kind: wp.kind, preset: wp.preset };
+  // The dark mode uses the light-mode picture until it gets its own.
+  const pick: WallpaperPick | null = slot === "light" ? lightPick : (wp.dark ?? null);
+  const nextWith = (p: WallpaperPick | null): NonNullable<Settings["wallpaper"]> =>
+    slot === "light" ? { ...wp, kind: p!.kind, preset: p!.preset } : { ...wp, dark: p ?? undefined };
+  const choose = (p: WallpaperPick | null) => set("wallpaper", nextWith(p));
+  const anyShown = wp.kind !== "none" || (!!wp.dark && wp.dark.kind !== "none");
 
   const upload = async (f: File) => {
     setBusy(true);
     try {
-      await saveWallpaperImage(f);
-      setWp({ kind: "image", strength });
-      await applyWallpaper({ kind: "image", strength });
-      toast.success("Papel de parede aplicado", { description: "A imagem fica salva neste aparelho." });
+      await saveWallpaperImage(f, slot);
+      const next = nextWith({ kind: "image" });
+      set("wallpaper", next);
+      // Same kind as before ("image") but a new picture: show it now.
+      await applyWallpaper(next, isDark);
+      toast.success(slot === "dark" ? "Papel de parede do modo escuro aplicado" : "Papel de parede do modo claro aplicado", {
+        description: "A imagem fica salva neste aparelho.",
+      });
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Não foi possível usar essa imagem.");
     }
@@ -117,21 +135,21 @@ export function AppearanceTab() {
       <FieldSet>
         <FieldLegend variant="label">Fundo</FieldLegend>
         <FieldDescription>
-          Um degradê com as cores do Organizer atrás das páginas. Um papel de parede, se escolhido, fica no lugar dele.
+          O que fica atrás das páginas. Um papel de parede, se escolhido, fica no lugar dele.
         </FieldDescription>
         <ToggleGroup
           type="single"
           variant="outline"
           className="flex-wrap"
           aria-label="Fundo"
-          value={st.backdrop ?? "animated"}
-          onValueChange={(v) => v && set("backdrop", v === "animated" ? undefined : (v as Settings["backdrop"]))}
+          value={backdropMode(st.backdrop)}
+          onValueChange={(v) => v && set("backdrop", v === "dots" ? undefined : (v as Settings["backdrop"]))}
         >
-          <ToggleGroupItem value="animated" className="px-3">
-            Animado
+          <ToggleGroupItem value="dots" className="px-3">
+            Pontilhado
           </ToggleGroupItem>
-          <ToggleGroupItem value="static" className="px-3">
-            Degradê parado
+          <ToggleGroupItem value="animated" className="px-3">
+            Degradê animado
           </ToggleGroupItem>
           <ToggleGroupItem value="plain" className="px-3">
             Liso
@@ -140,24 +158,72 @@ export function AppearanceTab() {
       </FieldSet>
 
       <FieldSet>
+        <FieldLegend variant="label">Clebinho no canto</FieldLegend>
+        <FieldDescription>O Clebinho, nosso mascote, fica pequeno no canto da tela, olha para o cursor e comemora suas tarefas. Só no computador e no tablet.</FieldDescription>
+        <ToggleGroup
+          type="single"
+          variant="outline"
+          aria-label="Clebinho no canto"
+          value={st.companion === false ? "off" : "on"}
+          onValueChange={(v) => v && set("companion", v === "on" ? undefined : false)}
+        >
+          <ToggleGroupItem value="on" className="px-3">
+            Mostrar
+          </ToggleGroupItem>
+          <ToggleGroupItem value="off" className="px-3">
+            Esconder
+          </ToggleGroupItem>
+        </ToggleGroup>
+      </FieldSet>
+
+      <FieldSet>
         <FieldLegend variant="label">Papel de parede</FieldLegend>
-        <FieldDescription>Aparece atrás das páginas. Cartões e menus continuam sólidos para a leitura.</FieldDescription>
-        <div className="grid grid-cols-3 gap-2 sm:grid-cols-4" role="radiogroup" aria-label="Papel de parede">
-          <WallpaperChoice label="Nenhum" selected={wp.kind === "none"} onClick={() => setWp({ kind: "none", strength })}>
+        <FieldDescription>
+          Aparece atrás das páginas. Escolha um para o modo claro e outro para o escuro, se quiser.
+        </FieldDescription>
+        <ToggleGroup
+          type="single"
+          variant="outline"
+          aria-label="Papel de parede de qual modo"
+          value={slot}
+          onValueChange={(v) => v && setSlot(v as WallpaperSlot)}
+          className="self-start"
+        >
+          <ToggleGroupItem value="light" className="px-3">
+            Modo claro
+          </ToggleGroupItem>
+          <ToggleGroupItem value="dark" className="px-3">
+            Modo escuro
+          </ToggleGroupItem>
+        </ToggleGroup>
+        <div
+          className="grid grid-cols-3 gap-2 sm:grid-cols-4"
+          role="radiogroup"
+          aria-label={slot === "dark" ? "Papel de parede do modo escuro" : "Papel de parede do modo claro"}
+        >
+          {slot === "dark" && (
+            <WallpaperChoice label="Igual ao claro" selected={pick === null} onClick={() => choose(null)}>
+              <span className="absolute inset-0 bg-background" />
+              <span aria-hidden="true" className="absolute inset-0 flex items-center justify-center text-xs font-semibold text-muted-foreground">
+                = claro
+              </span>
+            </WallpaperChoice>
+          )}
+          <WallpaperChoice label="Nenhum" selected={pick?.kind === "none"} onClick={() => choose({ kind: "none" })}>
             <span className="absolute inset-0 bg-background" />
           </WallpaperChoice>
           {WALLPAPERS.map((w) => (
             <WallpaperChoice
               key={w.id}
               label={w.name}
-              selected={wp.kind === "preset" && wp.preset === w.id}
-              onClick={() => setWp({ kind: "preset", preset: w.id, strength })}
+              selected={pick?.kind === "preset" && pick.preset === w.id}
+              onClick={() => choose({ kind: "preset", preset: w.id })}
             >
               <span className="absolute inset-0 bg-background" />
               <span className="absolute inset-0" style={{ background: w.css }} />
             </WallpaperChoice>
           ))}
-          <WallpaperChoice label="Sua imagem" selected={wp.kind === "image"} onClick={() => file.current?.click()}>
+          <WallpaperChoice label="Sua imagem" selected={pick?.kind === "image"} onClick={() => file.current?.click()}>
             <span className="absolute inset-0 flex items-center justify-center bg-muted text-muted-foreground">
               <ImagePlus className="size-6" aria-hidden="true" />
             </span>
@@ -175,7 +241,7 @@ export function AppearanceTab() {
           }}
         />
         {busy && <p className="text-sm text-muted-foreground">Preparando a imagem…</p>}
-        {wp.kind === "image" && (
+        {pick?.kind === "image" && (
           <div className="flex flex-wrap items-center gap-2">
             <Button type="button" variant="outline" size="sm" onClick={() => file.current?.click()}>
               <ImagePlus data-icon="inline-start" />
@@ -187,8 +253,8 @@ export function AppearanceTab() {
               size="sm"
               className="text-destructive"
               onClick={async () => {
-                await removeWallpaperImage();
-                setWp({ kind: "none", strength });
+                await removeWallpaperImage(slot);
+                choose({ kind: "none" });
               }}
             >
               <Trash2 data-icon="inline-start" />
@@ -197,7 +263,7 @@ export function AppearanceTab() {
             <span className="text-sm text-muted-foreground">Fica só neste aparelho.</span>
           </div>
         )}
-        {wp.kind !== "none" && (
+        {anyShown && (
           <Field>
             <FieldLabel htmlFor="wp-strength">
               Intensidade <span className="font-normal text-muted-foreground tabular-nums">{Math.round(strength * 100)}%</span>
@@ -209,7 +275,7 @@ export function AppearanceTab() {
               max={70}
               step={5}
               value={Math.round(strength * 100)}
-              onChange={(e) => setWp({ ...wp, strength: Number(e.target.value) / 100 })}
+              onChange={(e) => set("wallpaper", { ...wp, strength: Number(e.target.value) / 100 })}
               className="w-full accent-(--primary)"
             />
             <FieldDescription>Mais baixo deixa o texto mais fácil de ler.</FieldDescription>

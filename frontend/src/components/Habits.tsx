@@ -54,12 +54,6 @@ export function Habits() {
   return (
     <div className="mx-auto flex w-full max-w-3xl flex-col gap-6 px-4 pt-6 pb-28 md:px-8 md:pt-8">
       <div className="flex flex-wrap items-center gap-3">
-        {/* The mascot waters a sprout; with every habit done today, he cheers. */}
-        <Mascot
-          pose={habits.length && doneToday === habits.length ? "comemora" : "rega"}
-          size={54}
-          className="mascot-pop -my-2"
-        />
         <div className="mr-auto">
           <h1 className="text-3xl font-extrabold tracking-tight md:text-4xl">Hábitos</h1>
           <p className="text-base text-muted-foreground">

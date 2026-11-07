@@ -1,7 +1,7 @@
 import { Suspense, lazy, useEffect, useState } from "react";
 import { ThemeProvider, useTheme } from "next-themes";
 import { MotionConfig } from "motion/react";
-import { PROGRESS_ROUTE, SETTINGS_ROUTE, checkReviews, closePeek, openModal, openNotes, scrollToTop, useStore } from "./store";
+import { SETTINGS_ROUTE, checkReviews, closePeek, openModal, openNotes, scrollToTop, useStore } from "./store";
 import { GUIDE_ID, GUIDE_SEEN_KEY } from "./lib/template";
 import { authLink, clearAuthLink, cloudEnabled, supabase } from "./lib/supabase";
 import { installLocalTrash, startCloud, useSync } from "./lib/sync";
@@ -14,9 +14,9 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { Toaster } from "@/components/ui/sonner";
 import { AppHeader } from "./components/app/AppHeader";
 import { AppBackdrop } from "./components/app/AppBackdrop";
+import { Companion } from "./components/companion/Companion";
 import { ShortcutsDialog, useKeyboardShortcuts } from "./components/app/Shortcuts";
-import { Progress } from "./components/Progress";
-import { CreateButton, GlobalNewTask } from "./components/app/CreateButton";
+import { GlobalNewTask } from "./components/app/CreateButton";
 import { ListsPanel, ListsSheet } from "./components/lists/ListsPanel";
 import { rememberList } from "./components/lists/state";
 import { MobileNav } from "./components/app/MobileNav";
@@ -56,7 +56,7 @@ function routeFromHash() {
     });
     return true;
   }
-  if (id === SETTINGS_ROUTE || id === PROGRESS_ROUTE) {
+  if (id === SETTINGS_ROUTE) {
     setUi((u) => {
       u.route = id;
       u.peek = null;
@@ -137,12 +137,13 @@ function ThemeSync() {
   const theme = useStore((s) => s.ws.settings.theme);
   const accent = useStore((s) => s.ws.settings.accent);
   const wallpaper = useStore((s) => s.ws.settings.wallpaper);
-  const { setTheme } = useTheme();
+  const { setTheme, resolvedTheme } = useTheme();
+  const dark = resolvedTheme === "dark";
   useEffect(() => setTheme(theme), [theme]);
   useEffect(() => applyAccent(accent), [accent]);
   useEffect(() => {
-    void applyWallpaper(wallpaper);
-  }, [wallpaper?.kind, wallpaper?.preset, wallpaper?.strength]);
+    void applyWallpaper(wallpaper, dark);
+  }, [wallpaper?.kind, wallpaper?.preset, wallpaper?.strength, wallpaper?.dark?.kind, wallpaper?.dark?.preset, dark]);
   return null;
 }
 
@@ -219,9 +220,8 @@ function Workspace() {
   useEffect(() => scrollToTop(), [route, route === "notes" ? noteId : null]);
 
   const settings = route === SETTINGS_ROUTE;
-  const progress = route === PROGRESS_ROUTE;
   const current =
-    page ?? (route === "notes" || settings || progress ? null : useStore.getState().ws.pages.find((p) => p.type === "home"));
+    page ?? (route === "notes" || settings ? null : useStore.getState().ws.pages.find((p) => p.type === "home"));
   useKeyboardShortcuts();
   // The folders and lists show beside a list only; the other pages use the tabs in the top bar.
   const onList = current?.type === "db";
@@ -253,9 +253,8 @@ function Workspace() {
           </div>
         ) : (
           <div data-scroll className="min-w-0 flex-1">
-            <div key={settings || progress ? route : current?.id} className="page-enter">
+            <div key={settings ? route : current?.id} className="page-enter">
               {settings && <SettingsPage />}
-              {progress && <Progress />}
               {current?.type === "home" && <Home />}
               {current?.type === "calendar" && <CalendarPage />}
               {current?.type === "habits" && <Habits />}
@@ -265,7 +264,7 @@ function Workspace() {
         )}
       </main>
       <MobileNav />
-      <CreateButton />
+      <Companion />
       <ListsSheet />
       <TrashDrops />
       <TaskSheet />

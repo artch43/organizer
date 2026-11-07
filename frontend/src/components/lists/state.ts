@@ -49,8 +49,38 @@ function readPanel() {
   return typeof matchMedia === "undefined" || matchMedia("(min-width: 1024px)").matches;
 }
 
+/** The lists panel's width (px), chosen by dragging its edge. */
+const WIDTH_KEY = "organizer:lists-panel-width";
+export const PANEL_WIDTH = { min: 240, max: 520, default: 296 };
+export const clampPanelWidth = (w: number) => Math.round(Math.min(PANEL_WIDTH.max, Math.max(PANEL_WIDTH.min, w)));
+function readWidth() {
+  try {
+    const v = Number(localStorage.getItem(WIDTH_KEY));
+    if (v) return clampPanelWidth(v);
+  } catch {
+    /* private mode */
+  }
+  return PANEL_WIDTH.default;
+}
+
 /** The lists panel (computer) and the lists sheet (phone). */
-export const useListsUi = create<{ panel: boolean; sheet: boolean }>(() => ({ panel: readPanel(), sheet: false }));
+export const useListsUi = create<{ panel: boolean; sheet: boolean; width: number }>(() => ({
+  panel: readPanel(),
+  sheet: false,
+  width: readWidth(),
+}));
+
+/** Resizes the lists panel; `save` keeps the width for next time (at the end of a drag). */
+export function setListsPanelWidth(w: number, save = true) {
+  const width = clampPanelWidth(w);
+  useListsUi.setState({ width });
+  if (save)
+    try {
+      localStorage.setItem(WIDTH_KEY, String(width));
+    } catch {
+      /* private mode */
+    }
+}
 
 export function setListsPanel(open: boolean) {
   useListsUi.setState({ panel: open });

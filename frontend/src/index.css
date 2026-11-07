@@ -1,14 +1,14 @@
 @import "tailwindcss";
 @import "tw-animate-css";
 @import "./shadcn-tailwind.css";
-@import "@fontsource-variable/plus-jakarta-sans";
+@import "@fontsource-variable/fustat";
 @import "@fontsource-variable/jetbrains-mono";
 
 @custom-variant dark (&:is(.dark *, .ink *));
 
 @theme inline {
   --font-heading: var(--font-sans);
-  --font-sans: "Plus Jakarta Sans Variable", ui-sans-serif, system-ui, sans-serif;
+  --font-sans: "Fustat Variable", ui-sans-serif, system-ui, sans-serif;
   --font-mono: "JetBrains Mono Variable", ui-monospace, Menlo, monospace;
   --color-sidebar-ring: var(--sidebar-ring);
   --color-sidebar-border: var(--sidebar-border);
@@ -47,6 +47,7 @@
   --color-card: var(--card);
   --color-foreground: var(--foreground);
   --color-background: var(--background);
+  --color-chrome: var(--chrome);
   --color-area-coral: var(--area-coral);
   --color-area-petrol: var(--area-petrol);
   --color-area-violet: var(--area-violet);
@@ -65,9 +66,11 @@
 }
 
 :root {
-  --background: #faf7f2;
+  /* Three layers: the bars (white), the page (a deeper cream) and the cards (white), for contrast. */
+  --chrome: #ffffff;
+  --background: #f3eee5;
   --foreground: #0b1d51;
-  --card: #fffdf9;
+  --card: #ffffff;
   --card-foreground: #0b1d51;
   --popover: #fffdf9;
   --popover-foreground: #0b1d51;
@@ -92,7 +95,7 @@
   /* Soft relief for cards: a hairline plus a short, low blur. */
   --shadow-card: 0 1px 2px rgb(11 29 81 / 0.05), 0 1px 1px rgb(11 29 81 / 0.03);
   --shadow-lift: 0 2px 4px rgb(11 29 81 / 0.06), 0 10px 24px -8px rgb(11 29 81 / 0.16);
-  --column: #f4f0e8;
+  --column: #ebe5da;
   /* The brand color dark enough for text on its own light tints (AA). */
   --primary-strong: #c21a6b;
   --sidebar: #0b1d51;
@@ -139,9 +142,11 @@
   color-scheme: dark;
   --shadow-card: 0 1px 2px rgb(0 0 0 / 0.35), 0 1px 1px rgb(0 0 0 / 0.2);
   --shadow-lift: 0 2px 4px rgb(0 0 0 / 0.4), 0 12px 28px -8px rgb(0 0 0 / 0.55);
-  --column: #1f2023;
+  --column: #18191c;
   --primary-strong: #c6ff3d;
-  --background: #1a1b1e;
+  /* Three layers: the bars (the deepest black), the page (a deeper black) and the cards (the black they had). */
+  --chrome: #08090a;
+  --background: #111214;
   --foreground: #fafafa;
   --card: #222327;
   --card-foreground: #fafafa;
@@ -700,21 +705,41 @@ html {
   }
 }
 
-/* Progresso: the pixels of each day's stack land one after another. */
-.pixel-pop {
-  animation: pixel-pop 260ms steps(3, end) both;
-  animation-delay: calc(var(--i, 0) * 28ms);
+/* Titles set like AbacatePay's: Fustat bold with tight letters (their h1: 700, -0.05em, 1.05).
+   Unlayered on purpose, so it wins over the utility classes on each title. */
+h1,
+.heading-title {
+  font-weight: 700;
+  letter-spacing: -0.05em;
+  line-height: 1.05;
 }
-@keyframes pixel-pop {
-  from {
-    opacity: 0;
-    transform: translateY(-6px);
-  }
+/* Block and window titles: the same face, a little less tight (their smaller titles: -0.03em). */
+h2,
+h3 {
+  letter-spacing: -0.03em;
 }
-@media (prefers-reduced-motion: reduce) {
-  .pixel-pop {
-    animation: none;
-  }
+
+/* Fustat's tabular figures also widen the space, comma, colon and period to a digit's width
+   ("nada   com   prazo", "Ontem , 00 : 26"), so its proportional figures are used everywhere. */
+.tabular-nums {
+  font-variant-numeric: normal;
+}
+
+/* The little 3D mascot in the corner (src/components/companion/Companion.tsx): small, out of the way. */
+.companion {
+  position: fixed;
+  right: 1rem;
+  bottom: 0.25rem;
+  z-index: 25;
+  width: 84px;
+  height: 92px;
+  transition: opacity 250ms ease;
+}
+
+/* A window, menu or panel is open: he steps back. */
+.companion-dim {
+  opacity: 0.25;
+  pointer-events: none;
 }
 
 /* ---------- The page background (src/components/app/AppBackdrop.tsx) ---------- */
@@ -728,12 +753,12 @@ html {
   pointer-events: none;
   background:
     radial-gradient(70% 60% at 15% 10%, rgb(255 156 198 / 0.55), transparent 70%),
-    radial-gradient(60% 60% at 90% 90%, rgb(185 200 255 / 0.6), transparent 70%), #faf7f2;
+    radial-gradient(60% 60% at 90% 90%, rgb(185 200 255 / 0.6), transparent 70%), var(--background);
 }
 .dark .app-backdrop {
   background:
     radial-gradient(70% 60% at 15% 10%, rgb(127 174 28 / 0.35), transparent 70%),
-    radial-gradient(60% 60% at 90% 90%, rgb(47 75 184 / 0.35), transparent 70%), #121316;
+    radial-gradient(60% 60% at 90% 90%, rgb(47 75 184 / 0.35), transparent 70%), var(--background);
 }
 .shader-backdrop {
   position: absolute;
@@ -765,80 +790,151 @@ html {
 .dark .shader-backdrop::after {
   background: linear-gradient(180deg, rgb(18 19 22 / 0.62), rgb(18 19 22 / 0.3) 45%, rgb(18 19 22 / 0.45));
 }
+/* A soft glow that rises from the mascot's corner when a task is done (bigger when the day is cleared). */
+.backdrop-pulse {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  opacity: 0;
+  background:
+    radial-gradient(80% 75% at 100% 100%, color-mix(in oklab, var(--primary) 75%, transparent), transparent 70%),
+    radial-gradient(60% 50% at 50% 100%, color-mix(in oklab, var(--primary) 35%, transparent), transparent 70%);
+  animation: backdrop-pulse 1100ms cubic-bezier(0.23, 1, 0.32, 1);
+}
+.backdrop-pulse[data-kind="cheer"] {
+  background:
+    radial-gradient(90% 85% at 100% 100%, color-mix(in oklab, var(--primary) 80%, transparent), transparent 70%),
+    radial-gradient(70% 70% at 0% 0%, rgb(255 95 162 / 0.55), transparent 70%),
+    radial-gradient(60% 60% at 0% 100%, rgb(107 140 255 / 0.45), transparent 70%);
+  animation-duration: 1700ms;
+}
+@keyframes backdrop-pulse {
+  18% {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+/* A few little pixel cubes drifting up very slowly (transform and opacity only). The neutral one is navy on
+   the light page and cream on the dark one, so it never melts into the page color. */
+.app-backdrop {
+  --cube-neutral: #0b1d51;
+}
+.dark .app-backdrop {
+  --cube-neutral: #faf7f2;
+}
+.backdrop-cube {
+  position: absolute;
+  bottom: -40px;
+  z-index: 2;
+  width: var(--s);
+  height: var(--s);
+  background: var(--c);
+  opacity: 0;
+  box-shadow:
+    inset calc(var(--s) / -4) calc(var(--s) / -4) 0 rgb(0 0 0 / 0.22),
+    inset calc(var(--s) / 4) calc(var(--s) / 4) 0 rgb(255 255 255 / 0.3);
+  animation: backdrop-cube var(--d) linear var(--delay) infinite;
+}
+@keyframes backdrop-cube {
+  0% {
+    opacity: 0;
+    transform: translate3d(0, 0, 0) rotate(0deg);
+  }
+  10% {
+    opacity: var(--o);
+  }
+  50% {
+    transform: translate3d(var(--sway), -55vh, 0) rotate(90deg);
+  }
+  90% {
+    opacity: var(--o);
+  }
+  100% {
+    opacity: 0;
+    transform: translate3d(0, -112vh, 0) rotate(180deg);
+  }
+}
+
 /* With the gradient behind them, dark-mode cards are slightly see-through so its colors tint them. */
 html:not(.dark):not(.has-wallpaper) [data-app-root] {
-  --card: rgb(255 253 249 / 0.88);
+  --card: rgb(255 255 255 / 0.9);
 }
 html.dark:not(.has-wallpaper) [data-app-root] {
   --card: rgb(34 35 39 / 0.8);
   --column: rgb(31 32 35 / 0.7);
 }
-.app-glow {
+/* Over the dots, cards stay (almost) solid: dots inside them would be noise behind the text. */
+html[data-backdrop="dots"]:not(.dark):not(.has-wallpaper) [data-app-root] {
+  --card: rgb(255 255 255 / 0.97);
+}
+html[data-backdrop="dots"].dark:not(.has-wallpaper) [data-app-root] {
+  --card: rgb(34 35 39 / 0.96);
+  --column: rgb(31 32 35 / 0.9);
+}
+/* The default background: dots in the palette, with three soft lights drifting slowly behind them
+   (only transforms move; the dot grid itself is a static mask). */
+.backdrop-dots {
   position: absolute;
-  width: 70vmax;
-  height: 70vmax;
+  inset: 0;
+  --dot-grid: radial-gradient(circle, #000 1.15px, transparent 1.75px) 0 0 / 22px 22px;
+}
+/* The dots themselves, faint everywhere. */
+.backdrop-dots::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(circle, color-mix(in oklab, var(--primary) 30%, transparent) 1.15px, transparent 1.75px) 0
+    0 / 22px 22px;
+}
+/* Where a light passes, the dots glow in the palette colors. */
+.backdrop-dots-light {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  mask: var(--dot-grid);
+  -webkit-mask: var(--dot-grid);
+}
+.backdrop-dots-blob {
+  position: absolute;
+  width: 60vmax;
+  height: 60vmax;
   border-radius: 50%;
-  will-change: transform;
-  animation: app-drift 38s ease-in-out infinite alternate;
+  opacity: 0.9;
+  animation: backdrop-drift 46s ease-in-out infinite alternate;
 }
-.app-glow-1 {
-  top: -30vmax;
-  left: -18vmax;
-  background: radial-gradient(closest-side, var(--glow-1), transparent);
+.backdrop-dots-blob-1 {
+  top: -18vmax;
+  left: -12vmax;
+  background: radial-gradient(closest-side, var(--primary), transparent);
 }
-.app-glow-2 {
-  top: -22vmax;
-  right: -26vmax;
-  background: radial-gradient(closest-side, var(--glow-2), transparent);
-  animation-duration: 46s;
-  animation-delay: -12s;
-}
-.app-glow-3 {
-  bottom: -34vmax;
-  left: 18vmax;
-  background: radial-gradient(closest-side, var(--glow-3), transparent);
-  animation-duration: 52s;
-  animation-delay: -24s;
-}
-.app-glow-4 {
-  bottom: -28vmax;
+.backdrop-dots-blob-2 {
+  top: 20vh;
   right: -20vmax;
-  width: 56vmax;
-  height: 56vmax;
-  background: radial-gradient(closest-side, var(--glow-4), transparent);
-  animation-duration: 42s;
-  animation-delay: -6s;
+  background: radial-gradient(closest-side, #ff5fa2, transparent);
+  animation-duration: 58s;
+  animation-delay: -20s;
 }
-@keyframes app-drift {
+.backdrop-dots-blob-3 {
+  bottom: -26vmax;
+  left: 22vw;
+  background: radial-gradient(closest-side, #6b8cff, transparent);
+  animation-duration: 52s;
+  animation-delay: -34s;
+}
+.backdrop-dots[data-still] .backdrop-dots-blob {
+  animation: none;
+}
+@keyframes backdrop-drift {
   0% {
     transform: translate3d(0, 0, 0) scale(1);
   }
-  33% {
-    transform: translate3d(9vmax, 6vmax, 0) scale(1.08);
-  }
-  66% {
-    transform: translate3d(-5vmax, 11vmax, 0) scale(0.94);
+  50% {
+    transform: translate3d(14vmax, 10vmax, 0) scale(1.12);
   }
   100% {
-    transform: translate3d(7vmax, -4vmax, 0) scale(1.04);
-  }
-}
-.app-dots {
-  position: absolute;
-  inset: 0;
-  background-image: radial-gradient(circle, rgb(11 29 81 / 0.07) 1px, transparent 1.5px);
-  background-size: 24px 24px;
-  mask-image: radial-gradient(80% 70% at 50% 30%, #000 20%, transparent 80%);
-}
-.dark .app-dots {
-  background-image: radial-gradient(circle, rgb(255 255 255 / 0.05) 1px, transparent 1.5px);
-}
-.app-backdrop[data-still] .app-glow {
-  animation: none;
-}
-@media (prefers-reduced-motion: reduce) {
-  .app-glow {
-    animation: none;
+    transform: translate3d(-8vmax, 16vmax, 0) scale(0.92);
   }
 }
 

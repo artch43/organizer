@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useLayoutEffect, useMemo, useRef, useState } from "react";
 import {
   Bold,
   CalendarDays,
@@ -63,7 +63,6 @@ import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty";
-import { Mascot } from "@/components/brand/Brand";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -100,17 +99,21 @@ export default function NotesView() {
     <div className="flex min-h-0 min-w-0 flex-1">
       {listOpen && (
         <aside
-          className={cn("flex min-h-0 w-full shrink-0 flex-col border-r md:w-80", phone("list"))}
+          className={cn("flex min-h-0 w-full shrink-0 flex-col border-r bg-card md:w-80", phone("list"))}
           aria-label="Lista de notas"
         >
           <NotesPanel />
         </aside>
       )}
-      <section className={cn("min-h-0 min-w-0 flex-1 overflow-y-auto", listOpen && phone("note"))} aria-label="Nota">
+      {/* An open note is a solid writing surface: the page background stays out from behind the text. */}
+      <section
+        className={cn("min-h-0 min-w-0 flex-1 overflow-y-auto", note && "bg-background", listOpen && phone("note"))}
+        aria-label="Nota"
+      >
         {note ? <NotePane key={note.id} note={note} editorApi={editorApi} /> : <NotesHome />}
       </section>
       {note && sideOpen && (
-        <aside className="hidden min-h-0 w-80 shrink-0 overflow-y-auto border-l xl:flex" aria-label="Sumário">
+        <aside className="hidden min-h-0 w-80 shrink-0 overflow-y-auto border-l bg-card xl:flex" aria-label="Sumário">
           <NoteSide note={note} editorApi={editorApi} />
         </aside>
       )}
@@ -359,8 +362,6 @@ function NotesPanel() {
   return (
     <>
       <div className="flex items-center gap-1 px-4 pt-5 pb-3">
-        {/* Small, writing, next to the list's title. */}
-        <Mascot pose="anota" size={30} className="-my-1 shrink-0" />
         <button
           className="mr-auto min-w-0 truncate rounded-md px-1.5 text-lg font-bold hover:text-primary-strong"
           title="Ver todas as notas"
@@ -734,6 +735,14 @@ function NotePane({ note, editorApi }: { note: Note; editorApi: React.MutableRef
   const sideOpen = useStore((s) => s.ui.notesSide);
   const setUi = useStore((s) => s.setUi);
   const [title, setTitle] = useState(note.title);
+  // The title grows with its lines (browsers without CSS field-sizing).
+  const titleRef = useRef<HTMLTextAreaElement>(null);
+  useLayoutEffect(() => {
+    const el = titleRef.current;
+    if (!el) return;
+    el.style.height = "auto";
+    el.style.height = el.scrollHeight + "px";
+  }, [title]);
   const dismissedTitle = useStore((s) => s.ui.dismissedNoteTitles[note.id]);
   // The task this note was opened from (gone if the task was deleted).
   const task = useStore((s) => (note.task ? s.ws.items[note.task] : undefined));
@@ -888,25 +897,29 @@ function NotePane({ note, editorApi }: { note: Note; editorApi: React.MutableRef
       </div>
 
       <article className="mx-auto flex w-full max-w-3xl flex-1 flex-col px-5 pt-6 md:px-12">
-        <input
+        {/* A textarea so long titles wrap instead of running off the right edge (Enter goes to the text). */}
+        <textarea
+          ref={titleRef}
           aria-label="Título da nota"
           autoComplete="off"
+          rows={1}
           value={title}
           placeholder="Sem título"
           autoFocus={/^Sem título( \d+)?$/.test(note.title)}
           onFocus={(e) => {
             if (/^Sem título( \d+)?$/.test(e.target.value)) e.target.select();
           }}
-          onChange={(e) => setTitle(e.target.value)}
+          onChange={(e) => setTitle(e.target.value.replace(/\s*\n\s*/g, " "))}
           onBlur={commit}
           onKeyDown={(e) => {
-            if (e.key === "Enter") {
+            if (e.key === "Enter" && !e.nativeEvent.isComposing) {
               e.preventDefault();
               commit();
-              setTimeout(() => editorApi.current?.focus(), 0);
+              // Right away, so the next letters typed already land in the text.
+              editorApi.current?.focus();
             }
           }}
-          className="w-full bg-transparent text-4xl leading-tight font-extrabold tracking-tight text-balance outline-none placeholder:text-muted-foreground md:text-5xl"
+          className="heading-title field-sizing-content w-full resize-none overflow-hidden bg-transparent text-4xl leading-tight font-extrabold tracking-tight text-balance outline-none placeholder:text-muted-foreground md:text-5xl"
         />
         <div className="mt-3 mb-7 flex flex-wrap items-center gap-x-3 gap-y-2 text-[15px] text-muted-foreground">
           {tags.map((t, i) => (

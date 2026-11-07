@@ -1,6 +1,6 @@
 import { useEffect } from "react";
 import { IS_MAC, MOD, isEditable } from "@/lib/shortcuts";
-import { PROGRESS_ROUTE, SETTINGS_ROUTE, go, openModal, openNotes, useStore } from "@/store";
+import { SETTINGS_ROUTE, go, openModal, openNotes, useStore } from "@/store";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Mascot } from "../brand/Brand";
 import { openLists } from "../lists/state";
@@ -12,7 +12,6 @@ const GOTO: Record<string, { label: string; run: () => void }> = {
   c: { label: "Calendário", run: () => goType("calendar") },
   h: { label: "Hábitos", run: () => goType("habits") },
   n: { label: "Notas", run: () => openNotes() },
-  p: { label: "Progresso", run: () => go(PROGRESS_ROUTE) },
   s: { label: "Configurações", run: () => go(SETTINGS_ROUTE) },
 };
 function goType(type: string) {
