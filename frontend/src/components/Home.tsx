@@ -23,14 +23,12 @@ import { eventsByDay, inArea } from "@/lib/events";
 import { dateOf, firstOptInGroup, groupOf, optOf, statusProp, streakOf } from "@/lib/model";
 import { addDays, fmtDate, parseD, today } from "@/lib/util";
 import { alarmTimes, alarmsBetween, beforeLabel, CHANNEL, dayOfMs, hhmm, untilLabel, type Alarm } from "@/lib/alarms";
-import { boardFolderList } from "@/lib/notes";
 import { cloudEnabled } from "@/lib/supabase";
 import {
   celebrate,
   exampleData,
   go,
   openEvent,
-  openModal,
   openPeek,
   removeExamples,
   setProp,
@@ -60,19 +58,17 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Mascot, UiIcon } from "./brand/Brand";
+import { Mascot } from "./brand/Brand";
 import { EmptyState } from "./EmptyState";
 import { OptionBadge, areaVar, greeting, useAreas, useToday } from "./common";
 import { Glyph } from "./icons";
 import { AreaSwitcher } from "./app/Topbar";
 import { useNow } from "./app/AppHeader";
-import { FolderGlyph } from "./app/folderIcons";
-import { FolderDialog } from "./lists/FolderDialog";
-import { openLists } from "./lists/state";
 import { vtName, withMotion } from "@/lib/motion";
 import { focusPoint, pixelBurst } from "@/lib/pixelBurst";
 import { homeTasks, saveHomeOrder } from "@/lib/homeOrder";
 import { HomeTaskList } from "./HomeTaskList";
+import { HomeSummary } from "./HomeSummary";
 
 interface Entry {
   key: string;
@@ -105,8 +101,7 @@ const ALARM_DAYS = 7;
 const CARD = "rounded-2xl border bg-card shadow-card";
 
 /**
- * Início, in blocks: today's tasks (the biggest block), the next alarm and the agenda beside them,
- * and the habits and lists below. Done and "remarcar" in one tap; a click on a task opens its list.
+ * Início, in blocks: today's tasks (the biggest block), with habits, the next alarm and the agenda beside them. Done and "remarcar" in one tap; a click on a task opens its list.
  * Another day can be picked in the header to see that day's tasks and events.
  */
 export function Home() {
@@ -241,12 +236,12 @@ export function Home() {
       </header>
 
       {/* Two columns. Left: the day's tasks, as a list of cards (Atrasadas, the day's, the done ones folded
-          away, "Ver todas"). Right: the next alarm, the agenda, the habits and the lists, one under the other.
+          away, "Ver todas"). Right: the next alarm, the habits and the agenda, one under the other.
           Phone: one column, tasks first. */}
       <div
         key={D}
         data-dir={dir ?? undefined}
-        className={cn("grid items-start gap-6 lg:grid-cols-[minmax(0,1.6fr)_minmax(20rem,1fr)] xl:gap-8", dir && "cal-enter")}
+        className={cn("grid items-start gap-6 lg:grid-cols-[minmax(0,2fr)_minmax(18rem,1fr)] xl:gap-8", dir && "cal-enter")}
       >
         <section aria-labelledby="home-tasks" className="flex min-w-0 flex-col gap-3">
           <div className="flex flex-col gap-1">
@@ -341,12 +336,17 @@ export function Home() {
           )}
         </section>
 
-        <aside className="flex min-w-0 flex-col gap-5" aria-label="Resumo do dia">
-          {isToday ? <NextAlarm now={now} area={area} /> : <DayNote D={D} />}
-          <Agenda T={T} D={D} area={area} now={now} />
-          {D <= T && <HabitsBlock D={D} isToday={isToday} />}
-          <ListsBlock />
-        </aside>
+        <HomeSummary
+          order={ws.settings.homeSectionOrder}
+          onReorder={(order) => useStore.getState().mut((w) => { w.settings.homeSectionOrder = order; })}
+          sections={[
+            { id: "alarm", title: isToday ? "E-mail" : "Resumo do dia", content: isToday ? <NextAlarm now={now} area={area} /> : <DayNote D={D} /> },
+            ...(D <= T && ws.pages.some((p) => p.type === "habits")
+              ? [{ id: "habits", title: "Hábitos", content: <HabitsBlock D={D} isToday={isToday} /> }]
+              : []),
+            { id: "agenda", title: "Agenda", content: <Agenda T={T} D={D} area={area} now={now} /> },
+          ]}
+        />
       </div>
     </div>
   );
@@ -387,7 +387,7 @@ function BlockHead({
 }
 
 /**
- * The next alarm (task or event) in the coming days: the one highlighted block. When it arrives, by
+ * The next alarm (task or event) in the coming days. When it arrives, by
  * e-mail or WhatsApp, and buttons to open what it is for (where the alarm can be changed).
  */
 function NextAlarm({ now, area }: { now: number; area: string }) {
@@ -447,7 +447,7 @@ function NextAlarm({ now, area }: { now: number; area: string }) {
         <button
           type="button"
           onClick={open}
-          className="flex h-10 items-center gap-2 rounded-xl bg-primary-foreground px-4 text-[15px] font-semibold text-white transition-opacity hover:opacity-90 focus-visible:ring-2 focus-visible:ring-primary-foreground/50 focus-visible:ring-offset-2 focus-visible:ring-offset-primary focus-visible:outline-none"
+          className="flex h-10 items-center gap-2 rounded-xl bg-foreground px-4 text-[15px] font-semibold text-background transition-opacity hover:opacity-90 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-card focus-visible:outline-none"
         >
           <ExternalLink className="size-4" aria-hidden="true" />
           {next.kind === "task" ? "Abrir tarefa" : "Abrir evento"}
@@ -455,7 +455,7 @@ function NextAlarm({ now, area }: { now: number; area: string }) {
         <button
           type="button"
           onClick={open}
-          className="flex h-10 items-center gap-2 rounded-xl border border-primary-foreground/25 px-4 text-[15px] font-semibold transition-colors hover:bg-primary-foreground/8 focus-visible:ring-2 focus-visible:ring-primary-foreground/50 focus-visible:outline-none"
+          className="flex h-10 items-center gap-2 rounded-xl border border-foreground/25 px-4 text-[15px] font-semibold transition-colors hover:bg-foreground/8 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
         >
           <BellRing className="size-4" aria-hidden="true" />
           Trocar alarme
@@ -568,7 +568,7 @@ function HabitsBlock({ D, isToday }: { D: string; isToday: boolean }) {
   if (!page) return null;
   if (!habits.length)
     return (
-      <section aria-label="Hábitos" className={cn(CARD, "px-4 py-3.5")}>
+      <section aria-label="Hábitos" className={cn(CARD, "min-h-72 p-5 md:p-6")}>
         <EmptyState
           compact
           pose="rega"
@@ -581,7 +581,7 @@ function HabitsBlock({ D, isToday }: { D: string; isToday: boolean }) {
   const doneIds = new Set(habitLog[D] ?? []);
   const done = habits.filter((h) => doneIds.has(h.id)).length;
   return (
-    <section aria-labelledby="home-habits" className={cn(CARD, "flex flex-col gap-1.5 px-4 py-3.5")}>
+    <section aria-labelledby="home-habits" className={cn(CARD, "flex min-h-72 flex-col gap-3 p-5 md:p-6")}>
       <BlockHead
         id="home-habits"
         title="Hábitos"
@@ -601,7 +601,7 @@ function HabitsBlock({ D, isToday }: { D: string; isToday: boolean }) {
                 title={on ? "Desmarcar" : "Marcar como feito"}
                 onClick={() => withMotion(() => toggleHabit(h.id, D))}
                 className={cn(
-                  "flex w-full items-center gap-2.5 rounded-xl py-1.5 text-left transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none sm:-mx-1 sm:px-1 sm:hover:bg-muted/60",
+                  "flex w-full items-center gap-2.5 rounded-xl py-3 text-left transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none sm:-mx-1 sm:px-1 sm:hover:bg-muted/60",
                   "max-sm:h-full max-sm:flex-col max-sm:items-start max-sm:gap-2 max-sm:border max-sm:bg-background/40 max-sm:p-3",
                   on && "max-sm:border-primary-strong max-sm:bg-primary/10",
                 )}
@@ -638,113 +638,6 @@ function HabitsBlock({ D, isToday }: { D: string; isToday: boolean }) {
           );
         })}
       </ul>
-    </section>
-  );
-}
-
-/** The folders (with their lists) and lists, with open-task counts; a click opens the list. */
-function ListsBlock() {
-  const ws = useStore((s) => s.ws);
-  const [newFolder, setNewFolder] = useState(false);
-  const lists = ws.pages.filter((p) => p.type === "db" && !p.archived);
-  if (!lists.length)
-    return (
-      <section aria-label="Listas" className={cn(CARD, "px-4 py-3.5")}>
-        <EmptyState
-          compact
-          pose="organiza"
-          title="Nenhuma lista ainda"
-          text="Separe suas tarefas em listas: faculdade, casa, trabalho…"
-          action={{ label: "Criar a primeira lista", run: () => openModal("newBoard") }}
-        />
-      </section>
-    );
-  const icons = ws.settings.boardFolderIcons ?? {};
-  const open = new Map<string, number>();
-  for (const it of Object.values(ws.items)) {
-    const db = ws.dbs[it.db];
-    if (db && groupOf(db, it) !== "done") open.set(it.db, (open.get(it.db) ?? 0) + 1);
-  }
-  const top = boardFolderList(ws).filter((f) => !f.includes("/"));
-  const inside = (f: string) => lists.filter((p) => p.folder === f || p.folder?.startsWith(f + "/"));
-  const loose = lists.filter((p) => !p.folder);
-  type Row = { key: string; depth: number; icon: React.ReactNode; name: string; count: number; run: () => void };
-  const rows: Row[] = [];
-  for (const f of top) {
-    const ls = inside(f);
-    rows.push({
-      key: "f" + f,
-      depth: 0,
-      icon: <FolderGlyph icon={icons[f]} className="size-5!" />,
-      name: f,
-      count: ls.reduce((n, p) => n + (open.get(p.id) ?? 0), 0),
-      run: () => (ls[0] ? go(ls[0].id) : openLists()),
-    });
-    for (const p of ls)
-      rows.push({
-        key: p.id,
-        depth: 1,
-        icon: <Glyph icon={p.icon} size="sm" className="text-muted-foreground" />,
-        name: p.title || "Sem título",
-        count: open.get(p.id) ?? 0,
-        run: () => go(p.id),
-      });
-  }
-  for (const p of loose)
-    rows.push({
-      key: p.id,
-      depth: 0,
-      icon: <Glyph icon={p.icon} size="sm" />,
-      name: p.title || "Sem título",
-      count: open.get(p.id) ?? 0,
-      run: () => go(p.id),
-    });
-  const MAX = 5;
-  return (
-    <section aria-labelledby="home-lists" className={cn(CARD, "flex flex-col gap-1.5 px-4 py-3.5")}>
-      <BlockHead
-        id="home-lists"
-        title="Listas"
-        meta={top.length ? `${top.length} ${top.length === 1 ? "pasta" : "pastas"}` : `${lists.length}`}
-      >
-        <button
-          type="button"
-          aria-label="Criar nova pasta"
-          title="Criar nova pasta"
-          onClick={() => setNewFolder(true)}
-          className="ml-auto flex size-7 items-center justify-center self-center rounded-lg transition-colors hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
-        >
-          <UiIcon name="newFolder" size={20} />
-        </button>
-      </BlockHead>
-      <ul className="-mx-1 flex flex-col">
-        {rows.slice(0, MAX).map((r) => (
-          <li key={r.key}>
-            <button
-              type="button"
-              onClick={r.run}
-              className={cn(
-                "flex w-full items-center gap-2.5 rounded-lg px-1 py-1 text-left transition-colors hover:bg-muted/60 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none",
-                r.depth && "pl-8",
-              )}
-            >
-              <span className="flex size-5 shrink-0 items-center justify-center">{r.icon}</span>
-              <span className={cn("min-w-0 flex-1 truncate", r.depth ? "text-[13px]" : "text-sm font-semibold")}>{r.name}</span>
-              {r.count > 0 && <span className="shrink-0 text-xs text-muted-foreground tabular-nums">{r.count}</span>}
-            </button>
-          </li>
-        ))}
-      </ul>
-      {rows.length > MAX && (
-        <button
-          type="button"
-          onClick={openLists}
-          className="w-fit rounded-md px-1 text-[13px] font-semibold text-primary-strong hover:underline focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
-        >
-          Ver todas as listas
-        </button>
-      )}
-      {newFolder && <FolderDialog parent="" onClose={() => setNewFolder(false)} />}
     </section>
   );
 }
