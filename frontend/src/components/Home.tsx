@@ -71,6 +71,8 @@ import { FolderDialog } from "./lists/FolderDialog";
 import { openLists } from "./lists/state";
 import { vtName, withMotion } from "@/lib/motion";
 import { focusPoint, pixelBurst } from "@/lib/pixelBurst";
+import { homeTasks, saveHomeOrder } from "@/lib/homeOrder";
+import { HomeTaskList } from "./HomeTaskList";
 
 interface Entry {
   key: string;
@@ -182,7 +184,17 @@ export function Home() {
   const others = allOpen.filter((e) => !shownKeys.has(e.key));
   const overdue = isToday ? entries.filter((e) => e.day < T).sort((a, b) => a.day.localeCompare(b.day) || byTime(a, b)) : [];
   const todays = entries.filter((e) => e.day === D);
-  const open = todays.filter((e) => !e.done).sort(byTime);
+  const openEntries = new Map(todays.filter((e) => !e.done).map((e) => [e.key, e]));
+  const open = homeTasks(ws, D, area).map((it) => openEntries.get("t" + it.id)!);
+  const manualOrder = !!ws.settings.homeTaskOrder?.[D];
+  const reorder = (keys: string[]) =>
+    useStore.getState().mut((w) =>
+      saveHomeOrder(
+        w,
+        D,
+        keys.map((key) => key.slice(1)),
+      ),
+    );
   const done = todays.filter((e) => e.done).sort(byTime);
   const summary = !isToday
     ? open.length + done.length === 0
@@ -256,7 +268,32 @@ export function Home() {
             />
           )}
           {open.length > 0 && (
-            <TaskGroup title={isToday ? "Hoje" : "A fazer"} count={open.length} items={open} T={T} hideTitle={!overdue.length} />
+            <>
+              <div className="flex flex-wrap items-center justify-between gap-2 text-sm text-muted-foreground">
+                <span>{manualOrder ? "Ordem personalizada" : "Por prioridade"} · Arraste pela alça para reordenar</span>
+                {manualOrder && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() =>
+                      useStore.getState().mut((w) => {
+                        delete w.settings.homeTaskOrder?.[D];
+                      })
+                    }
+                  >
+                    Ordenar por prioridade
+                  </Button>
+                )}
+              </div>
+              <TaskGroup
+                title={isToday ? "Hoje" : "A fazer"}
+                count={open.length}
+                items={open}
+                T={T}
+                hideTitle={!overdue.length}
+                onReorder={reorder}
+              />
+            </>
           )}
           {!open.length && !overdue.length && (
             <Empty className="border border-dashed bg-card/60">
@@ -825,6 +862,7 @@ function TaskGroup({
   tone,
   hint,
   hideTitle,
+  onReorder,
 }: {
   title: string;
   count: number;
@@ -833,6 +871,7 @@ function TaskGroup({
   tone?: "warning";
   hint?: string;
   hideTitle?: boolean;
+  onReorder?: (keys: string[]) => void;
 }) {
   const id = "grp-" + title;
   return (
@@ -850,11 +889,19 @@ function TaskGroup({
         <span className="font-normal">({count})</span>
         {hint && <span className="font-normal text-muted-foreground max-sm:hidden">· {hint}</span>}
       </h2>
-      <ol className="stagger flex flex-col gap-2.5">
-        {items.map((e, i) => (
-          <Row key={e.key} e={e} i={i} T={T} />
-        ))}
-      </ol>
+      {onReorder ? (
+        <HomeTaskList
+          items={items}
+          onReorder={onReorder}
+          renderRow={(e, i, controls) => <Row key={e.key} e={e} i={i} T={T} drag={controls} />}
+        />
+      ) : (
+        <ol className="stagger flex flex-col gap-2.5">
+          {items.map((e, i) => (
+            <Row key={e.key} e={e} i={i} T={T} />
+          ))}
+        </ol>
+      )}
     </section>
   );
 }
@@ -884,7 +931,20 @@ function DoneGroup({ items, T, label }: { items: Entry[]; T: string; label: stri
 }
 
 /** One task: a card with its area's stripe, done in one tap, the time on the left and "remarcar" on the right. */
-function Row({ e, i, T }: { e: Entry; i: number; T: string }) {
+function Row({
+  e,
+  i,
+  T,
+  drag,
+}: {
+  e: Entry;
+  i: number;
+  T: string;
+  drag?: {
+    attributes: React.HTMLAttributes<HTMLLIElement>;
+    handle: React.ReactNode;
+  };
+}) {
   const late = !!e.day && e.day < T;
   const when = !e.day
     ? "Sem data"
@@ -934,12 +994,21 @@ function Row({ e, i, T }: { e: Entry; i: number; T: string }) {
   );
   return (
     <li
-      style={{ ...areaVar(e.area), "--i": Math.min(i, 12), viewTransitionName: vtName("home", e.key) } as React.CSSProperties}
+      {...drag?.attributes}
+      style={
+        {
+          ...areaVar(e.area),
+          "--i": Math.min(i, 12),
+          viewTransitionName: vtName("home", e.key),
+          ...drag?.attributes.style,
+        } as React.CSSProperties
+      }
       className={cn(
         "area-stripe flex items-center gap-1 rounded-2xl border border-border/70 bg-card py-1.5 pr-1.5 pl-3 shadow-card transition-colors focus-within:border-primary/40 hover:border-primary/40",
         e.done && "opacity-75",
       )}
     >
+      {drag?.handle}
       {/* Done in one tap. */}
       {e.onToggle && (
         <button

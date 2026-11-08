@@ -154,6 +154,8 @@ export interface Todo {
 }
 export type AlertChannel = "email" | "whatsapp";
 export interface Settings {
+  /** Manual task order on Home, independently for each deadline day. */
+  homeTaskOrder?: Record<string, string[]>;
   theme: "system" | "light" | "dark";
   start: string;
   name: string;
