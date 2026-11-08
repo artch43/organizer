@@ -66,7 +66,7 @@ import { AreaSwitcher } from "./app/Topbar";
 import { useNow } from "./app/AppHeader";
 import { vtName, withMotion } from "@/lib/motion";
 import { focusPoint, pixelBurst } from "@/lib/pixelBurst";
-import { homeTasks, saveHomeOrder } from "@/lib/homeOrder";
+import { homeTasks, saveHomeOrder, hasCustomHomeOrder } from "@/lib/homeOrder";
 import { HomeTaskList } from "./HomeTaskList";
 import { HomeSummary } from "./HomeSummary";
 
@@ -173,15 +173,16 @@ export function Home() {
     if (shown) entries.push(entry);
     if (!isDone) allOpen.push({ ...entry, showDay: true });
   }
-  // Dated ones first, soonest first; then those without a date.
-  allOpen.sort((a, b) => (a.day || "9").localeCompare(b.day || "9") || byTime(a, b));
-  const shownKeys = new Set(entries.map((e) => e.key));
-  const others = allOpen.filter((e) => !shownKeys.has(e.key));
-  const overdue = isToday ? entries.filter((e) => e.day < T).sort((a, b) => a.day.localeCompare(b.day) || byTime(a, b)) : [];
+  const allEntries = new Map(allOpen.map((entry) => [entry.key, entry]));
+  const otherGroup = isToday ? "others" : "remaining";
+  const others = homeTasks(ws, D, area, otherGroup).map((it) => allEntries.get("t" + it.id)!);
+  const overdue = isToday ? homeTasks(ws, D, area, "overdue").map((it) => allEntries.get("t" + it.id)!) : [];
+  const reorderGroup = (group: "overdue" | "others" | "remaining", keys: string[]) =>
+    useStore.getState().mut((w) => saveHomeOrder(w, D, keys.map((key) => key.slice(1)), group));
   const todays = entries.filter((e) => e.day === D);
   const openEntries = new Map(todays.filter((e) => !e.done).map((e) => [e.key, e]));
   const open = homeTasks(ws, D, area).map((it) => openEntries.get("t" + it.id)!);
-  const manualOrder = !!ws.settings.homeTaskOrder?.[D];
+  const manualOrder = hasCustomHomeOrder(ws, D, area) || (overdue.length > 0 && hasCustomHomeOrder(ws, D, area, "overdue"));
   const reorder = (keys: string[]) =>
     useStore.getState().mut((w) =>
       saveHomeOrder(
@@ -252,18 +253,7 @@ export function Home() {
             {/* How much of the day is done: a bar with an outlined track (visible even at 0%), the count, and a done state. */}
             {todays.length > 0 && <DayProgress done={done.length} total={todays.length} />}
           </div>
-          {overdue.length > 0 && (
-            <TaskGroup
-              title="Atrasadas"
-              count={overdue.length}
-              tone="warning"
-              hint="Ficaram de dias anteriores. Conclua ou remarque."
-              items={overdue}
-              T={T}
-            />
-          )}
-          {open.length > 0 && (
-            <>
+          {(open.length > 0 || overdue.length > 0) && (
               <div className="flex flex-wrap items-center justify-between gap-2 text-sm text-muted-foreground">
                 <span>{manualOrder ? "Ordem personalizada" : "Por prioridade"} · Arraste pela alça para reordenar</span>
                 {manualOrder && (
@@ -273,6 +263,7 @@ export function Home() {
                     onClick={() =>
                       useStore.getState().mut((w) => {
                         delete w.settings.homeTaskOrder?.[D];
+                        if (overdue.length) delete w.settings.homeTaskOrder?.[`overdue:${D}`];
                       })
                     }
                   >
@@ -280,6 +271,20 @@ export function Home() {
                   </Button>
                 )}
               </div>
+          )}
+          {overdue.length > 0 && (
+            <TaskGroup
+              title="Atrasadas"
+              count={overdue.length}
+              tone="warning"
+              hint="Ficaram de dias anteriores. Conclua ou remarque."
+              items={overdue}
+              onReorder={(keys) => reorderGroup("overdue", keys)}
+              T={T}
+            />
+          )}
+          {open.length > 0 && (
+            <>
               <TaskGroup
                 title={isToday ? "Hoje" : "A fazer"}
                 count={open.length}
@@ -329,6 +334,7 @@ export function Home() {
                 title={entries.length ? "Outras tarefas a fazer" : "Todas as tarefas a fazer"}
                 count={others.length}
                 items={others}
+                onReorder={(keys) => reorderGroup(otherGroup, keys)}
                 T={T}
                 hideTitle
               />
@@ -835,7 +841,6 @@ function Row({
   T: string;
   drag?: {
     attributes: React.HTMLAttributes<HTMLLIElement>;
-    handle: React.ReactNode;
   };
 }) {
   const late = !!e.day && e.day < T;
@@ -901,7 +906,6 @@ function Row({
         e.done && "opacity-75",
       )}
     >
-      {drag?.handle}
       {/* Done in one tap. */}
       {e.onToggle && (
         <button
@@ -920,9 +924,10 @@ function Row({
       )}
       {e.onOpen ? (
         <button
+          data-home-drag-surface
           onClick={e.onOpen}
           title="Abrir a lista desta tarefa"
-          className="flex min-w-0 flex-1 items-center gap-3 rounded-xl py-2.5 pr-2 text-left focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+          className={cn("flex min-w-0 flex-1 items-center gap-3 rounded-xl py-2.5 pr-2 text-left focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none", drag && "cursor-grab active:cursor-grabbing")}
         >
           {body}
         </button>

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { template, mkDb, DEFAULT_STATUS } from "./template";
 import type { Item } from "./types";
-import { homeTasks, saveHomeOrder, moveHomeTask } from "./homeOrder";
+import { homeTasks, saveHomeOrder, moveHomeTask, hasCustomHomeOrder } from "./homeOrder";
 import { fromRecords, toEntities } from "./records";
 import { normalizeWorkspace } from "./migrate";
 
@@ -89,4 +89,38 @@ describe("ordem das tarefas do início", () => {
     expect(moveHomeTask(["a", "b", "c"], "c", "a", false)).toEqual(["c", "a", "b"]);
     expect(moveHomeTask(["a", "b"], "external", "b", true)).toEqual(["a", "b"]);
   });
+});
+
+it("prioriza e salva grupos de atrasadas e outras sem alterar o dia", () => {
+  const { ws } = fixture();
+  ws.items.high.props.date = "2026-11-05";
+  ws.items.low.props.date = "2026-11-04";
+  expect(ids(homeTasks(ws, day, "all", "overdue"))).toEqual(["high", "low"]);
+  saveHomeOrder(ws, day, ["low", "high"], "overdue");
+  expect(ids(homeTasks(ws, day, "all", "overdue"))).toEqual(["low", "high"]);
+  expect(ids(homeTasks(ws, day))).toEqual(["none"]);
+  ws.items.high.props.date = "2026-11-09";
+  ws.items.low.props.date = "";
+  expect(ids(homeTasks(ws, day, "all", "others"))).toEqual(["high", "low"]);
+  saveHomeOrder(ws, day, ["low", "high"], "others");
+  expect(ids(homeTasks(ws, day, "all", "others"))).toEqual(["low", "high"]);
+});
+
+
+it("reconhece quando a ordem manual ja corresponde a prioridade", () => {
+  const { ws } = fixture();
+  expect(hasCustomHomeOrder(ws, day)).toBe(false);
+  saveHomeOrder(ws, day, ["low", "high", "none"]);
+  expect(hasCustomHomeOrder(ws, day)).toBe(true);
+  saveHomeOrder(ws, day, ["high", "low", "none"]);
+  expect(hasCustomHomeOrder(ws, day)).toBe(false);
+  ws.items.high.props.date = "2026-11-05";
+  ws.items.low.props.date = "2026-11-04";
+  saveHomeOrder(ws, day, ["low", "high"], "overdue");
+  expect(hasCustomHomeOrder(ws, day, "all", "overdue")).toBe(true);
+  expect(hasCustomHomeOrder(ws, day, "pessoal", "overdue")).toBe(true);
+  ws.items.low.area = "trabalho";
+  expect(hasCustomHomeOrder(ws, day, "pessoal", "overdue")).toBe(false);
+  saveHomeOrder(ws, day, ["high", "low"], "overdue");
+  expect(hasCustomHomeOrder(ws, day, "all", "overdue")).toBe(false);
 });
