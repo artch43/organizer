@@ -278,6 +278,7 @@ export function Home() {
               count={overdue.length}
               tone="warning"
               hint="Ficaram de dias anteriores. Conclua ou remarque."
+              onMoveAll={(to) => moveItemsDay(overdue.map((e) => e.key.slice(1)), to)}
               items={overdue}
               onReorder={(keys) => reorderGroup("overdue", keys)}
               T={T}
@@ -762,6 +763,7 @@ function TaskGroup({
   hint,
   hideTitle,
   onReorder,
+  onMoveAll,
 }: {
   title: string;
   count: number;
@@ -771,23 +773,34 @@ function TaskGroup({
   hint?: string;
   hideTitle?: boolean;
   onReorder?: (keys: string[]) => void;
+  onMoveAll?: (day: string | null) => void;
 }) {
   const id = "grp-" + title;
   return (
     <section aria-labelledby={id} className="flex flex-col gap-2.5">
-      <h2
-        id={id}
-        className={cn(
-          "flex items-baseline gap-2 text-sm font-semibold",
-          tone === "warning" ? "text-warning" : "text-muted-foreground",
-          hideTitle && "sr-only",
+      <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
+        <h2
+          id={id}
+          className={cn(
+            "flex items-baseline gap-2 text-sm font-semibold",
+            tone === "warning" ? "text-warning" : "text-muted-foreground",
+            hideTitle && "sr-only",
+          )}
+        >
+          {tone === "warning" && <AlertCircle className="size-4 self-center" aria-hidden="true" />}
+          {title}
+          <span className="font-normal">({count})</span>
+          {hint && <span className="font-normal text-muted-foreground max-sm:hidden">· {hint}</span>}
+        </h2>
+        {onMoveAll && (
+          <RescheduleMenu day={items[0].day} T={T} onMove={onMoveAll}>
+            <Button variant="ghost" size="sm" className="shrink-0 max-sm:min-h-11">
+              <CalendarClock aria-hidden="true" />
+              Remarcar todas
+            </Button>
+          </RescheduleMenu>
         )}
-      >
-        {tone === "warning" && <AlertCircle className="size-4 self-center" aria-hidden="true" />}
-        {title}
-        <span className="font-normal">({count})</span>
-        {hint && <span className="font-normal text-muted-foreground max-sm:hidden">· {hint}</span>}
-      </h2>
+      </div>
       {onReorder ? (
         <HomeTaskList
           items={items}
@@ -826,6 +839,36 @@ function DoneGroup({ items, T, label }: { items: Entry[]; T: string; label: stri
         </ol>
       )}
     </section>
+  );
+}
+
+/** Shared date choices for individual tasks and the overdue group. */
+function RescheduleMenu({ day, T, onMove, children }: {
+  day: string;
+  T: string;
+  onMove: (day: string | null) => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>{children}</DropdownMenuTrigger>
+      <DropdownMenuContent align="end">
+        <DropdownMenuLabel>Remarcar para</DropdownMenuLabel>
+        <DropdownMenuGroup>
+          {day !== T && <DropdownMenuItem onSelect={() => onMove(T)}>Hoje</DropdownMenuItem>}
+          <DropdownMenuItem onSelect={() => onMove(addDays(T, 1))}>Amanhã</DropdownMenuItem>
+          <DropdownMenuItem onSelect={() => onMove(addDays(T, 7))}>Daqui a uma semana</DropdownMenuItem>
+        </DropdownMenuGroup>
+        {day && (
+          <>
+            <DropdownMenuSeparator />
+            <DropdownMenuGroup>
+              <DropdownMenuItem onSelect={() => onMove(null)}>Tirar a data</DropdownMenuItem>
+            </DropdownMenuGroup>
+          </>
+        )}
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }
 
@@ -936,35 +979,17 @@ function Row({
       )}
       {/* Another day, without opening anything. */}
       {!e.done && (
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button
-              variant="ghost"
-              size="icon"
-              aria-label={`Remarcar “${e.title}”`}
-              title="Remarcar"
-              className="size-11 shrink-0 text-muted-foreground"
-            >
-              <CalendarClock />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            <DropdownMenuLabel>Remarcar para</DropdownMenuLabel>
-            <DropdownMenuGroup>
-              {e.day !== T && <DropdownMenuItem onSelect={() => e.onMove(T)}>Hoje</DropdownMenuItem>}
-              <DropdownMenuItem onSelect={() => e.onMove(addDays(T, 1))}>Amanhã</DropdownMenuItem>
-              <DropdownMenuItem onSelect={() => e.onMove(addDays(T, 7))}>Daqui a uma semana</DropdownMenuItem>
-            </DropdownMenuGroup>
-            {e.day && (
-              <>
-                <DropdownMenuSeparator />
-                <DropdownMenuGroup>
-                  <DropdownMenuItem onSelect={() => e.onMove(null)}>Tirar a data</DropdownMenuItem>
-                </DropdownMenuGroup>
-              </>
-            )}
-          </DropdownMenuContent>
-        </DropdownMenu>
+        <RescheduleMenu day={e.day} T={T} onMove={e.onMove}>
+          <Button
+            variant="ghost"
+            size="icon"
+            aria-label={`Remarcar “${e.title}”`}
+            title="Remarcar"
+            className="size-11 shrink-0 text-muted-foreground"
+          >
+            <CalendarClock />
+          </Button>
+        </RescheduleMenu>
       )}
     </li>
   );
@@ -1077,4 +1102,24 @@ function moveItemDay(id: string, to: string | null) {
   const prev = typeof it.props.date === "string" ? it.props.date : null;
   withMotion(() => setProp(id, "date", to ? to + (prev?.slice(10) ?? "") : null, { quiet: true }));
   toast(movedLabel(to), () => setProp(id, "date", prev, { quiet: true }));
+}
+
+/** Move the visible overdue tasks together, preserving each time and offering one undo. */
+function moveItemsDay(ids: string[], to: string | null) {
+  const ws = useStore.getState().ws;
+  const previous = ids.flatMap((id) => {
+    const it = ws.items[id];
+    return it ? [{ id, date: typeof it.props.date === "string" ? it.props.date : null }] : [];
+  });
+  if (!previous.length) return;
+  withMotion(() => {
+    for (const { id, date } of previous) {
+      setProp(id, "date", to ? to + (date?.slice(10) ?? "") : null, { quiet: true });
+    }
+  });
+  toast(`${previous.length} ${previous.length === 1 ? "tarefa remarcada" : "tarefas remarcadas"}.`, () => {
+    withMotion(() => {
+      for (const { id, date } of previous) setProp(id, "date", date, { quiet: true });
+    });
+  });
 }
