@@ -22,8 +22,8 @@ import {
 import { cn } from "@/lib/utils";
 import { alarmsBetween } from "@/lib/alarms";
 import type { AreaColor, Settings as S, Workspace } from "@/lib/types";
-import { NONE, WhatsAppNumber } from "./calendar/AlertPicker";
-import { ALERT_PRESETS, whenLabel } from "@/lib/events";
+import { CustomAlert, NONE, WhatsAppNumber } from "./calendar/AlertPicker";
+import { alertPresets, whenLabel } from "@/lib/events";
 import { downloadBackup, parseBackup } from "@/lib/backup";
 import { cloudEnabled, supabase } from "@/lib/supabase";
 import { deleteAllMyData, signOut, useSync } from "@/lib/sync";
@@ -164,10 +164,20 @@ export function SettingsPage() {
 
 /** Alertas: what the alarms are, the switches, and a preview of the e-mail that arrives. */
 function AlertsTab() {
+  const [draggedPreset, setDraggedPreset] = useState<number | null>(null);
   const ws = useStore((s) => s.ws);
   const mut = useStore((s) => s.mut);
   const user = useSync((s) => s.user);
   const st = ws.settings;
+  const presets = alertPresets(st.alertPresets);
+  const removePreset = (minutes: number) => {
+    mut((w) => {
+      w.settings.alertPresets = alertPresets(w.settings.alertPresets)
+        .filter((p) => p.minutes !== minutes).map((p) => p.minutes);
+      w.settings.defaultAlerts = w.settings.defaultAlerts.filter((m) => m !== minutes);
+    });
+    setDraggedPreset(null);
+  };
   const set = <K extends keyof S>(k: K, v: S[K]) =>
     mut((w) => {
       w.settings[k] = v;
@@ -222,12 +232,16 @@ function AlertsTab() {
             </Field>
           </SCard>
         </div>
-        <SCard icon={CalendarClock} title="Alarme já marcado em eventos novos">
+        <SCard icon={CalendarClock} title="Opções de horários predefinidos em eventos">
+          <p className="text-sm text-muted-foreground">
+            Disponíveis nos avisos de tarefas e eventos. Marque os horários que deseja ativar em novos eventos.
+            Para remover uma opção, arraste para a lixeira abaixo.
+          </p>
           <ToggleGroup
             type="multiple"
             variant="outline"
             spacing={2}
-            aria-label="Alarme já marcado em eventos novos"
+            aria-label="Opções de horários predefinidos em eventos"
             className="flex-wrap"
             value={st.defaultAlerts.length ? st.defaultAlerts.map(String) : [NONE]}
             onValueChange={(v) =>
@@ -245,12 +259,36 @@ function AlertsTab() {
             <ToggleGroupItem value={NONE} className={PILL}>
               Sem alarme
             </ToggleGroupItem>
-            {ALERT_PRESETS.map((p) => (
-              <ToggleGroupItem key={p.minutes} value={String(p.minutes)} className={PILL}>
-                {p.label}
-              </ToggleGroupItem>
+            {presets.map((p) => (
+              <div key={p.minutes} className="flex items-center gap-1" draggable
+                onDragStart={(e) => {
+                  e.dataTransfer.setData("application/x-organizer-alert-preset", String(p.minutes));
+                  e.dataTransfer.effectAllowed = "move";
+                  setDraggedPreset(p.minutes);
+                }}
+                onDragEnd={() => setDraggedPreset(null)}>
+                <ToggleGroupItem value={String(p.minutes)} className={PILL}>
+                  {p.label}
+                </ToggleGroupItem>
+              </div>
             ))}
           </ToggleGroup>
+          <div className="flex flex-wrap items-center gap-3">
+            <CustomAlert what="evento ou tarefa" onAdd={(minutes) => {
+              set("alertPresets", alertPresets([...presets.map((p) => p.minutes), minutes]).map((p) => p.minutes));
+            }} />
+            <div className={cn("flex min-h-11 items-center gap-2 rounded-xl border border-dashed px-4 py-2 text-sm text-muted-foreground", draggedPreset !== null && "border-destructive bg-destructive/10 text-destructive")}
+              onDragOver={(e) => {
+                if (draggedPreset !== null) { e.preventDefault(); e.dataTransfer.dropEffect = "move"; }
+              }}
+              onDrop={(e) => {
+                e.preventDefault();
+                if (draggedPreset !== null) removePreset(draggedPreset);
+              }}>
+              <Trash2 className="size-4" aria-hidden="true" />
+              Arraste um horário para excluir
+            </div>
+          </div>
         </SCard>
       </div>
 
@@ -302,7 +340,7 @@ function AlertsTab() {
               </span>
             </div>
             <div className="flex flex-wrap gap-2">
-              {ALERT_PRESETS.slice(0, 5).map((p) => (
+              {presets.slice(0, 5).map((p) => (
                 <span
                   key={p.minutes}
                   className={cn(

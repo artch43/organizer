@@ -2,7 +2,7 @@ import { useState } from "react";
 import { BellOff, BellRing, Mail, MessageCircle, Plus, X } from "lucide-react";
 import type { AlertChannel } from "@/lib/types";
 import { formatPhone, normalizePhone } from "@/lib/util";
-import { ALERT_PRESETS, alertLabel } from "@/lib/events";
+import { alertPresets, alertLabel } from "@/lib/events";
 import { cloudEnabled } from "@/lib/supabase";
 import { celebrate, useStore } from "@/store";
 import { FieldDescription, FieldLegend, FieldSet } from "@/components/ui/field";
@@ -34,7 +34,9 @@ export function AlertPicker({
 }) {
   const emailAlerts = useStore((s) => s.ws.settings.emailAlerts);
   const phone = useStore((s) => s.ws.settings.whatsapp);
-  const presets = ALERT_PRESETS.map((p) => String(p.minutes));
+  const savedPresets = useStore((s) => s.ws.settings.alertPresets);
+  const availablePresets = alertPresets(savedPresets);
+  const presets = availablePresets.map((p) => String(p.minutes));
   const setAlerts = (next: number[]) => {
     if (!value.length && next.length)
       celebrate(
@@ -44,7 +46,7 @@ export function AlertPicker({
       );
     onChange(next);
   };
-  const custom = value.filter((m) => !ALERT_PRESETS.some((p) => p.minutes === m));
+  const custom = value.filter((m) => !availablePresets.some((p) => p.minutes === m));
   const hint = !cloudEnabled
     ? "Os avisos precisam de uma conta. Você pode escolher agora; eles começam a valer quando você entrar."
     : !emailAlerts
@@ -106,7 +108,7 @@ export function AlertPicker({
             <BellOff aria-hidden="true" />
             Sem alarme
           </ToggleGroupItem>
-          {ALERT_PRESETS.map((p) => (
+          {availablePresets.map((p) => (
             <ToggleGroupItem key={p.minutes} value={String(p.minutes)} className="px-2.5">
               {p.label}
             </ToggleGroupItem>
@@ -190,13 +192,13 @@ export function WhatsAppNumber({ phone }: { phone?: string }) {
   );
 }
 
-function CustomAlert({ onAdd, what }: { onAdd: (minutes: number) => void; what: string }) {
+export function CustomAlert({ onAdd, what }: { onAdd: (minutes: number) => void; what: string }) {
   const [open, setOpen] = useState(false);
   const [n, setN] = useState("2");
   const [unit, setUnit] = useState("60");
   const add = () => {
     const v = Math.round(Number(n));
-    if (v > 0) {
+    if (v > 0 && Number.isSafeInteger(v * Number(unit))) {
       onAdd(v * Number(unit));
       setOpen(false);
     }

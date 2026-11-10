@@ -166,6 +166,8 @@ export interface Settings {
   emailAlerts: boolean;
   /** Alerts pre-selected for new events, in minutes before. */
   defaultAlerts: number[];
+  /** Available reminder options across tasks and events; undefined uses the original presets. */
+  alertPresets?: number[];
   /** WhatsApp number for alerts, in international format (+5511987654321). */
   whatsapp?: string;
   /** Note folders created by the person, kept even while empty. */
