@@ -126,10 +126,7 @@ export function CalendarPage() {
   const days = cal.view === "month" ? monthGrid(anchor) : weekOf(anchor);
   const selected = cal.selected && days.includes(cal.selected) ? cal.selected : days.includes(T) ? T : anchor;
   const byDay = collect(ws, days[0], days[days.length - 1], area, cal.showTasks);
-  // Which way the last move went, so the new month/week slides in from that side.
-  const [dir, setDir] = useState<"next" | "prev" | "none">("none");
   const pickDay = (day: string) => {
-    setDir(day > selected ? "next" : day < selected ? "prev" : "none");
     set({ anchor: day, selected: day });
   };
   const shift = (k: number) => {
@@ -201,7 +198,7 @@ export function CalendarPage() {
       </header>
       <div className="grid items-start gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(20rem,24rem)]">
         <div className="flex min-w-0 flex-col gap-5">
-          <div key={cal.view + (cal.view === "month" ? anchor.slice(0, 7) : week[0])} className="cal-enter" data-dir={dir}>
+          <div>
             {cal.view === "month" ? (
               <MonthView
                 anchor={anchor}

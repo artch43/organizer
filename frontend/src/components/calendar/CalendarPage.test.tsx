@@ -86,3 +86,20 @@ it("mantém o dia ao mudar a visualização e volta para hoje", () => {
   act(() => [...host.querySelectorAll("button")].find((b) => b.textContent === "Hoje")!.click());
   expect(useStore.getState().ui.calendar).toMatchObject({ anchor: today(), selected: today() });
 });
+
+it.each([
+  ["month", "2026-11-09", "next"],
+  ["month", "2026-01-31", "next"],
+  ["month", "2027-01-01", "prev"],
+  ["week", "2026-11-15", "next"],
+  ["week", "2026-11-16", "prev"],
+] as const)("preserva a grade ao navegar em %s: %s, %s", (view, day, direction) => {
+  useStore.setState((s) => ({ ui: { ...s.ui, calendar: { ...s.ui.calendar, view, anchor: day, selected: day } } }));
+  act(() => root.render(<CalendarPage />));
+  const gridLabel = () =>
+    [...host.querySelectorAll("div")].find((el) => el.textContent === (view === "month" ? "seg" : "dia todo"));
+  const before = gridLabel();
+  expect(before).toBeDefined();
+  clickHeaderArrow(direction);
+  expect(gridLabel()).toBe(before);
+});

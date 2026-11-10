@@ -1108,33 +1108,6 @@ html.has-wallpaper [data-app-root] {
   }
 }
 
-/* Month/week switches slide in from the side you moved to. */
-.cal-enter {
-  animation: cal-fade 260ms cubic-bezier(0.22, 1, 0.36, 1) both;
-}
-.cal-enter[data-dir="next"] {
-  animation-name: cal-next;
-}
-.cal-enter[data-dir="prev"] {
-  animation-name: cal-prev;
-}
-@keyframes cal-fade {
-  from {
-    opacity: 0;
-  }
-}
-@keyframes cal-next {
-  from {
-    opacity: 0;
-    transform: translateX(24px);
-  }
-}
-@keyframes cal-prev {
-  from {
-    opacity: 0;
-    transform: translateX(-24px);
-  }
-}
 /* The streak count bumps when it grows. */
 .streak-bump {
   animation: pop 420ms cubic-bezier(0.34, 1.56, 0.64, 1);
