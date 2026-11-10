@@ -8,7 +8,7 @@ import { cn } from "@/lib/utils";
 import type { Workspace } from "@/lib/types";
 import { eventsByDay, inArea, minutesOf, monthGrid, weekOf } from "@/lib/events";
 import { dateOf, groupOf } from "@/lib/model";
-import { MONTHS, addDays, pad, parseD, today } from "@/lib/util";
+import { addDays, pad, parseD, today } from "@/lib/util";
 import { go, moveEvent, openEvent, openPeek, setProp, useStore } from "@/store";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
@@ -110,7 +110,7 @@ const parseDrop = (dt: DataTransfer): Dropped | null => {
 };
 
 const SEG =
-  "relative flex h-9 items-center rounded-lg px-3.5 text-[15px] font-medium transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none";
+  "relative flex h-10 items-center rounded-lg px-3.5 text-[15px] font-medium transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none";
 
 export function CalendarPage() {
   const ws = useStore((s) => s.ws);
@@ -123,52 +123,54 @@ export function CalendarPage() {
     });
   const T = today();
   const anchor = cal.anchor;
-  const d = parseD(anchor);
   const days = cal.view === "month" ? monthGrid(anchor) : weekOf(anchor);
   const selected = cal.selected && days.includes(cal.selected) ? cal.selected : days.includes(T) ? T : anchor;
   const byDay = collect(ws, days[0], days[days.length - 1], area, cal.showTasks);
   // Which way the last move went, so the new month/week slides in from that side.
   const [dir, setDir] = useState<"next" | "prev" | "none">("none");
+  const pickDay = (day: string) => {
+    setDir(day > selected ? "next" : day < selected ? "prev" : "none");
+    set({ anchor: day, selected: day });
+  };
   const shift = (k: number) => {
-    setDir(k > 0 ? "next" : "prev");
-    if (cal.view === "week") return set({ anchor: addDays(anchor, 7 * k) });
-    const n = new Date(d.getFullYear(), d.getMonth() + k, 1);
-    set({ anchor: `${n.getFullYear()}-${pad(n.getMonth() + 1)}-01` });
+    pickDay(addDays(selected, k));
   };
   const week = weekOf(anchor);
-  const w0 = parseD(week[0]),
-    w6 = parseD(week[6]);
-  const label =
-    cal.view === "month"
-      ? `${MONTHS[d.getMonth()]} de ${d.getFullYear()}`
-      : `${w0.getDate()} ${MONTHS[w0.getMonth()].slice(0, 3)} – ${w6.getDate()} ${MONTHS[w6.getMonth()].slice(0, 3)} ${w6.getFullYear()}`;
+  const label = parseD(selected).toLocaleDateString("pt-BR", { day: "numeric", month: "long", year: "numeric" });
 
   return (
-    <div className="mx-auto grid w-full max-w-[90rem] items-start gap-6 px-4 pt-5 pb-28 md:px-10 md:pt-7 xl:grid-cols-[minmax(0,1fr)_minmax(20rem,24rem)]">
-      <div className="flex min-w-0 flex-col gap-5">
-        <div className="flex flex-wrap items-center gap-x-4 gap-y-3">
-          <div className="mr-auto flex min-w-0 items-center gap-4">
-            <h1 className="text-[1.75rem] leading-tight font-extrabold tracking-tight first-letter:uppercase sm:text-3xl md:text-[2.5rem]">
-              {label}
-            </h1>
-          </div>
-          <CalendarOptions showTasks={cal.showTasks} onShowTasks={(v) => set({ showTasks: v })} />
-          <div className="flex items-center gap-1.5">
-            <Button variant="ghost" size="icon" className="size-10" aria-label="Anterior" onClick={() => shift(-1)}>
+    <div className="mx-auto flex w-full max-w-[90rem] flex-col gap-5 px-4 pt-5 pb-28 md:px-10 md:pt-7">
+      <header className="flex flex-wrap items-center gap-x-6 gap-y-3">
+        <div className="flex min-w-0 flex-1 basis-full flex-wrap items-center gap-x-5 gap-y-3 lg:basis-auto">
+          <h1 className="text-[1.75rem] leading-tight font-extrabold tracking-tight sm:text-3xl">{label}</h1>
+          <div role="group" aria-label="Navegar entre dias" className="flex shrink-0 items-center gap-0.5">
+            <Button
+              variant="ghost"
+              size="icon"
+              className="size-11"
+              aria-label="Dia anterior"
+              title="Dia anterior"
+              onClick={() => shift(-1)}
+            >
               <ChevronLeft />
             </Button>
-            <Button
-              variant="outline"
-              className="h-10 rounded-xl px-4 text-[15px]"
-              onClick={() => set({ anchor: T, selected: T })}
-            >
+            <Button variant="ghost" className="h-11 rounded-lg px-3 text-[15px]" onClick={() => pickDay(T)}>
               Hoje
             </Button>
-            <Button variant="ghost" size="icon" className="size-10" aria-label="Próximo" onClick={() => shift(1)}>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="size-11"
+              aria-label="Próximo dia"
+              title="Próximo dia"
+              onClick={() => shift(1)}
+            >
               <ChevronRight />
             </Button>
           </div>
-          <div role="radiogroup" aria-label="Visão" className="flex rounded-xl border bg-card/50 p-0.5">
+        </div>
+        <div className="flex max-w-full flex-wrap items-center gap-3">
+          <div role="group" aria-label="Visualização do calendário" className="flex shrink-0 rounded-xl bg-muted/50 p-0.5">
             {(
               [
                 ["month", "Mês"],
@@ -177,9 +179,9 @@ export function CalendarPage() {
             ).map(([v, name]) => (
               <button
                 key={v}
-                role="radio"
-                aria-checked={cal.view === v}
-                onClick={() => set({ view: v })}
+                type="button"
+                aria-pressed={cal.view === v}
+                onClick={() => set({ view: v, anchor: selected, selected })}
                 className={cn(SEG, cal.view === v ? "text-foreground" : "text-muted-foreground hover:text-foreground")}
               >
                 {cal.view === v && (
@@ -194,28 +196,33 @@ export function CalendarPage() {
               </button>
             ))}
           </div>
+          <CalendarOptions showTasks={cal.showTasks} onShowTasks={(v) => set({ showTasks: v })} />
         </div>
-        <div key={cal.view + (cal.view === "month" ? anchor.slice(0, 7) : week[0])} className="cal-enter" data-dir={dir}>
-          {cal.view === "month" ? (
-            <MonthView
-              anchor={anchor}
-              byDay={byDay}
-              onOpen={openEntry}
-              onAdd={(date) => openEvent(null, date)}
-              onMove={(e, date) => moveEntry(e, date)}
-              selected={selected}
-              onSelect={(day) => set({ selected: day })}
-            />
-          ) : (
-            <WeekView days={week} byDay={byDay} />
-          )}
+      </header>
+      <div className="grid items-start gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(20rem,24rem)]">
+        <div className="flex min-w-0 flex-col gap-5">
+          <div key={cal.view + (cal.view === "month" ? anchor.slice(0, 7) : week[0])} className="cal-enter" data-dir={dir}>
+            {cal.view === "month" ? (
+              <MonthView
+                anchor={anchor}
+                byDay={byDay}
+                onOpen={openEntry}
+                onAdd={(date) => openEvent(null, date)}
+                onMove={(e, date) => moveEntry(e, date)}
+                selected={selected}
+                onSelect={pickDay}
+              />
+            ) : (
+              <WeekView days={week} byDay={byDay} />
+            )}
+          </div>
+          <p className="text-sm text-muted-foreground max-xl:hidden">
+            Clique num dia para ver a agenda dele ao lado; clique duas vezes para criar um evento. Arraste para remarcar. Na
+            semana, clique duas vezes num horário para criar um evento.
+          </p>
         </div>
-        <p className="text-sm text-muted-foreground max-xl:hidden">
-          Clique num dia para ver a agenda dele ao lado; clique duas vezes para criar um evento. Arraste para remarcar. Na semana,
-          clique duas vezes num horário para criar um evento.
-        </p>
+        <DayPanel day={selected} entries={byDay[selected] ?? []} onPick={pickDay} />
       </div>
-      <DayPanel day={selected} entries={byDay[selected] ?? []} onPick={(day) => set({ selected: day, anchor: day })} />
     </div>
   );
 }
@@ -228,19 +235,19 @@ function CalendarOptions({ showTasks, onShowTasks }: { showTasks: boolean; onSho
   return (
     <Popover>
       <PopoverTrigger asChild>
-        <Button variant="outline" className="h-10 gap-2 rounded-xl px-3.5 text-[15px]">
+        <Button variant="ghost" className="h-11 max-w-full gap-2 rounded-lg px-3 text-[15px]" aria-label="Filtros do calendário">
           {current ? (
             <span className="size-2.5 rounded-full bg-(--area)" style={areaVar(current)} aria-hidden="true" />
           ) : (
             <SlidersHorizontal data-icon="inline-start" />
           )}
-          {current ? current.name : "Todas as áreas"}
-          {!showTasks && <span className="text-muted-foreground">· sem tarefas</span>}
+          <span className="max-w-36 truncate">{current ? current.name : "Todas as áreas"}</span>
+          {!showTasks && <span className="size-1.5 rounded-full bg-primary-strong" aria-label="Tarefas ocultas" />}
         </Button>
       </PopoverTrigger>
       <PopoverContent align="end" className="flex w-80 flex-col gap-4">
         <div className="flex flex-col gap-1.5">
-          <span className="text-xs font-medium text-muted-foreground">Área (vale para todo o site)</span>
+          <span className="text-xs font-medium text-muted-foreground">Área</span>
           <AreaSwitcher className="min-w-0" />
         </div>
         <div className="flex items-center justify-between gap-3 border-t pt-3">
@@ -263,7 +270,7 @@ function DayPanel({ day, entries, onPick }: { day: string; entries: Entry[]; onP
     <section
       aria-labelledby="day-panel"
       aria-live="polite"
-      className="flex flex-col gap-4 rounded-2xl border bg-card p-5 shadow-card xl:sticky xl:top-24 xl:mt-[4.25rem] md:p-6"
+      className="flex min-w-0 flex-col gap-4 rounded-2xl border bg-card p-5 shadow-card xl:sticky xl:top-24 md:p-6"
     >
       <div className="flex items-center gap-1">
         <h2 id="day-panel" className="mr-auto text-xl font-bold tracking-tight">
