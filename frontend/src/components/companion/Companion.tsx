@@ -101,7 +101,7 @@ export function Companion() {
           key={line}
           role="status"
           className={cn(
-            "auth-bubble absolute bottom-[calc(100%+0.75rem)] w-max max-w-48 rounded-2xl bg-card px-3 py-2 text-sm font-semibold text-foreground shadow-lift ring-1 ring-border",
+            "auth-bubble absolute bottom-[calc(100%+0.75rem)] w-max max-w-48 rounded-2xl bg-popover px-3 py-2 text-sm font-semibold text-foreground shadow-lift ring-1 ring-border",
             "right-10 rounded-br-sm",
           )}
         >
