@@ -22,7 +22,7 @@ import type { AlertChannel, Area, Option } from "@/lib/types";
 import { eventsByDay, inArea } from "@/lib/events";
 import { dateOf, firstOptInGroup, groupOf, optOf, statusProp, streakOf } from "@/lib/model";
 import { addDays, fmtDate, parseD, today } from "@/lib/util";
-import { alarmTimes, alarmsBetween, beforeLabel, CHANNEL, dayOfMs, hhmm, untilLabel, type Alarm } from "@/lib/alarms";
+import { alarmTimes, alarmsBetween, CHANNEL, dayOfMs, hhmm, untilLabel, type Alarm } from "@/lib/alarms";
 import { cloudEnabled } from "@/lib/supabase";
 import {
   celebrate,
@@ -440,9 +440,11 @@ function NextAlarm({ now, area }: { now: number; area: string }) {
       >
         {CHANNEL[next.channel]} às {hhmm(next.at)}
       </h2>
-      <p className="truncate pr-20 text-[15px] font-medium opacity-85 md:pr-24 md:whitespace-normal">
-        {next.title}
-        <span className="max-md:hidden"> · {beforeLabel(next)}</span>
+      <p className="pr-20 text-[15px] font-medium break-words opacity-85 md:pr-24">
+        {next.kind === "task" ? "Tarefa" : "Evento"}: {next.title}
+        <span className="mt-1 block">
+          Recebimento previsto: {new Date(next.at).toLocaleDateString("pt-BR")} às {hhmm(next.at)}
+        </span>
       </p>
       {off && (
         <p className="mt-1 flex items-center gap-1.5 pr-24 text-xs font-medium opacity-80 max-md:hidden">
