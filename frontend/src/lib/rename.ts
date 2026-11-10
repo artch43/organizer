@@ -56,6 +56,27 @@ async function copyOldFiles(oldName: string, into: IDBDatabase) {
 }
 
 const opened = new Map<string, Promise<IDBDatabase>>();
+
+/**
+ * Erases this app's file databases (wallpaper picture, attachments kept without an account) from the
+ * device, for signing out. Open connections are closed first, or the browser would wait for them.
+ */
+export async function eraseFilesDbs(names: string[]) {
+  for (const name of names) {
+    const p = opened.get(name);
+    opened.delete(name);
+    await p?.then((d) => d.close()).catch(() => undefined);
+    await new Promise<void>((resolve) => {
+      try {
+        const req = indexedDB.deleteDatabase(`${APP_KEY}-${name}`);
+        req.onsuccess = req.onerror = req.onblocked = () => resolve();
+      } catch {
+        resolve();
+      }
+      setTimeout(resolve, 1500);
+    });
+  }
+}
 /** Opens this app's "<name>" database with a "files" store, bringing over what the old name kept. */
 export function openFilesDb(name: string): Promise<IDBDatabase> {
   let p = opened.get(name);

@@ -4,12 +4,13 @@ import { MotionConfig } from "motion/react";
 import { SETTINGS_ROUTE, checkReviews, closePeek, openModal, openNotes, scrollToTop, useStore } from "./store";
 import { GUIDE_ID, GUIDE_SEEN_KEY } from "./lib/template";
 import { authLink, clearAuthLink, cloudEnabled, supabase } from "./lib/supabase";
-import { installLocalTrash, startCloud, useSync } from "./lib/sync";
+import { NOTICE_KEY, installLocalTrash, startCloud, useSync } from "./lib/sync";
+import { toast } from "sonner";
 import { installDeleteShortcut } from "./lib/shortcuts";
 import { installTouchDnd } from "./lib/touchDnd";
 import { installNativeBars } from "./lib/native";
 import { useBackToClose } from "./lib/backClose";
-import { applyAccent, applyWallpaper } from "./lib/appearance";
+import { applyAccent, applyWallpaper, uploadLegacyWallpaper } from "./lib/appearance";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { Toaster } from "@/components/ui/sonner";
 import { AppHeader } from "./components/app/AppHeader";
@@ -72,6 +73,17 @@ function routeFromHash() {
 }
 
 export default function App() {
+  // A message left by the page before it reloaded (signing out, erasing the account).
+  useEffect(() => {
+    try {
+      const notice = sessionStorage.getItem(NOTICE_KEY);
+      if (!notice) return;
+      sessionStorage.removeItem(NOTICE_KEY);
+      toast(notice, { duration: 10_000 });
+    } catch {
+      /* storage blocked */
+    }
+  }, []);
   return (
     <MotionConfig reducedMotion="user">
       <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
@@ -141,9 +153,37 @@ function ThemeSync() {
   const dark = resolvedTheme === "dark";
   useEffect(() => setTheme(theme), [theme]);
   useEffect(() => applyAccent(accent), [accent]);
+  // The phone's status bar follows the theme chosen here, not only the system's (index.html has the defaults).
+  useEffect(() => {
+    if (!resolvedTheme) return;
+    document
+      .querySelectorAll<HTMLMetaElement>('meta[name="theme-color"]')
+      .forEach((m) => (m.content = dark ? "#08090A" : "#FFFFFF"));
+  }, [dark, resolvedTheme]);
   useEffect(() => {
     void applyWallpaper(wallpaper, dark);
-  }, [wallpaper?.kind, wallpaper?.preset, wallpaper?.strength, wallpaper?.dark?.kind, wallpaper?.dark?.preset, dark]);
+  }, [
+    wallpaper?.kind,
+    wallpaper?.preset,
+    wallpaper?.image,
+    wallpaper?.strength,
+    wallpaper?.dark?.kind,
+    wallpaper?.dark?.preset,
+    wallpaper?.dark?.image,
+    dark,
+  ]);
+  // A photo chosen before photos went to the account: upload it so the other devices get it too.
+  const legacy =
+    (wallpaper?.kind === "image" && !wallpaper.image) || (wallpaper?.dark?.kind === "image" && !wallpaper.dark.image);
+  useEffect(() => {
+    if (!legacy) return;
+    void uploadLegacyWallpaper(useStore.getState().ws.settings.wallpaper).then((next) => {
+      if (next)
+        useStore.getState().mut((w) => {
+          w.settings.wallpaper = next;
+        });
+    });
+  }, [legacy]);
   return null;
 }
 

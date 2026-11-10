@@ -1,7 +1,6 @@
 import type { Note, Workspace } from "./types";
 import { dateOf, groupOf } from "./model";
-import { today } from "./util";
-import { emojiOf } from "./util";
+import { emojiOf, today } from "./util";
 
 /** Splits a [[target#heading|alias]] link body into its parts. */
 export function parseWiki(inner: string) {

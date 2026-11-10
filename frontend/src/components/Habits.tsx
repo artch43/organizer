@@ -259,7 +259,7 @@ function HabitRow({ h, T, i }: { h: Habit; T: string; i: number }) {
           ))}
         </div>
         <button
-          className="ml-auto flex items-center gap-1 rounded-md px-2 py-1 text-sm text-muted-foreground hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+          className="touch-hit ml-auto flex items-center gap-1 rounded-md px-2 py-1 text-sm text-muted-foreground hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
           aria-expanded={history}
           onClick={toggleHistory}
         >

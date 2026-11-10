@@ -1,9 +1,8 @@
 import { createJSONStorage } from "zustand/middleware";
 
 /**
- * Where the workspace is persisted. Today: the browser's localStorage.
- * To add accounts later (e.g. Supabase or Firebase), replace this with an
- * adapter that implements getItem / setItem / removeItem against the backend.
+ * Where the workspace is kept on this device: the browser's localStorage.
+ * With an account, lib/sync.ts points it at a key of that person and sends every change to Supabase.
  */
 export const workspaceStorage = createJSONStorage(() => localStorage);
 export const STORAGE_KEY = "organizer";

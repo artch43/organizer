@@ -264,6 +264,20 @@
     touch-action: manipulation;
     -webkit-tap-highlight-color: transparent;
   }
+  html {
+    -webkit-text-size-adjust: 100%;
+  }
+  /* Holding a finger on a control shouldn't select its label or open the copy/share callout
+     (text you read stays selectable). */
+  button,
+  [role="button"],
+  [role="tab"],
+  [role="radio"],
+  [role="menuitem"] {
+    -webkit-user-select: none;
+    user-select: none;
+    -webkit-touch-callout: none;
+  }
   [data-slot="sheet-content"],
   [data-slot="dialog-content"],
   [data-slot="alert-dialog-content"] {
@@ -737,6 +751,16 @@ h3 {
 }
 
 /* A window, menu or panel is open: he steps back. */
+/* Phones: smaller, and above the bottom bar (and the home indicator) instead of over it. */
+@media (max-width: 767px) {
+  .companion {
+    right: 0.5rem;
+    bottom: calc(5.75rem + env(safe-area-inset-bottom));
+    width: 64px;
+    height: 70px;
+  }
+}
+
 .companion-dim {
   opacity: 0.25;
   pointer-events: none;
@@ -1178,6 +1202,7 @@ html.has-wallpaper [data-app-root] {
 .logo-art g {
   transition: transform 220ms steps(3, end);
 }
+@media (hover: hover) and (pointer: fine) {
 .logo:hover .l-card-1,
 a:hover .logo .l-card-1,
 button:hover .logo .l-card-1 {
@@ -1194,6 +1219,7 @@ a:hover .logo .l-card-3,
 button:hover .logo .l-card-3 {
   transform: translateY(-1.5px);
   transition-delay: 120ms;
+}
 }
 
 /* Mascot: every motion moves in whole pixels (steps), like a sprite. */
@@ -1489,9 +1515,11 @@ button:hover .logo .l-card-3 {
 .mascot-still .m-blink {
   animation: none;
 }
+@media (hover: hover) and (pointer: fine) {
 :is(button, [role="button"]):hover .mascot-still:not([data-open]) .m-card-2 {
   transform: translateY(-1px);
   transition-delay: 0ms;
+}
 }
 
 /* "Create a folder": holding a "+" card. Every few seconds his cards rise one after another,
@@ -1541,6 +1569,8 @@ button:hover .logo .l-card-3 {
     transform: none;
   }
 }
+/* Only with a mouse (on touch, :hover sticks after a tap); keyboard focus works everywhere. */
+@media (hover: hover) and (pointer: fine) {
 :is(button:hover, button:focus-visible) .mascot[data-pose="nova-pasta"] .m-card-1 {
   animation: none;
   transform: translate(-1px, -2px);
@@ -1554,6 +1584,22 @@ button:hover .logo .l-card-3 {
   transform: translate(1px, -2px);
 }
 :is(button:hover, button:focus-visible) .mascot[data-pose="nova-pasta"] .m-badge {
+  animation: m-plus-pop 360ms cubic-bezier(0.34, 1.6, 0.64, 1) both;
+}
+}
+button:focus-visible .mascot[data-pose="nova-pasta"] .m-card-1 {
+  animation: none;
+  transform: translate(-1px, -2px);
+}
+button:focus-visible .mascot[data-pose="nova-pasta"] .m-card-2 {
+  animation: none;
+  transform: translateY(-3px);
+}
+button:focus-visible .mascot[data-pose="nova-pasta"] .m-card-3 {
+  animation: none;
+  transform: translate(1px, -2px);
+}
+button:focus-visible .mascot[data-pose="nova-pasta"] .m-badge {
   animation: m-plus-pop 360ms cubic-bezier(0.34, 1.6, 0.64, 1) both;
 }
 @keyframes m-plus-pop {
@@ -1650,5 +1696,18 @@ button:hover .logo .l-card-3 {
   .logo-art g {
     animation: none !important;
     transition: none !important;
+  }
+}
+
+/* Touch screens: small buttons (text links, icon buttons in dense rows) keep their look but get a
+   finger-sized hit area (about 44px) around them. */
+.touch-hit {
+  position: relative;
+}
+@media (pointer: coarse) {
+  .touch-hit::after {
+    content: "";
+    position: absolute;
+    inset: -8px;
   }
 }

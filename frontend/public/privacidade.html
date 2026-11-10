@@ -14,40 +14,61 @@
   h2 { font-size: 19px; margin: 32px 0 6px; }
   .muted { color: var(--muted); }
   a { color: var(--accent); }
-  .todo { border: 1px dashed var(--accent); border-radius: 8px; padding: 10px 14px; }
 </style>
 </head>
 <body>
 <main>
   <p><a href="/">← Voltar para o Organizer</a></p>
   <h1>Privacidade e termos de uso</h1>
-  <p class="muted">Última atualização: 27 de outubro de 2026</p>
+  <p class="muted">Última atualização: 10 de novembro de 2026</p>
 
   <h2>Quais dados guardamos</h2>
-  <p>O seu e-mail (para login) e o conteúdo que você cria: páginas, itens, anotações, hábitos e preferências de aparência. Não coletamos dados de navegação para publicidade e não vendemos dados.</p>
+  <ul>
+    <li>O seu e-mail, para entrar na conta e receber os alarmes.</li>
+    <li>O que você cria: listas, tarefas, eventos, anotações, hábitos e preferências (como tema e cor).</li>
+    <li>As imagens e os PDFs que você anexa às anotações.</li>
+    <li>O número de WhatsApp, só se você o informar para receber alarmes por lá.</li>
+  </ul>
+  <p>Não coletamos dados de navegação para publicidade, não usamos rastreadores e não vendemos dados.</p>
 
   <h2>Para que usamos</h2>
-  <p>Só para fazer o serviço funcionar: guardar o seu espaço com segurança e sincronizá-lo entre os seus aparelhos. Cada conta só consegue ler os próprios dados.</p>
+  <p>Só para fazer o serviço funcionar: guardar o seu espaço, sincronizá-lo entre os seus aparelhos e enviar os alarmes que você marcar. Cada conta só consegue ler os próprios dados, e os anexos ficam num armazenamento privado.</p>
 
-  <h2>Onde os dados ficam</h2>
-  <p>Num banco de dados hospedado pelo Supabase. A senha é guardada pelo sistema de autenticação do Supabase, de forma criptografada, e nunca fica visível para nós.</p>
+  <h2>Quem processa os dados por nós</h2>
+  <ul>
+    <li><b>Supabase</b>: banco de dados, login, anexos e o envio dos alarmes. A senha é guardada pelo sistema de login do Supabase, de forma criptografada, e nunca fica visível para nós.</li>
+    <li><b>Vercel</b>: hospeda o site e registra acessos técnicos (como o endereço IP) por pouco tempo, por segurança.</li>
+    <li>O serviço de e-mail usado para os alarmes recebe o seu e-mail, o título e o horário do alarme.</li>
+    <li>Se você escolher alarmes por WhatsApp, o provedor do WhatsApp recebe o seu número, o título e o horário.</li>
+  </ul>
+
+  <h2>No seu aparelho</h2>
+  <p>Para funcionar sem internet, o site guarda uma cópia do seu espaço neste navegador. Ao <b>sair da conta</b>, essa cópia, o papel de parede com foto e as preferências deste aparelho são apagados. Num computador compartilhado, sempre saia da conta ao terminar.</p>
+
+  <h2>Por quanto tempo</h2>
+  <ul>
+    <li>Enquanto a sua conta existir.</li>
+    <li>O que você exclui vai para a Lixeira e é apagado de vez depois de 30 dias.</li>
+    <li>O registro dos alarmes já enviados é apagado depois de 30 dias.</li>
+  </ul>
 
   <h2>Seus direitos (LGPD)</h2>
   <p>Você pode, a qualquer momento:</p>
   <ul>
-    <li>baixar uma cópia de tudo em <b>Configurações → Backup</b>;</li>
-    <li>apagar todos os seus dados em <b>Configurações → Conta → Apagar todos os meus dados</b>;</li>
-    <li>pedir a exclusão da conta ou tirar dúvidas pelo contato abaixo.</li>
+    <li>baixar uma cópia de tudo em <b>Configurações → Dados → Baixar backup</b>;</li>
+    <li>apagar a sua conta e todos os seus dados em <b>Configurações → Dados → Apagar todos os meus dados</b>;</li>
+    <li>tirar dúvidas ou fazer outros pedidos pelo contato abaixo.</li>
   </ul>
-
-  <h2>Itens excluídos</h2>
-  <p>O que você exclui vai para a Lixeira e é apagado de vez depois de 30 dias.</p>
 
   <h2>Uso do serviço</h2>
   <p>O serviço é oferecido como está, sem garantia de disponibilidade contínua. Recomendamos baixar backups de vez em quando. Não use o serviço para guardar conteúdo ilegal.</p>
 
   <h2>Contato</h2>
-  <p class="todo">Preencha aqui o e-mail de contato do responsável pelo site antes de publicar.</p>
+  <p>Para dúvidas, pedidos sobre seus dados ou para excluir o cadastro do seu e-mail, escreva para:</p>
+  <ul>
+    <li><a href="mailto:arthur.maffeo43@gmail.com">arthur.maffeo43@gmail.com</a></li>
+    <li><a href="mailto:arthurfranciscolh@gmail.com">arthurfranciscolh@gmail.com</a></li>
+  </ul>
 </main>
 </body>
 </html>

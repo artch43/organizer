@@ -142,7 +142,7 @@ export function Board({ page, db, view, list }: { page: Page; db: Database; view
                 />
               ) : (
                 <button
-                  className="min-w-0 truncate rounded-md px-1 py-0.5 text-left text-base font-bold hover:bg-background"
+                  className="touch-hit min-w-0 truncate rounded-md px-1 py-0.5 text-left text-base font-bold hover:bg-background"
                   title="Clique para renomear"
                   onClick={() => setEditing(o.id)}
                 >
@@ -238,7 +238,7 @@ function ColumnName({ name, onDone }: { name: string; onDone: (name: string | nu
     <Input
       autoFocus
       aria-label="Nome da coluna"
-      className="h-7 flex-1 px-1.5 text-sm font-semibold"
+      className="h-7 flex-1 px-1.5 text-base font-semibold pointer-fine:text-sm"
       value={v}
       onFocus={(e) => e.target.select()}
       onChange={(e) => setV(e.target.value)}
@@ -418,7 +418,7 @@ function Card({
               variant="ghost"
               size="icon-xs"
               aria-label="Mudar status"
-              className="opacity-0 group-hover:opacity-100 focus-visible:opacity-100 pointer-coarse:opacity-100"
+              className="touch-hit opacity-0 group-hover:opacity-100 focus-visible:opacity-100 pointer-coarse:opacity-100"
               onClick={(e) => e.stopPropagation()}
             >
               <ArrowLeftRight />
@@ -497,9 +497,19 @@ function Card({
 function QuickAdd({ onAdd }: { onAdd: (title: string) => void }) {
   const [open, setOpen] = useState(false);
   const [v, setV] = useState("");
+  // Esc cancels for good: the blur that may follow when the field goes away must not add the task.
+  const cancelled = useRef(false);
   if (!open)
     return (
-      <Button variant="ghost" size="sm" className="justify-start text-muted-foreground" onClick={() => setOpen(true)}>
+      <Button
+        variant="ghost"
+        size="sm"
+        className="justify-start text-muted-foreground"
+        onClick={() => {
+          cancelled.current = false;
+          setOpen(true);
+        }}
+      >
         <Plus data-icon="inline-start" />
         Nova tarefa
       </Button>
@@ -517,12 +527,13 @@ function QuickAdd({ onAdd }: { onAdd: (title: string) => void }) {
       value={v}
       onChange={(e) => setV(e.target.value)}
       onBlur={() => {
-        submit();
+        if (!cancelled.current) submit();
         setOpen(false);
       }}
       onKeyDown={(e) => {
         if (e.key === "Enter") submit();
         if (e.key === "Escape") {
+          cancelled.current = true;
           setV("");
           setOpen(false);
         }

@@ -258,7 +258,7 @@ export function Auth({ error: outer, startMode }: { error?: string; startMode?: 
       const { data, error } = await supabase.auth.signUp({ email, password, options: { emailRedirectTo: redirect } });
       if (error) setError(msgOf(error));
       else if (data.session) celebrate();
-      else if (!data.session)
+      else
         setInfo(`Enviamos um link de confirmação para ${email}. Abra o e-mail e clique nele para ativar a conta.`);
     } else {
       // ?tipo=recuperar tells the app, when the link opens, to ask for the new password.
@@ -309,7 +309,7 @@ export function Auth({ error: outer, startMode }: { error?: string; startMode?: 
         )
       }
     >
-      <form onSubmit={submit} noValidate={false}>
+      <form onSubmit={submit}>
         <FieldGroup>
           <Field data-invalid={emailBad}>
             <FieldLabel htmlFor="auth-email">E-mail</FieldLabel>
@@ -483,7 +483,7 @@ export function ChooseStart() {
   return (
     <Shell
       title="Boas-vindas!"
-      description={`Encontramos dados salvos neste navegador (${pages} páginas e ${items} tarefas). Quer levá-los para a sua conta?`}
+      description={`Encontramos dados salvos neste navegador (${pages} páginas e ${items} tarefas). Quer levá-los para a sua conta? Em qualquer caso, eles saem deste navegador.`}
     >
       <div className="flex flex-col gap-2">
         <Button size="lg" onClick={() => seedAccount(candidate)}>

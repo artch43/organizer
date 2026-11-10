@@ -94,7 +94,7 @@ function moveEntry(e: Dropped, date: string, minutes?: number) {
     // Dropped on an hour of the week view: that hour too. On a day (or the all-day row): keeps its time.
     const time =
       minutes !== undefined
-        ? "T" + pad(Math.floor(minutes / 60) % 24) + ":" + pad(minutes % 60)
+        ? " " + pad(Math.floor(minutes / 60) % 24) + ":" + pad(minutes % 60)
         : typeof cur === "string"
           ? cur.slice(10)
           : "";
@@ -144,7 +144,7 @@ export function CalendarPage() {
       : `${w0.getDate()} ${MONTHS[w0.getMonth()].slice(0, 3)} – ${w6.getDate()} ${MONTHS[w6.getMonth()].slice(0, 3)} ${w6.getFullYear()}`;
 
   return (
-    <div className="mx-auto grid w-full max-w-[90rem] items-start gap-6 px-4 pt-5 pb-28 md:px-10 md:pt-7 xl:grid-cols-[minmax(0,1fr)_minmax(20rem,24rem)]">
+    <div className="mx-auto grid w-full max-w-[90rem] grid-cols-[minmax(0,1fr)] items-start gap-6 px-4 pt-5 pb-28 md:px-10 md:pt-7 xl:grid-cols-[minmax(0,1fr)_minmax(20rem,24rem)]">
       <div className="flex min-w-0 flex-col gap-5">
         <div className="flex flex-wrap items-center gap-x-4 gap-y-3">
           <div className="mr-auto flex min-w-0 items-center gap-4">

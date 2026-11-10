@@ -1,4 +1,4 @@
-import type { Database, Filter, Group, Item, Page, PropValue, View, Workspace, Prop, Option } from "./types";
+import type { Database, Filter, Group, Item, PropValue, View, Workspace, Prop, Option } from "./types";
 import { INTERVALS, addDays, today } from "./util";
 
 export const statusProp = (db: Database) => db.props.find((p) => p.type === "status");
@@ -14,26 +14,6 @@ export function firstOptInGroup(db: Database, g: Group) {
 }
 export const childrenOf = (ws: Workspace, pid: string | null) =>
   ws.pages.filter((p) => (p.parent || null) === pid).sort((a, b) => a.order - b.order);
-export function descendants(ws: Workspace, pid: string): string[] {
-  const out: string[] = [];
-  const walk = (id: string) =>
-    childrenOf(ws, id).forEach((c) => {
-      out.push(c.id);
-      walk(c.id);
-    });
-  walk(pid);
-  return out;
-}
-export function pagePath(ws: Workspace, id: string): Page[] {
-  const out: Page[] = [];
-  let p = ws.pages.find((x) => x.id === id);
-  while (p) {
-    out.unshift(p);
-    const parent: string | null = p.parent;
-    p = parent ? ws.pages.find((x) => x.id === parent) : undefined;
-  }
-  return out;
-}
 export const itemsOf = (ws: Workspace, dbId: string) => Object.values(ws.items).filter((i) => i.db === dbId);
 export const dateOf = (db: Database, item: Item) => {
   const dp = dateProp(db);
@@ -111,6 +91,11 @@ export function applyFilters(ws: Workspace, dbId: string, view: View, search: st
     const key = (i: Item): string | number => {
       if (s.prop === "title") return (i.title || "").toLowerCase();
       if (s.prop === "created") return i.created;
+      // Day then time, whichever separator the saved value has ("2026-01-05 14:00" or the older "…T14:00").
+      if (s.prop === "date") {
+        const d = typeof i.props.date === "string" ? i.props.date : "";
+        return d ? d.slice(0, 10) + " " + d.slice(11, 16) : "\uffff";
+      }
       const v = i.props[s.prop];
       if (prop?.options) {
         const k = prop.options.findIndex((o) => o.id === v);
@@ -169,8 +154,6 @@ export function defaultsFromFilters(db: Database, view: View) {
   }
   return out;
 }
-export const visibleProps = (db: Database, view: View) => db.props.filter((pr) => !(view.hidden || []).includes(pr.id));
-
 /** The first day the habit was ever marked, or null if never. Days before it don't count as missed. */
 export function firstDoneOf(log: Record<string, string[]>, hid: string) {
   let first: string | null = null;

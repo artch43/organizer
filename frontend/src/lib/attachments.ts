@@ -105,25 +105,3 @@ export async function attachmentUrl(id: string): Promise<string | null> {
   }
   return url;
 }
-
-/** Swaps attachment references inside rendered HTML (img[data-anexo], a[href^="anexo:"]) for real URLs. */
-export function resolveIn(root: HTMLElement) {
-  for (const img of root.querySelectorAll<HTMLImageElement>("img[data-anexo]")) {
-    const id = img.dataset.anexo!;
-    img.classList.add("attach-img");
-    void attachmentUrl(id).then((u) => {
-      if (u) img.src = u;
-      else img.alt = `${img.alt} (arquivo não encontrado)`;
-    });
-  }
-  for (const a of root.querySelectorAll<HTMLAnchorElement>(`a[href^="${ATTACH_PREFIX}"]`)) {
-    const id = a.getAttribute("href")!.slice(ATTACH_PREFIX.length);
-    a.removeAttribute("href");
-    a.classList.add("attach-file");
-    a.target = "_blank";
-    a.rel = "noopener noreferrer";
-    void attachmentUrl(id).then((u) => {
-      if (u) a.href = u;
-    });
-  }
-}

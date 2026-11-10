@@ -339,7 +339,7 @@ function BlockHead({
         <button
           type="button"
           onClick={link.run}
-          className="ml-auto rounded-md px-1 text-[13px] font-semibold text-primary-strong hover:underline focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+          className="touch-hit ml-auto rounded-md px-1 text-[13px] font-semibold text-primary-strong hover:underline focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
         >
           {link.label}
         </button>
@@ -410,7 +410,7 @@ function NextAlarm({ now, area }: { now: number; area: string }) {
         <button
           type="button"
           onClick={open}
-          className="flex h-10 items-center gap-2 rounded-xl bg-primary-foreground px-4 text-[15px] font-semibold text-white transition-opacity hover:opacity-90 focus-visible:ring-2 focus-visible:ring-primary-foreground/50 focus-visible:ring-offset-2 focus-visible:ring-offset-primary focus-visible:outline-none"
+          className="flex h-10 items-center gap-2 rounded-xl bg-primary-foreground px-4 text-[15px] font-semibold text-primary transition-opacity hover:opacity-90 focus-visible:ring-2 focus-visible:ring-primary-foreground/50 focus-visible:ring-offset-2 focus-visible:ring-offset-primary focus-visible:outline-none"
         >
           <ExternalLink className="size-4" aria-hidden="true" />
           {next.kind === "task" ? "Abrir tarefa" : "Abrir evento"}
@@ -675,7 +675,7 @@ function ListsBlock() {
           aria-label="Criar nova pasta"
           title="Criar nova pasta"
           onClick={() => setNewFolder(true)}
-          className="ml-auto flex size-7 items-center justify-center self-center rounded-lg transition-colors hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+          className="touch-hit ml-auto flex size-7 items-center justify-center self-center rounded-lg transition-colors hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
         >
           <UiIcon name="newFolder" size={20} />
         </button>
@@ -687,7 +687,7 @@ function ListsBlock() {
               type="button"
               onClick={r.run}
               className={cn(
-                "flex w-full items-center gap-2.5 rounded-lg px-1 py-1 text-left transition-colors hover:bg-muted/60 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none",
+                "flex w-full items-center gap-2.5 rounded-lg px-1 py-1 text-left pointer-coarse:py-2.5 transition-colors hover:bg-muted/60 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none",
                 r.depth && "pl-8",
               )}
             >
@@ -834,7 +834,7 @@ function TaskGroup({
   hint?: string;
   hideTitle?: boolean;
 }) {
-  const id = "grp-" + title;
+  const id = "grp-" + title.toLowerCase().replace(/\s+/g, "-");
   return (
     <section aria-labelledby={id} className="flex flex-col gap-2.5">
       <h2

@@ -209,6 +209,14 @@
   accent-color: var(--primary-strong);
   cursor: pointer;
 }
+/* Fingers: a bigger box, easier to hit. */
+@media (pointer: coarse) {
+  .note-editor .cm-task-box {
+    width: 1.25em;
+    height: 1.25em;
+    vertical-align: -0.25em;
+  }
+}
 .note-editor .cm-task-done {
   color: var(--muted-foreground);
   text-decoration: line-through;

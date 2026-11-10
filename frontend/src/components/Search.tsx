@@ -10,11 +10,10 @@ import {
   CommandItem,
   CommandList,
 } from "@/components/ui/command";
-import { fmtDate, ymd } from "@/lib/util";
+import { emojiOf, fmtDate, ymd } from "@/lib/util";
 import { dateOf, statusProp } from "@/lib/model";
 import { REPEAT_LABELS } from "@/lib/events";
 import { plainSnippet } from "@/lib/notes";
-import { emojiOf } from "@/lib/util";
 import { Glyph } from "./icons";
 import { EmptyState } from "./EmptyState";
 
@@ -105,7 +104,7 @@ export function Search() {
                 >
                   <CalendarDays />
                   <Two
-                    title={e.title}
+                    title={e.title || "Evento"}
                     sub={[
                       fmtDate(e.date) + (e.allDay ? ", dia inteiro" : `, ${e.start}`),
                       e.repeat && e.repeat !== "none" ? REPEAT_LABELS[e.repeat] : "",
