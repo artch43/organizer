@@ -21,6 +21,13 @@ export function alertLabel(minutes: number) {
   return `${minutes} min antes`;
 }
 
+export function alertPresets(saved?: number[]) {
+  return [...new Set(saved ?? ALERT_PRESETS.map((p) => p.minutes))]
+    .filter((m) => Number.isSafeInteger(m) && m >= 0)
+    .sort((a, b) => a - b)
+    .map((minutes) => ({ minutes, label: alertLabel(minutes) }));
+}
+
 export const REPEAT_LABELS: Record<Repeat, string> = {
   none: "Não se repete",
   daily: "Todo dia",

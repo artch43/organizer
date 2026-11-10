@@ -8,6 +8,8 @@ import { addDays, parseD, today } from "@/lib/util";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { areaVar } from "../common";
+import { contrast, isHex } from "@/lib/appearance";
+import { useStore } from "@/store";
 
 export interface Entry {
   key: string;
@@ -102,6 +104,13 @@ export function MonthView({
   onSelect?: (date: string) => void;
   max?: number;
 }) {
+  const accent = useStore((s) => s.ws.settings.accent);
+  const selectedColor = accent && isHex(accent) ? accent : undefined;
+  const selectedForeground = selectedColor
+    ? contrast(selectedColor, "#ffffff") >= contrast(selectedColor, "#000000")
+      ? "#ffffff"
+      : "#000000"
+    : undefined;
   const days = monthGrid(anchor);
   const month = parseD(anchor).getMonth();
   const T = today();
@@ -139,7 +148,6 @@ export function MonthView({
                   "group relative flex min-h-16 min-w-0 cursor-default flex-col gap-1 border-r border-b p-1.5 transition-colors sm:min-h-32 sm:p-2",
                   (i + 1) % 7 === 0 && "border-r-0",
                   i >= days.length - 7 && "border-b-0",
-                  isPicked && "bg-muted/70",
                   over === d && "bg-primary/8 ring-2 ring-primary-strong/40 ring-inset",
                 )}
                 onDragOver={(e) => {
@@ -162,15 +170,21 @@ export function MonthView({
                   }
                 }}
               >
-                <div className="flex items-center justify-between max-sm:justify-center">
-                  <span
-                    className={cn(
-                      "flex size-8 items-center justify-center rounded-full text-[15px] font-semibold tabular-nums transition-colors max-sm:size-7 max-sm:text-sm",
-                      d === T ? "bg-primary text-primary-foreground" : out ? "text-muted-foreground/60" : "text-foreground",
-                    )}
-                  >
-                    {parseD(d).getDate()}
-                  </span>
+                <div className="flex items-start justify-between max-sm:justify-center">
+                  <div className="flex h-12 flex-col items-center gap-0.5">
+                    <span
+                      aria-current={d === T ? "date" : undefined}
+                      aria-label={isPicked ? `${parseD(d).getDate()}, dia selecionado` : undefined}
+                      style={isPicked ? { backgroundColor: selectedColor, color: selectedForeground } : undefined}
+                      className={cn(
+                        "flex size-8 items-center justify-center rounded-full text-[15px] font-semibold tabular-nums max-sm:size-7 max-sm:text-sm",
+                        isPicked ? "bg-primary text-primary-foreground" : out ? "text-muted-foreground/60" : "text-foreground",
+                      )}
+                    >
+                      {parseD(d).getDate()}
+                    </span>
+                    {d === T && <span className="text-[10px] leading-3 font-medium text-muted-foreground">Hoje</span>}
+                  </div>
                   {onAdd && (
                     <Button
                       variant="ghost"

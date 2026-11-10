@@ -343,6 +343,14 @@ function buildDecorations(view: EditorView): DecorationSet {
         }
         if (name === "FencedCode" || name === "InlineCode" || name === "CodeBlock") code.push([node.from, node.to]);
         if (name === "FencedCode") {
+          const fences = node.node.getChildren("CodeMark");
+          const editing = view.hasFocus && state.selection.ranges.some((r) => r.to >= node.from && r.from <= node.to);
+          if (!editing && fences.length === 2) {
+            for (const fence of fences) {
+              const fenceLine = state.doc.lineAt(fence.from);
+              out.push(hide.range(fenceLine.from, fenceLine.to));
+            }
+          }
           for (let p = node.from; p <= node.to;) {
             const l = state.doc.lineAt(p);
             out.push(lineDeco("cm-codeblock").range(l.from));
@@ -442,16 +450,122 @@ const livePreview = ViewPlugin.fromClass(
   { decorations: (v) => v.decorations },
 );
 
+/** Toggle existing code first, then choose inline or fenced code by selection. */
+function codeRange(state: EditorState, r: typeof state.selection.main) {
+  let delimiters: { from: number; to: number }[] | undefined;
+  syntaxTree(state).iterate({
+    from: r.from,
+    to: r.to,
+    enter(node) {
+      if (node.from > r.from || node.to < r.to) return;
+      if (node.name !== "InlineCode" && node.name !== "FencedCode") return;
+      const marks = node.node.getChildren("CodeMark");
+      if (marks.length !== 2) return;
+      if (node.name === "InlineCode") {
+        delimiters = marks.map(({ from, to }) => ({ from, to }));
+        const content = state.sliceDoc(marks[0].to, marks[1].from);
+        if (content.startsWith(" ") && content.endsWith(" ") && /[^ ]/.test(content)) {
+          delimiters[0].to++;
+          delimiters[1].from--;
+        }
+      } else {
+        const first = state.doc.lineAt(marks[0].from);
+        const last = state.doc.lineAt(marks[1].from);
+        delimiters = first.to + 1 > last.from - 1
+          ? [{ from: first.from, to: last.to }]
+          : [{ from: first.from, to: first.to + 1 }, { from: last.from - 1, to: last.to }];
+      }
+    },
+  });
+  if (!delimiters && r.empty && state.sliceDoc(r.from - 1, r.from + 1) === "``") {
+    delimiters = [{ from: r.from - 1, to: r.from + 1 }];
+  }
+  if (delimiters) {
+    const changes = state.changes(delimiters.map(({ from, to }) => ({ from, to, insert: "" })));
+    return { changes, range: EditorSelection.range(changes.mapPos(r.anchor), changes.mapPos(r.head)) };
+  }
+  const selected = state.sliceDoc(r.from, r.to);
+  const multiline = selected.includes("\n");
+  const from = multiline ? state.doc.lineAt(r.from).from : r.from;
+  const to = multiline ? state.doc.lineAt(r.to > r.from && state.doc.lineAt(r.to).from === r.to ? r.to - 1 : r.to).to : r.to;
+  const text = state.sliceDoc(from, to);
+  const runs = [...text.matchAll(/`+/g)].map((m) => m[0].length);
+  const fence = "`".repeat(Math.max(multiline ? 3 : 1, ...runs.map((size) => size + 1)));
+  const padding = !multiline && (text.startsWith("`") || text.endsWith("`") ||
+    (text.startsWith(" ") && text.endsWith(" ") && /[^ ]/.test(text))) ? " " : "";
+  const prefix = fence + (multiline ? "\n" : padding);
+  const suffix = (multiline ? "\n" : padding) + fence;
+  return {
+    changes: [{ from, insert: prefix }, { from: to, insert: suffix }],
+    range: EditorSelection.range(
+      Math.min(r.anchor, to) + prefix.length,
+      Math.min(r.head, to) + prefix.length,
+    ),
+  };
+}
+
 function wrapWith(mark: string) {
   return (view: EditorView) => {
     view.dispatch(
-      view.state.changeByRange((r) => ({
-        changes: [
-          { from: r.from, insert: mark },
-          { from: r.to, insert: mark },
-        ],
-        range: EditorSelection.range(r.from + mark.length, r.to + mark.length),
-      })),
+      view.state.changeByRange((r) => {
+        if (mark === "`") return codeRange(view.state, r);
+        if (mark === "*" || mark === "**") {
+          const name = mark === "**" ? "StrongEmphasis" : "Emphasis";
+          let delimiters: { from: number; to: number }[] | undefined;
+          syntaxTree(view.state).iterate({
+            from: r.from,
+            to: r.to,
+            enter(node) {
+              if (node.name !== name || node.from > r.from || node.to < r.to) return;
+              const marks = node.node.getChildren("EmphasisMark");
+              if (marks.length === 2) delimiters = marks;
+            },
+          });
+          // Empty pairs have no emphasis node yet. Only remove an exact pair,
+          // so the stars belonging to bold cannot be mistaken for italic.
+          const size = mark.length;
+          if (!delimiters && r.empty && r.from >= size &&
+            view.state.sliceDoc(r.from - size, r.from) === mark &&
+            view.state.sliceDoc(r.to, r.to + size) === mark &&
+            view.state.sliceDoc(r.from - size - 1, r.from - size) !== "*" &&
+            view.state.sliceDoc(r.to + size, r.to + size + 1) !== "*") {
+            delimiters = [{ from: r.from - size, to: r.from }, { from: r.to, to: r.to + size }];
+          }
+          if (delimiters) {
+            const changes = view.state.changes(delimiters.map(({ from, to }) => ({ from, to, insert: "" })));
+            return {
+              changes,
+              range: EditorSelection.range(changes.mapPos(r.anchor), changes.mapPos(r.head)),
+            };
+          }
+        }
+        if (mark === "~~") {
+          const selected = view.state.sliceDoc(r.from, r.to);
+          const inside = selected.length >= 4 && selected.startsWith(mark) && selected.endsWith(mark);
+          const outside =
+            r.from >= 2 && view.state.sliceDoc(r.from - 2, r.from) === mark &&
+            view.state.sliceDoc(r.to, r.to + 2) === mark;
+          if (inside || outside) {
+            const from = inside ? r.from : r.from - 2;
+            const to = inside ? r.to : r.to + 2;
+            const end = to - 4;
+            return {
+              changes: [
+                { from, to: from + 2, insert: "" },
+                { from: to - 2, to, insert: "" },
+              ],
+              range: EditorSelection.range(r.anchor > r.head ? end : from, r.anchor > r.head ? from : end),
+            };
+          }
+        }
+        return {
+          changes: [
+            { from: r.from, insert: mark },
+            { from: r.to, insert: mark },
+          ],
+          range: EditorSelection.range(r.from + mark.length, r.to + mark.length),
+        };
+      }),
       { userEvent: "input" },
     );
     return true;
