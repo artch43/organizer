@@ -111,7 +111,7 @@ export function DbPage({ page }: { page: Page }) {
             variant="outline"
             aria-label="Editar status"
             title="Editar status"
-            className="h-10 rounded-xl max-lg:size-10 max-lg:px-0"
+            className="h-10 rounded-xl max-lg:size-10 max-lg:p-0!"
             onClick={() =>
               setUi((u) => {
                 u.statusDialog = page.id;
@@ -263,7 +263,7 @@ function SortButton({ view, onChange }: { view: View; onChange: (s: View["sort"]
           variant="outline"
           aria-label={`Ordenar: ${cur.label}`}
           title={`Ordem: ${cur.label}`}
-          className="h-10 rounded-xl max-sm:size-10 max-sm:px-0"
+          className="h-10 rounded-xl max-sm:size-10 max-sm:p-0!"
         >
           <ArrowDownUp data-icon="inline-start" className="max-sm:m-0" />
           <span className="max-sm:hidden">{key === "auto" ? "Ordenar" : cur.key === "manual" ? "Manual" : "Ordenado"}</span>
@@ -333,7 +333,7 @@ function FilterButton({ dbId, view, onAdd }: { dbId: string; view: View; onAdd: 
       <PopoverTrigger asChild>
         <Button
           variant={count ? "secondary" : "outline"}
-          className="h-10 rounded-xl"
+          className="h-10 rounded-xl max-sm:size-10 max-sm:p-0!"
           aria-label={`Filtrar${count ? ` (${count})` : ""}`}
         >
           <Filter data-icon="inline-start" className="max-sm:m-0" />

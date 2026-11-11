@@ -232,7 +232,10 @@ export function Home() {
         <div className="flex min-w-0 flex-wrap items-center gap-x-4 gap-y-2 max-sm:w-full">
           <AreaSwitcher className="min-w-0 max-sm:w-full" />
           <span className="h-7 w-px bg-border max-sm:hidden" aria-hidden="true" />
-          <DayPicker D={D} T={T} onPick={pick} />
+          {/* Phones: centered under the areas. */}
+          <div className="flex max-sm:w-full max-sm:justify-center">
+            <DayPicker D={D} T={T} onPick={pick} />
+          </div>
         </div>
       </header>
 
@@ -1029,11 +1032,12 @@ function WelcomeBanner() {
         </h2>
         <p className="text-sm text-muted-foreground">Você está visualizando dados de exemplo para conhecer os recursos.</p>
       </div>
-      <div className="flex flex-wrap gap-2">
-        <Button variant="outline" onClick={() => setAsk(true)}>
+      {/* Phones: one under the other, full width, labels centered. */}
+      <div className="flex flex-wrap gap-2 max-sm:flex-col">
+        <Button variant="outline" className="max-sm:h-11 max-sm:w-full" onClick={() => setAsk(true)}>
           Limpar exemplos e começar do zero
         </Button>
-        <Button variant="ghost" onClick={dismiss}>
+        <Button variant="ghost" className="max-sm:h-11 max-sm:w-full" onClick={dismiss}>
           Explorar com exemplos
         </Button>
       </div>

@@ -462,7 +462,6 @@ export async function signOut(force = false, notice?: string) {
   location.reload();
 }
 
-/** Deletes every row this person has in the cloud (LGPD: right to erasure), then signs out. */
 /**
  * Deletes everything this person has in the cloud and the account itself (LGPD: right to erasure),
  * then signs out. The account is removed by the `delete-account` function (the browser can't); its

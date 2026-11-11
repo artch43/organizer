@@ -262,7 +262,11 @@ export async function removeWallpaperImage(pick: WallpaperPick | null | undefine
   }
   await store("readwrite", (s) => s.delete(cacheKey(pick.image!))).catch(() => undefined);
   const user = await signedInUser();
-  if (user && supabase) await supabase.storage.from(BUCKET).remove([cloudPath(user, pick.image)]).catch(() => undefined);
+  if (user && supabase)
+    await supabase.storage
+      .from(BUCKET)
+      .remove([cloudPath(user, pick.image)])
+      .catch(() => undefined);
 }
 
 /**
@@ -287,6 +291,18 @@ export async function uploadLegacyWallpaper(w: Wallpaper | undefined): Promise<W
     next = slot === "light" ? { ...next, image: id } : { ...next, dark: { ...next.dark!, image: id } };
   }
   return next === w ? null : next;
+}
+
+/**
+ * Forgets this device's copies of pictures that are no longer chosen (replaced or removed, maybe on
+ * another device). Only the cached copies: the account's files are handled by removeWallpaperImage.
+ */
+export async function pruneWallpaperCache(w: Wallpaper | undefined) {
+  const keep = new Set([w?.image, w?.dark?.image].filter(Boolean).map((id) => cacheKey(id!)));
+  const keys = await store<IDBValidKey[]>("readonly", (s) => s.getAllKeys()).catch(() => []);
+  for (const k of keys)
+    if (typeof k === "string" && k.startsWith("img:") && !keep.has(k))
+      await store("readwrite", (s) => s.delete(k)).catch(() => undefined);
 }
 
 let objectUrl: string | null = null;
