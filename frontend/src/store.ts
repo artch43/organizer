@@ -4,7 +4,7 @@ import { persist } from "zustand/middleware";
 import { immer } from "zustand/middleware/immer";
 import { createElement } from "react";
 import { toast as sonner } from "sonner";
-import type { Area, CalendarEvent, Color, Group, Item, Note, PropValue, Todo, Workspace } from "./lib/types";
+import type { Area, CalendarEvent, Color, Group, Item, Note, PropValue, Workspace } from "./lib/types";
 import { template, mkDb, DEFAULT_STATUS } from "./lib/template";
 import { applyStatusChange, childrenOf, runReviews, statusProp, streakOf } from "./lib/model";
 import { DEFAULT_LIST_ICON, addDays, diffDays, fmtDate, parseD, today, uid } from "./lib/util";
@@ -477,7 +477,7 @@ export function movePage(id: string, dir: -1 | 1) {
   mut((w) => {
     const all = childrenOf(w, null);
     const folder = all.find((p) => p.id === id)?.folder ?? "";
-    const list = all.filter((p) => p.type === "db" && (p.folder ?? "") === folder);
+    const list = all.filter((p) => p.type === "db" && !p.archived && (p.folder ?? "") === folder);
     const i = list.findIndex((p) => p.id === id),
       j = i + dir;
     if (i < 0 || j < 0 || j >= list.length) return;
@@ -764,40 +764,6 @@ export const openEvent = (id: string | null, date?: string, start?: string) =>
   });
 
 /* ---------- to-do ---------- */
-export function addTodo(text: string, extra: Partial<Todo> = {}) {
-  const clean = text.trim();
-  if (!clean) return null;
-  const id = uid();
-  const area = useStore.getState().ui.area;
-  mut((w) => {
-    const top = Math.min(0, ...Object.values(w.todos).map((t) => t.order));
-    w.todos[id] = {
-      id,
-      text: clean,
-      done: false,
-      order: top - 1,
-      created: Date.now(),
-      ...(area !== "all" ? { area } : {}),
-      ...extra,
-    };
-  });
-  return id;
-}
-export function updateTodo(id: string, patch: Partial<Todo>) {
-  mut((w) => {
-    const t = w.todos[id];
-    if (t) Object.assign(t, patch);
-  });
-}
-export function toggleTodo(id: string) {
-  mut((w) => {
-    const t = w.todos[id];
-    if (t) {
-      t.done = !t.done;
-      t.doneAt = t.done ? Date.now() : undefined;
-    }
-  });
-}
 export function deleteTodo(id: string) {
   const snap = ws().todos[id];
   if (!snap) return;
@@ -807,18 +773,6 @@ export function deleteTodo(id: string) {
   toast("Tarefa excluída", () =>
     mut((w) => {
       w.todos[id] = snap;
-    }),
-  );
-}
-export function clearDoneTodos() {
-  const done = Object.values(ws().todos).filter((t) => t.done);
-  if (!done.length) return;
-  mut((w) => {
-    for (const t of done) delete w.todos[t.id];
-  });
-  toast(`${done.length} ${done.length === 1 ? "concluído apagado" : "concluídos apagados"}`, () =>
-    mut((w) => {
-      for (const t of done) w.todos[t.id] = t;
     }),
   );
 }
@@ -972,7 +926,7 @@ export function renameFolder(from: string, to: string) {
         n.updated = Date.now();
       }
     }
-    w.settings.noteFolders = (w.settings.noteFolders ?? []).map(swap);
+    w.settings.noteFolders = [...new Set((w.settings.noteFolders ?? []).map(swap))];
   });
 }
 export function deleteFolder(path: string) {

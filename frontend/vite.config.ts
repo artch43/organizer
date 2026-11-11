@@ -37,7 +37,7 @@ export default defineConfig({
       },
     }),
   ],
-  resolve: { alias: { "@": path.resolve(__dirname, "./src") } },
+  resolve: { alias: { "@": path.resolve(import.meta.dirname, "./src") } },
   build: {
     rollupOptions: {
       output: {
@@ -49,7 +49,7 @@ export default defineConfig({
           if (has("katex")) return "vendor-math";
           if (has("radix-ui", "@radix-ui/", "lucide-react", "cmdk", "sonner", "@floating-ui/", "react-remove-scroll", "aria-hidden"))
             return "vendor-ui";
-          if (has("date-fns", "jszip", "marked", "dompurify", "react-day-picker")) return "vendor-utils";
+          if (has("jszip", "marked", "dompurify")) return "vendor-utils";
           if (has("@supabase/")) return "vendor-supabase";
           if (has("react/", "react-dom/", "scheduler")) return "vendor-react";
           if (has("zustand", "immer")) return "vendor-state";

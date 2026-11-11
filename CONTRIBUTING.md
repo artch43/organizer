@@ -6,9 +6,9 @@
 |---|---|
 | `frontend/` | O site e os apps: React + Vite + Tailwind + shadcn/ui, e o Capacitor (`android/`, `ios/`) |
 | `backend/` | O Supabase: banco (`supabase/migrations/`, `setup.sql`), a função dos alarmes (`supabase/functions/`) e o agendamento (`cron.sql`) |
-| `docs/` | Guias de configuração e dos apps |
+| `frontend/docs/` | Guias de configuração e dos apps |
 
-O mapa completo dos arquivos está em [docs/CONFIGURACAO.md](docs/CONFIGURACAO.md#estrutura-do-projeto).
+O mapa completo dos arquivos está em [frontend/docs/CONFIGURACAO.md](frontend/docs/CONFIGURACAO.md#estrutura-do-projeto).
 
 ## Primeira vez
 

@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="public/pwa-512.png" width="96" alt="Logo do Organizer" />
+<img src="frontend/public/pwa-512.png" width="96" alt="Logo do Organizer" />
 
 # Organizer
 
@@ -26,7 +26,7 @@ no computador, no tablet e no celular.
 
 <br />
 
-<img src="docs/screenshots/inicio.png" alt="Tela de Início do Organizer: tarefas de hoje, próximos compromissos e hábitos" width="100%" />
+<img src="frontend/docs/screenshots/inicio.png" alt="Tela de Início do Organizer: tarefas de hoje, próximos compromissos e hábitos" width="100%" />
 
 </div>
 
@@ -86,8 +86,8 @@ clique de distância, sem telas complicadas.
 
 <table>
   <tr>
-    <td width="50%"><img src="docs/screenshots/quadro.png" alt="Quadro de tarefas no tema escuro" /></td>
-    <td width="50%"><img src="docs/screenshots/anotacoes.png" alt="Anotação com fórmulas LaTeX" /></td>
+    <td width="50%"><img src="frontend/docs/screenshots/quadro.png" alt="Quadro de tarefas no tema escuro" /></td>
+    <td width="50%"><img src="frontend/docs/screenshots/anotacoes.png" alt="Anotação com fórmulas LaTeX" /></td>
   </tr>
   <tr>
     <td align="center"><sub>Quadro de tarefas, no tema escuro</sub></td>
@@ -96,9 +96,9 @@ clique de distância, sem telas complicadas.
 </table>
 
 <div align="center">
-  <img src="docs/screenshots/celular.png" alt="Início no celular" width="260" />
+  <img src="frontend/docs/screenshots/celular.png" alt="Início no celular" width="260" />
   &nbsp;&nbsp;&nbsp;
-  <img src="docs/screenshots/habitos.png" alt="Hábitos no celular, tema escuro" width="260" />
+  <img src="frontend/docs/screenshots/habitos.png" alt="Hábitos no celular, tema escuro" width="260" />
   <br />
   <sub>No celular: o dia e os hábitos</sub>
 </div>
@@ -132,7 +132,7 @@ npm run dev     # http://localhost:5173 (sem configuração, os dados ficam no n
 O código fica em duas pastas: **`frontend/`** (o site e os apps) e **`backend/`** (banco e funções no Supabase).
 Para contribuir, veja o **[CONTRIBUTING.md](CONTRIBUTING.md)**.
 
-Como ligar a nuvem, os alarmes e publicar: **[docs/CONFIGURACAO.md](docs/CONFIGURACAO.md)**. Apps para Android e iPhone: **[docs/APLICATIVO.md](docs/APLICATIVO.md)**.
+Como ligar a nuvem, os alarmes e publicar: **[frontend/docs/CONFIGURACAO.md](frontend/docs/CONFIGURACAO.md)**. Apps para Android e iPhone: **[frontend/docs/APLICATIVO.md](frontend/docs/APLICATIVO.md)**.
 
 <br />
 

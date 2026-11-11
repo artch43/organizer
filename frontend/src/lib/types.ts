@@ -183,12 +183,13 @@ export interface Settings {
   /** Independent dark-theme accent; falls back to the existing accent for older workspaces. */
   accentDark?: string;
   /** Background behind the pages: one for the light mode and, optionally, another for the dark mode.
-   * A photo stays on each device; presets sync. */
+   * A photo is uploaded to the account (`image` is its id) so every device shows it. */
   wallpaper?: {
     kind: "none" | "preset" | "image";
     preset?: string;
+    image?: string;
     strength?: number;
-    dark?: { kind: "none" | "preset" | "image"; preset?: string };
+    dark?: { kind: "none" | "preset" | "image"; preset?: string; image?: string };
   };
   /** Sidebar look: the default, a tint of the accent, or frosted glass over the wallpaper. */
   sidebarStyle?: "solid" | "accent" | "glass";

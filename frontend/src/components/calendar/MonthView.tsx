@@ -192,7 +192,7 @@ export function MonthView({
                       variant="ghost"
                       size="icon-xs"
                       aria-label={`Adicionar em ${d}`}
-                      className="opacity-0 group-hover:opacity-100 focus-visible:opacity-100 max-sm:hidden"
+                      className="opacity-0 group-hover:opacity-100 focus-visible:opacity-100 pointer-coarse:opacity-100 max-sm:hidden"
                       onClick={(e) => {
                         e.stopPropagation();
                         onAdd(d);

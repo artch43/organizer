@@ -52,7 +52,7 @@ export function TaskSheet() {
   return (
     <Sheet open={open} onOpenChange={(o) => !o && closePeek()}>
       <SheetContent
-        className="flex w-full flex-col gap-0 overflow-y-auto sm:max-w-lg"
+        className="flex w-full flex-col gap-0 overflow-y-auto data-[side=right]:w-full data-[side=right]:sm:max-w-lg"
         // Opening a task to read it shouldn't pop up the phone keyboard: only a new task starts in its title.
         onOpenAutoFocus={(e) => {
           if (!focus) e.preventDefault();

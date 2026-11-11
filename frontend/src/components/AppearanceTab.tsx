@@ -17,6 +17,7 @@ import {
 } from "@/lib/appearance";
 import { useTheme } from "next-themes";
 import { useStore } from "@/store";
+import { useSync } from "@/lib/sync";
 import { Field, FieldDescription, FieldGroup, FieldLabel, FieldSet, FieldLegend } from "@/components/ui/field";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { Button } from "@/components/ui/button";
@@ -45,25 +46,33 @@ export function AppearanceTab() {
       w.settings.accent = color;
     }
   });
-  const lightPick: WallpaperPick = { kind: wp.kind, preset: wp.preset };
+  const lightPick: WallpaperPick = { kind: wp.kind, preset: wp.preset, image: wp.image };
   const pick: WallpaperPick = slot === "light" ? lightPick : (wp.dark ?? lightPick);
   const nextWith = (p: WallpaperPick): NonNullable<Settings["wallpaper"]> =>
     slot === "light"
-      ? { ...wp, kind: p.kind, preset: p.preset, dark: wp.dark ?? (lightPick.kind === "image" ? { kind: "none" } : lightPick) }
+      ? { ...wp, kind: p.kind, preset: p.preset, image: p.image, dark: wp.dark ?? (lightPick.kind === "image" ? { kind: "none" } : lightPick) }
       : { ...wp, dark: p };
-  const choose = (p: WallpaperPick) => set("wallpaper", nextWith(p));
+  const choose = (p: WallpaperPick) => {
+    const next = nextWith(p);
+    const other = slot === "light" ? next.dark : lightPick;
+    if (pick.kind === "image" && !(other?.kind === "image" && other.image === pick.image)) {
+      void removeWallpaperImage(pick, slot);
+    }
+    set("wallpaper", next);
+  };
   const anyShown = wp.kind !== "none" || (!!wp.dark && wp.dark.kind !== "none");
+  const signedIn = useSync((s) => !!s.user);
 
   const upload = async (f: File) => {
     setBusy(true);
     try {
-      await saveWallpaperImage(f, slot);
-      const next = nextWith({ kind: "image" });
-      set("wallpaper", next);
-      // Same kind as before ("image") but a new picture: show it now.
+      const image = await saveWallpaperImage(f);
+      const next = nextWith({ kind: "image", image });
+      choose({ kind: "image", image });
+      // Show it now (without waiting for the next render).
       await applyWallpaper(next, isDark);
       toast.success(slot === "dark" ? "Papel de parede do modo escuro aplicado" : "Papel de parede do modo claro aplicado", {
-        description: "A imagem fica salva neste aparelho.",
+        description: signedIn ? "Aparece também nos seus outros aparelhos." : "Entre na sua conta para levar a imagem aos outros aparelhos.",
       });
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Não foi possível usar essa imagem.");
@@ -167,7 +176,7 @@ export function AppearanceTab() {
 
       <FieldSet>
         <FieldLegend variant="label">Clebinho no canto</FieldLegend>
-        <FieldDescription>O Clebinho, nosso mascote, fica pequeno no canto da tela, olha para o cursor e comemora suas tarefas. Só no computador e no tablet.</FieldDescription>
+        <FieldDescription>O Clebinho, nosso mascote, fica pequeno no canto da tela, olha para o cursor e comemora suas tarefas.</FieldDescription>
         <ToggleGroup
           type="single"
           variant="outline"
@@ -238,14 +247,15 @@ export function AppearanceTab() {
               size="sm"
               className="text-destructive"
               onClick={async () => {
-                await removeWallpaperImage(slot);
                 choose({ kind: "none" });
               }}
             >
               <Trash2 data-icon="inline-start" />
               Remover imagem
             </Button>
-            <span className="text-sm text-muted-foreground">Fica só neste aparelho.</span>
+            <span className="text-sm text-muted-foreground">
+              {signedIn ? "Salva na sua conta." : "Fica só neste aparelho."}
+            </span>
           </div>
         )}
         {anyShown && (

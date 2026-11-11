@@ -47,7 +47,7 @@ export function NewTaskDialog({
     }
     if (!dbId) return;
     const props: Record<string, PropValue> = { ...defaults };
-    if (date) props.date = date + (time ? "T" + time : "");
+    if (date) props.date = date + (time ? " " + time : "");
     const id = newItem(dbId, props, name);
     if (!date) celebrate(`Tarefa “${name}” criada`, page ? `Em ${page.title}` : undefined, "checklist");
     onClose();

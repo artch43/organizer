@@ -27,12 +27,7 @@ export function lastList() {
 export function openLists() {
   const { ws } = useStore.getState();
   const lists = ws.pages.filter((p) => p.type === "db" && !p.archived);
-  let last: string | null = null;
-  try {
-    last = localStorage.getItem(LAST_LIST_KEY);
-  } catch {
-    /* private mode */
-  }
+  const last = lastList();
   const target = ws.pages.find((p) => p.id === last && p.type === "db") ?? lists[0];
   if (target) go(target.id);
   else openModal("newBoard");

@@ -137,7 +137,7 @@ export function DbPage({ page }: { page: Page }) {
             })
           }
         >
-          <TabsList>
+          <TabsList className="pointer-coarse:h-11">
             {db.views.map((v) => {
               const Icon = ICON[v.type];
               return (

@@ -1,7 +1,7 @@
 # Configuração e desenvolvimento
 
 Guia técnico para rodar o **Organizer** localmente, ligar a nuvem (Supabase), os alarmes e publicar na Vercel.
-Para a apresentação do projeto, veja o [README](../README.md).
+Para a apresentação do projeto, veja o [README](../../README.md).
 
 ## Como rodar no seu computador
 
@@ -31,10 +31,12 @@ Sem o arquivo `frontend/.env.local`, o app roda **sem login**, com os dados no n
 
 1. Crie uma conta gratuita em [supabase.com](https://supabase.com) e um projeto novo.
 2. Em **SQL Editor → New query**, cole o conteúdo de `backend/supabase/setup.sql` e clique em **Run**.
-   Ele cria tudo de uma vez (equivale às migrações `001` a `007` de `backend/supabase/migrations/`, que também podem ser rodadas em ordem):
-   tabelas `records` e `reminders`, regras de acesso, limites e o armazenamento privado `anexos` para imagens e PDF.
+   Ele cria tudo de uma vez (equivale às migrações `001` a `008` de `backend/supabase/migrations/`, que também podem ser rodadas em ordem):
+   tabelas `records` e `reminders`, regras de acesso, limites, o armazenamento privado `anexos` para imagens e PDF
+   e a limpeza diária (lixeira com mais de 30 dias e alarmes antigos). A limpeza usa o `pg_cron`: se o SQL reclamar,
+   ative-o em **Database → Extensions** e rode de novo.
 3. Em **Project Settings → API**, copie a **Project URL** e a chave **anon public**.
-4. Copie `.env.example` para `.env.local` e preencha `VITE_SUPABASE_URL` e `VITE_SUPABASE_ANON_KEY`.
+4. Copie `frontend/.env.example` para `frontend/.env.local` e preencha `VITE_SUPABASE_URL` e `VITE_SUPABASE_ANON_KEY`.
 5. Em **Authentication → URL Configuration**, coloque o endereço do site em **Site URL** e em **Redirect URLs**
    (`http://localhost:5173` enquanto testa; depois, o da Vercel).
 6. Rode `npm run dev` de novo. Agora o site pede login.
@@ -47,7 +49,7 @@ Sem o arquivo `frontend/.env.local`, o app roda **sem login**, com os dados no n
 - **Link de nova senha que funciona em qualquer aparelho** (opcional): em **Authentication → Emails → Templates → Reset Password**,
   use o link `{{ .SiteURL }}/?token_hash={{ .TokenHash }}&type=recovery`. O app já reconhece esse formato.
 - **Tentativas de login:** além do limite no app, ajuste **Authentication → Rate Limits** (por exemplo, 10 entradas a cada 5 minutos).
-- **Privacidade:** preencha o contato em `public/privacidade.html`.
+- **Privacidade:** preencha o contato em `frontend/public/privacidade.html`.
 
 > A chave `anon` é pública por definição (as regras de acesso protegem os dados). Nunca coloque a
 > `service_role` ou outras chaves secretas no site ou no repositório; o `.env.local` já está no `.gitignore`.
@@ -98,7 +100,12 @@ npx supabase secrets set SMTP_USER=seu.app@gmail.com SMTP_PASS=<senha de app> CR
 npx supabase secrets set RESEND_API_KEY=re_xxx REMINDER_FROM="Organizer <alertas@seudominio.com>" CRON_SECRET=<uma-senha-longa> APP_URL=https://seu-site.vercel.app
 
 npx supabase functions deploy send-reminders --no-verify-jwt
+npx supabase functions deploy delete-account
 ```
+
+A `delete-account` é a que apaga a conta quando a pessoa usa **Configurações → Dados → Apagar todos os meus dados**.
+Ela é publicada **com** a verificação de login (sem `--no-verify-jwt`). Sem ela, os dados são apagados, mas o e-mail
+continua cadastrado no Supabase.
 
 Uma senha longa para o `CRON_SECRET` pode ser gerada com `openssl rand -hex 32`. Se Gmail e Resend
 estiverem configurados, vale o Gmail.
@@ -129,7 +136,7 @@ Depois, publique a função de novo.
 | ------------------------ | -------------------- |
 | `DAILY_EMAIL_LIMIT`      | 50 e-mails           |
 | `DAILY_WHATSAPP_LIMIT`   | 20 mensagens         |
-| `DAILY_WHATSAPP_NUMBERS` | 2 números diferentes |
+| `DAILY_WHATSAPP_NUMBERS` | 1 número             |
 
 ---
 
@@ -160,7 +167,7 @@ frontend/                   o site e os apps (React + Vite + Capacitor)
       sync.ts, records.ts     sincronização com a nuvem, lixeira e lembretes
       migrate.ts              atualiza dados salvos por versões antigas
       template.ts             espaço inicial: o guia "Comece por aqui" e os exemplos
-      appearance.ts           cor de destaque (com contraste garantido), papel de parede, barra lateral
+      appearance.ts           cor de destaque (com contraste garantido) e papel de parede
       attachments.ts          imagens e PDF das anotações
       backClose.ts            botão Voltar do celular fecha menus e janelas
       password.ts, loginLimit.ts  regras de senha e limite de tentativas de login
@@ -169,20 +176,23 @@ frontend/                   o site e os apps (React + Vite + Capacitor)
       shortcuts.ts, notes.ts, notesIO.ts, backup.ts, supabase.ts, storage.ts, util.ts
     components/
       ui/                     componentes do shadcn
-      app/                    barra lateral, barra superior, navegação do celular, lixeira de arrastar
+      app/                    barra superior, navegação do celular, fundo, atalhos, lixeira de arrastar
+      lists/                  painel de pastas e listas
+      brand/, auth3d/, companion/  logo, mascote (pixel art e 3D) e o Clebinho no canto
       tasks/                  página da lista, quadro, tabela, calendário, painel e nova tarefa
       calendar/               calendário (mês/semana), evento e alarme
-      notes/                  anotações: lista, editor (CodeMirror) e leitura
+      notes/                  anotações: lista e editor (CodeMirror)
       Home.tsx, Habits.tsx, Search.tsx, Settings.tsx, Auth.tsx…
   public/                     privacidade.html, ícones do app (PWA)
+  docs/                       este guia, o dos apps e as imagens do README
   android/, ios/, assets/     apps nativos (Capacitor) e os ícones de origem
 backend/
   supabase/
     setup.sql                 todo o banco de uma vez
-    migrations/               001 a 007, em ordem
+    migrations/               001 a 008, em ordem
     functions/send-reminders  envio dos alarmes (e-mail e WhatsApp)
+    functions/delete-account  exclusão da conta pela própria pessoa (LGPD)
     cron.sql                  agenda a função a cada minuto
-docs/                         este guia, o dos apps e as imagens do README
 vercel.json                   como a Vercel gera o site (a partir de frontend/) e cabeçalhos de segurança
 package.json                  atalhos da raiz (npm run dev, build, test…)
 ```
@@ -195,6 +205,8 @@ package.json                  atalhos da raiz (npm run dev, build, test…)
   Cada pessoa só lê e escreve as próprias linhas (Row Level Security).
 - As mudanças são enviadas em lotes; as de outros aparelhos chegam ao voltar para a aba e a cada minuto.
   Sem internet, ficam numa fila e são enviadas quando a conexão volta.
-- Itens excluídos ficam 30 dias na **Lixeira**.
+- Itens excluídos ficam 30 dias na **Lixeira** e depois são apagados por uma tarefa diária no banco.
+- Alarmes por WhatsApp só são aceitos para o número salvo nas configurações da própria conta.
+- Ao sair da conta, a cópia local, a lixeira local, o papel de parede e as preferências do aparelho são apagados.
 - Anexos ficam no armazenamento privado `anexos`, numa pasta por pessoa. O papel de parede com imagem fica só no aparelho.
 - Os lembretes ficam na tabela `reminders`; a função envia os que venceram e marca como enviados.

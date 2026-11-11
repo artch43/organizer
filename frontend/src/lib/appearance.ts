@@ -5,6 +5,8 @@
  */
 
 import { openFilesDb } from "./rename";
+import { supabase } from "./supabase";
+import { uid } from "./util";
 
 export const DEFAULT_ACCENT = "#c6ff3d";
 /** The default before the lime palette: picked by nobody on purpose, so it now means the default. */
@@ -23,8 +25,8 @@ export const ACCENTS: { name: string; hex: string }[] = [
   { name: "Grafite", hex: "#475569" },
 ];
 
-/** One picture: none, a preset or the person's own image. */
-export type WallpaperPick = { kind: "none" | "preset" | "image"; preset?: string };
+/** One picture: none, a preset or the person's own image (`image`: its id in the account's storage). */
+export type WallpaperPick = { kind: "none" | "preset" | "image"; preset?: string; image?: string };
 /** The light-mode picture (top level), the dark-mode one (`dark`, when different) and how strongly they show. */
 export type Wallpaper = WallpaperPick & {
   /** How strongly the wallpaper shows through (0.1–0.7). The rest is the page color, for legible text. */
@@ -45,7 +47,7 @@ export const backdropMode = (b: string | undefined): "sweep" | "dots" | "animate
 /** The picture shown in this mode. */
 export function wallpaperFor(w: Wallpaper | undefined, dark: boolean): WallpaperPick {
   if (!w) return { kind: "none" };
-  return dark && w.dark ? w.dark : { kind: w.kind, preset: w.preset };
+  return dark && w.dark ? w.dark : { kind: w.kind, preset: w.preset, image: w.image };
 }
 
 export const WALLPAPERS: { id: string; name: string; css: string }[] = [
@@ -180,10 +182,43 @@ async function store<T>(mode: IDBTransactionMode, run: (s: IDBObjectStore) => ID
   });
 }
 
+/*
+ * The picture is uploaded to the account (the private "anexos" bucket, in the person's own folder) and
+ * its id goes in the settings, which sync: logging in on the phone shows the same wallpaper. Each
+ * device keeps a copy in IndexedDB so it isn't downloaded again on every visit. Without an account
+ * the picture stays in this browser only.
+ */
 const MAX_SIDE = 2400;
-/** Shrinks big photos (phones take 4000px+) so the page stays fast; saves a JPEG/WebP. */
-const imageKey = (slot: WallpaperSlot) => (slot === "dark" ? "wallpaper-dark" : "wallpaper");
-export async function saveWallpaperImage(file: File, slot: WallpaperSlot = "light") {
+/** The server's limit per file (backend/supabase/setup.sql, bucket "anexos"). */
+const MAX_CLOUD_BYTES = 10 * 1024 * 1024;
+const BUCKET = "anexos";
+/** Pictures chosen before they were uploaded: one per slot, on the device that chose them. */
+const legacyKey = (slot: WallpaperSlot) => (slot === "dark" ? "wallpaper-dark" : "wallpaper");
+const cacheKey = (id: string) => `img:${id}`;
+const cloudPath = (user: string, id: string) => `${user}/wallpaper-${id}`;
+
+async function signedInUser(): Promise<string | null> {
+  if (!supabase) return null;
+  const { data } = await supabase.auth.getSession();
+  return data.session?.user.id ?? null;
+}
+
+async function upload(blob: Blob, id: string) {
+  const user = await signedInUser();
+  if (!user || !supabase) return;
+  if (blob.size > MAX_CLOUD_BYTES) throw new Error("A imagem passa de 10 MB. Escolha uma menor.");
+  const { error } = await supabase.storage
+    .from(BUCKET)
+    .upload(cloudPath(user, id), blob, { contentType: blob.type || "image/webp", upsert: false });
+  if (error) {
+    if (/bucket not found/i.test(error.message))
+      throw new Error("O envio de imagens ainda não foi ativado no servidor. Rode o backend/supabase/setup.sql no Supabase.");
+    throw new Error("Não foi possível enviar a imagem para a sua conta. Tente de novo.");
+  }
+}
+
+/** Shrinks big photos (phones take 4000px+) so the page stays fast; saves a WebP. Returns the picture's id. */
+export async function saveWallpaperImage(file: File): Promise<string> {
   if (!/^image\/(png|jpe?g|webp|gif|avif|heic|heif)$/i.test(file.type)) throw new Error("Escolha uma imagem (JPG, PNG, WebP…).");
   if (file.size > 25 * 1024 * 1024) throw new Error("A imagem passa de 25 MB.");
   let blob: Blob = file;
@@ -198,12 +233,61 @@ export async function saveWallpaperImage(file: File, slot: WallpaperSlot = "ligh
   } catch {
     /* the browser can't decode it here (e.g. HEIC on some systems): keep the original */
   }
-  await store("readwrite", (s) => s.put(blob, imageKey(slot)));
+  const id = uid();
+  await upload(blob, id);
+  await store("readwrite", (s) => s.put(blob, cacheKey(id))).catch(() => undefined);
+  return id;
 }
-export const loadWallpaperImage = (slot: WallpaperSlot = "light") =>
-  store<Blob | undefined>("readonly", (s) => s.get(imageKey(slot))).catch(() => undefined);
-export const removeWallpaperImage = (slot: WallpaperSlot = "light") =>
-  store("readwrite", (s) => s.delete(imageKey(slot))).catch(() => undefined);
+
+/** The picture's file: this device's copy, else the account's (then kept here). */
+async function loadWallpaperImage(pick: WallpaperPick, slot: WallpaperSlot): Promise<Blob | undefined> {
+  const local = (key: string) => store<Blob | undefined>("readonly", (s) => s.get(key)).catch(() => undefined);
+  if (!pick.image) return local(legacyKey(slot));
+  const hit = await local(cacheKey(pick.image));
+  if (hit) return hit;
+  const user = await signedInUser();
+  if (!user || !supabase) return undefined;
+  const { data } = await supabase.storage.from(BUCKET).download(cloudPath(user, pick.image));
+  if (!data) return undefined;
+  await store("readwrite", (s) => s.put(data, cacheKey(pick.image!))).catch(() => undefined);
+  return data;
+}
+
+/** Forgets a picture here and in the account (best effort: a leftover file only takes space). */
+export async function removeWallpaperImage(pick: WallpaperPick | null | undefined, slot: WallpaperSlot) {
+  if (pick?.kind !== "image") return;
+  if (!pick.image) {
+    await store("readwrite", (s) => s.delete(legacyKey(slot))).catch(() => undefined);
+    return;
+  }
+  await store("readwrite", (s) => s.delete(cacheKey(pick.image!))).catch(() => undefined);
+  const user = await signedInUser();
+  if (user && supabase) await supabase.storage.from(BUCKET).remove([cloudPath(user, pick.image)]).catch(() => undefined);
+}
+
+/**
+ * A picture chosen before pictures were uploaded lives only on the device that chose it. Once the
+ * person is signed in there, it's uploaded and given an id; returns the wallpaper to save, or null.
+ */
+export async function uploadLegacyWallpaper(w: Wallpaper | undefined): Promise<Wallpaper | null> {
+  if (!w || !(await signedInUser())) return null;
+  let next: Wallpaper = w;
+  for (const slot of ["light", "dark"] as const) {
+    const pick = slot === "light" ? w : w.dark;
+    if (pick?.kind !== "image" || pick.image) continue;
+    const blob = await store<Blob | undefined>("readonly", (s) => s.get(legacyKey(slot))).catch(() => undefined);
+    if (!blob) continue;
+    const id = uid();
+    try {
+      await upload(blob, id);
+    } catch {
+      continue;
+    }
+    await store("readwrite", (s) => s.put(blob, cacheKey(id))).catch(() => undefined);
+    next = slot === "light" ? { ...next, image: id } : { ...next, dark: { ...next.dark!, image: id } };
+  }
+  return next === w ? null : next;
+}
 
 let objectUrl: string | null = null;
 let applying = 0;
@@ -216,7 +300,7 @@ export async function applyWallpaper(w: Wallpaper | undefined, dark: boolean) {
   if (pick.kind === "preset") value = WALLPAPERS.find((p) => p.id === pick.preset)?.css ?? "";
   if (pick.kind === "image") {
     // The dark-mode picture is only its own image when the dark slot has one.
-    const blob = await loadWallpaperImage(dark && w?.dark ? "dark" : "light");
+    const blob = await loadWallpaperImage(pick, dark && w?.dark ? "dark" : "light");
     // A newer call (theme switched while loading) wins.
     if (run !== applying) return;
     if (objectUrl) URL.revokeObjectURL(objectUrl);
@@ -227,9 +311,28 @@ export async function applyWallpaper(w: Wallpaper | undefined, dark: boolean) {
     root.classList.remove("has-wallpaper");
     root.style.removeProperty("--wallpaper");
     root.style.removeProperty("--wallpaper-veil");
+    setShown(false);
     return;
   }
   root.classList.add("has-wallpaper");
   root.style.setProperty("--wallpaper", value);
   root.style.setProperty("--wallpaper-veil", String(1 - Math.min(0.7, Math.max(0.1, w?.strength ?? 0.35))));
+  setShown(true);
 }
+
+/* Whether a wallpaper is on screen right now (a picture that couldn't load isn't): the regular
+   background stays in its place until then. */
+let shown = false;
+const listeners = new Set<() => void>();
+function setShown(v: boolean) {
+  if (v === shown) return;
+  shown = v;
+  listeners.forEach((l) => l());
+}
+export const wallpaperShown = {
+  get: () => shown,
+  subscribe: (l: () => void) => {
+    listeners.add(l);
+    return () => listeners.delete(l);
+  },
+};

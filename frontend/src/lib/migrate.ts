@@ -124,7 +124,7 @@ export function normalizeWorkspace(input: Workspace): Workspace {
   const docPages = w.pages.filter((p) => (p.type as string) === "doc");
   for (const p of docPages) {
     const blocks = w.docs?.[p.id] ?? [];
-    const id = p.id === "guia" ? "guia" : p.id;
+    const id = p.id;
     if (!w.notes[id]) {
       const note: Note = {
         id,
