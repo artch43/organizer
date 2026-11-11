@@ -255,7 +255,7 @@ export function Home() {
           </div>
           {(open.length > 0 || overdue.length > 0) && (
               <div className="flex flex-wrap items-center justify-between gap-2 text-sm text-muted-foreground">
-                <span>{manualOrder ? "Ordem personalizada" : "Por prioridade"} · Arraste pela alça para reordenar</span>
+                <span>{manualOrder ? "Ordem personalizada" : "Por prioridade"} · Arraste para reordenar</span>
                 {manualOrder && (
                   <Button
                     variant="ghost"

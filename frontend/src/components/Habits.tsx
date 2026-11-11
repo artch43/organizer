@@ -162,9 +162,9 @@ function HabitRow({ h, T, i }: { h: Habit; T: string; i: number }) {
                 </b>{" "}
                 {streak === 1 ? "dia seguido" : "dias seguidos"}
               </>
-            ) : (
+            ) : !first ? (
               "Comece hoje"
-            )}
+            ) : null}
           </span>
         </div>
         {/* Phones: on a line of their own under the name, so the name keeps the width. */}
