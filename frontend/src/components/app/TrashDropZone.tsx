@@ -223,16 +223,17 @@ export function HeaderTrash({ onOpen }: { onOpen: () => void }) {
       aria-label="Lixeira"
       title={over ? `Soltar para excluir ${what}` : "Lixeira. Arraste algo até aqui para excluir."}
       className={cn(
-        "flex h-10 min-w-10 items-center justify-center gap-2 rounded-xl px-2.5 text-muted-foreground transition-[background-color,color,box-shadow,transform] duration-200 hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none [&_svg]:size-5",
+        "flex h-9 min-w-9 items-center justify-center gap-2 rounded-xl px-2 text-muted-foreground md:h-10 md:min-w-10 md:px-2.5 transition-[background-color,color,box-shadow,transform] duration-200 hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none [&_svg]:size-5",
         drag &&
           !over &&
-          "bg-destructive/8 px-3.5 text-destructive outline-2 -outline-offset-2 outline-dashed outline-destructive/50",
-        over && "scale-[1.04] bg-destructive! px-3.5 text-white! ring-2 ring-destructive",
+          "bg-destructive/8 text-destructive md:px-3.5 outline-2 -outline-offset-2 outline-dashed outline-destructive/50",
+        over && "scale-[1.04] bg-destructive! text-white! md:px-3.5 ring-2 ring-destructive",
       )}
     >
       <TrashCan over={over} gulp={gulp} />
       {drag && (
-        <span className="text-sm font-medium whitespace-nowrap">{over ? `Soltar para excluir ${what}` : "Solte aqui"}</span>
+        // Phones: no room for the label next to the logo (the "+" at the bottom becomes the trash too).
+        <span className="text-sm font-medium whitespace-nowrap max-md:hidden">{over ? `Soltar para excluir ${what}` : "Solte aqui"}</span>
       )}
     </button>
   );

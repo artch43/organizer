@@ -63,9 +63,9 @@ export function mkDb(
 /** Bump when the guide text changes, so saved copies that were never edited get the new one. */
 export const GUIDE_VERSION = 5;
 
-/** The one guide: short on purpose, so it gets read to the end. Same id everywhere (no copies). */
 /** Set once the guide has opened by itself on this device (first visit). */
 export const GUIDE_SEEN_KEY = "organizer:guide-seen";
+/** The one guide: short on purpose, so it gets read to the end. Same id everywhere (no copies). */
 export const GUIDE_ID = "comece-por-aqui";
 export const GUIDE_TITLE = "Comece por aqui";
 export const GUIDE_BODY_V4 = [

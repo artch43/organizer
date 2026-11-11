@@ -1,4 +1,4 @@
--- Organizer: full database setup in one go (same as running 001, 002 and 003 in order).
+-- Organizer: full database setup in one go (same as running migrations 001 to 008 in order).
 -- Safe to run more than once.
 
 
@@ -203,3 +203,52 @@ grant execute on function public.reminders_sent_today(uuid[]) to service_role;
 update storage.buckets
   set allowed_mime_types = array['image/png', 'image/jpeg', 'image/webp', 'image/gif', 'image/avif', 'image/heic', 'image/heif', 'application/pdf']
   where id = 'anexos';
+
+-- ===== 008_privacy.sql =====
+-- Organizer, version 8: data kept only as long as needed, and limits on what one account can store.
+
+-- 1. One row can't be huge, and one person can't fill the database (a busy account has a few thousand rows).
+alter table public.records drop constraint if exists records_data_size;
+alter table public.records add constraint records_data_size check (octet_length(data::text) <= 1048576) not valid;
+
+create or replace function public.records_cap() returns trigger
+language plpgsql security definer set search_path = public as $$
+begin
+  if (select count(*) from public.records where user_id = new.user_id) >= 50000 then
+    raise exception 'Too many records' using errcode = 'check_violation';
+  end if;
+  return new;
+end $$;
+drop trigger if exists records_cap on public.records;
+create trigger records_cap before insert on public.records for each row execute function public.records_cap();
+
+-- 2. A WhatsApp reminder only goes to the number saved in the person's own settings, never to a
+--    number written straight into a reminder.
+create or replace function public.reminders_phone_own() returns trigger
+language plpgsql security definer set search_path = public as $$
+begin
+  if new.channel = 'whatsapp' and new.phone is distinct from (
+    select r.data ->> 'whatsapp' from public.records r
+    where r.user_id = new.user_id and r.kind = 'settings' and r.id = 'main' and r.deleted_at is null
+  ) then
+    raise exception 'WhatsApp number does not match the account settings' using errcode = 'check_violation';
+  end if;
+  return new;
+end $$;
+drop trigger if exists reminders_phone_own on public.reminders;
+create trigger reminders_phone_own before insert on public.reminders for each row execute function public.reminders_phone_own();
+
+-- 3. Every day: what was deleted more than 30 days ago leaves the trash for good, and reminders
+--    already sent (or given up on) more than 30 days ago are erased. Until now this only happened
+--    when the person opened the app, so the deleted data of someone who never came back stayed forever.
+create extension if not exists pg_cron;
+
+create or replace function public.purge_old_data() returns void
+language sql security definer set search_path = public as $$
+  delete from public.records where deleted_at is not null and deleted_at < now() - interval '30 days';
+  delete from public.reminders where sent_at is not null and sent_at < now() - interval '30 days';
+$$;
+revoke all on function public.purge_old_data() from public, anon, authenticated;
+
+select cron.unschedule('purge-old-data') where exists (select 1 from cron.job where jobname = 'purge-old-data');
+select cron.schedule('purge-old-data', '17 3 * * *', $$ select public.purge_old_data() $$);

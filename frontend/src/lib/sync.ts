@@ -8,6 +8,7 @@ import type { AlertChannel, CalendarEvent, Item, Workspace } from "./types";
 import { remindersFor, taskAlertSource, type ReminderRow } from "./events";
 import { groupOf } from "./model";
 import { STORAGE_KEY } from "./storage";
+import { eraseFilesDbs } from "./rename";
 import { useStore } from "../store";
 
 /**
@@ -41,6 +42,8 @@ let pending = new Map<string, Rec>();
 let lastSync = EPOCH;
 let flushTimer: number | undefined;
 let flushing = false;
+/** Keys of the batch being sent right now: a pull that lands meanwhile must not put the older server copy back. */
+let sending = new Set<string>();
 let unsubscribe: (() => void) | null = null;
 let pollTimer: number | undefined;
 /** Reminders last written for each event/task, so only real changes reach the database. */
@@ -160,6 +163,9 @@ async function refreshAllReminders() {
     ...Object.values(ws.items).map((i) => ({ kind: "item" as const, id: i.id, data: i })),
   ];
   try {
+    // The settings (e.g. a new WhatsApp number) reach the server first: the database only accepts
+    // WhatsApp reminders for the number saved there.
+    await flushAll();
     await syncReminders(rows);
   } catch {
     /* retried on the next start or edit */
@@ -171,6 +177,7 @@ export async function flush() {
   flushing = true;
   const batch = [...pending.entries()];
   pending = new Map();
+  sending = new Set(batch.map(([k]) => k));
   try {
     for (let i = 0; i < batch.length; i += 500) {
       const rows = batch
@@ -191,6 +198,7 @@ export async function flush() {
     flushTimer = window.setTimeout(flush, 10_000);
   } finally {
     flushing = false;
+    sending = new Set();
     saveMeta();
     if (pending.size && useSync.getState().status === "saving") {
       clearTimeout(flushTimer);
@@ -217,7 +225,11 @@ async function fetchSince(since: string): Promise<Rec[]> {
 export async function pull() {
   if (!supabase || !uid || useSync.getState().phase !== "ready") return;
   try {
-    const rows = (await fetchSince(lastSync)).filter((r) => !pending.has(keyOf(r.kind, r.id)));
+    // Rows left out here don't move `lastSync`, so they are fetched again on the next pull.
+    const rows = (await fetchSince(lastSync)).filter((r) => {
+      const k = keyOf(r.kind, r.id);
+      return !pending.has(k) && !sending.has(k);
+    });
     if (rows.length) applyQuietly((ws) => applyRecords(ws, rows));
     advance(rows);
   } catch {
@@ -321,6 +333,13 @@ export function seedAccount(ws: Workspace) {
   // Treat everything as new so it all gets uploaded.
   onStoreChange(useStore.getState().ws);
   useSync.setState({ candidate: null });
+  // The copy from before the account is decided on (taken into the account or not): it leaves this
+  // browser, so it isn't offered again to whoever signs in here next.
+  try {
+    localStorage.removeItem(STORAGE_KEY);
+  } catch {
+    /* ignore */
+  }
   begin();
 }
 
@@ -392,42 +411,88 @@ async function flushAll() {
   return pending.size === 0;
 }
 
+/** Kept on sign-out: they hold nothing personal (the guide was seen; the wrong-password pause). */
+const KEEP_ON_SIGN_OUT = new Set([GUIDE_SEEN_KEY, "organizer:login-tries"]);
+/** Shown once after the reload that follows signing out (e.g. what could not be done). */
+export const NOTICE_KEY = "organizer:notice";
+
+/**
+ * Erases everything of the person kept on this device: the copy of the workspace, what was waiting to
+ * be sent, the copy from before the account, the local trash, remembered folder and list names, the
+ * wallpaper picture and this tab's session data. On a shared computer the next person finds nothing.
+ */
+async function clearDevice() {
+  try {
+    for (const k of Object.keys(localStorage))
+      if (
+        ((k === STORAGE_KEY || k.startsWith(STORAGE_KEY + ":")) && !KEEP_ON_SIGN_OUT.has(k)) ||
+        k === "board-folders-open" ||
+        k.startsWith("habit-history-")
+      )
+        localStorage.removeItem(k);
+    sessionStorage.clear();
+  } catch {
+    /* storage blocked: nothing kept there either */
+  }
+  await eraseFilesDbs(["aparencia", "anexos"]);
+}
+
 /**
  * Signs out and clears this browser's copy. Refuses while changes still can't reach the cloud
  * (offline, server error), since clearing then would lose them; `force` signs out anyway.
  */
-export async function signOut(force = false) {
+export async function signOut(force = false, notice?: string) {
   if (!(await flushAll()) && !force)
     throw new Error("Algumas alterações ainda não foram salvas na nuvem. Conecte-se à internet e tente sair de novo.");
-  try {
-    localStorage.removeItem(cacheKey());
-    localStorage.removeItem(metaKey());
-  } catch {
-    /* ignore */
-  }
+  // Nothing may be saved again after this point (the page reloads right after).
+  unsubscribe?.();
+  unsubscribe = null;
+  clearTimeout(flushTimer);
+  clearInterval(pollTimer);
+  useStore.persist.setOptions({ storage: { getItem: () => null, setItem: () => {}, removeItem: () => {} } });
   await supabase?.auth.signOut();
+  await clearDevice();
+  if (notice)
+    try {
+      sessionStorage.setItem(NOTICE_KEY, notice);
+    } catch {
+      /* ignore */
+    }
   location.hash = "";
   location.reload();
 }
 
 /** Deletes every row this person has in the cloud (LGPD: right to erasure), then signs out. */
+/**
+ * Deletes everything this person has in the cloud and the account itself (LGPD: right to erasure),
+ * then signs out. The account is removed by the `delete-account` function (the browser can't); its
+ * rows go with it. Without that function deployed, the data is still erased and the person is told
+ * the e-mail stays registered.
+ */
 export async function deleteAllMyData() {
   if (!supabase || !uid) return;
   clearTimeout(flushTimer);
   pending = new Map();
-  const { error } = await supabase.from(TABLE).delete().eq("user_id", uid);
-  const rem = await supabase.from("reminders").delete().eq("user_id", uid);
-  if (error || rem.error) throw new Error("Não foi possível apagar seus dados. Tente de novo.");
-  // Attached images and PDFs live in Storage, under a folder named after the user id.
+  // Attached images and PDFs first: they live in Storage, under a folder named after the user id,
+  // and can only be reached while the account exists.
   const bucket = supabase.storage.from("anexos");
   for (;;) {
     const { data, error: listErr } = await bucket.list(uid, { limit: 1000 });
-    if (listErr) throw new Error("Seus dados foram apagados, mas não os anexos. Tente de novo.");
+    if (listErr) throw new Error("Não foi possível apagar seus anexos. Nada foi apagado; tente de novo.");
     if (!data?.length) break;
     const { error: rmErr } = await bucket.remove(data.map((f) => `${uid}/${f.name}`));
-    if (rmErr) throw new Error("Seus dados foram apagados, mas não os anexos. Tente de novo.");
+    if (rmErr) throw new Error("Não foi possível apagar seus anexos. Tente de novo.");
     if (data.length < 1000) break;
   }
+  const account = await supabase.functions.invoke("delete-account", { method: "POST" });
+  let notice: string | undefined;
+  if (account.error) {
+    const { error } = await supabase.from(TABLE).delete().eq("user_id", uid);
+    const rem = await supabase.from("reminders").delete().eq("user_id", uid);
+    if (error || rem.error) throw new Error("Não foi possível apagar seus dados. Tente de novo.");
+    notice =
+      "Seus dados foram apagados, mas o cadastro do e-mail continua. Para excluí-lo também, fale com o contato da página de privacidade.";
+  } else notice = "Sua conta e todos os seus dados foram apagados.";
   reminderSigs = {};
   // A clean start: the guide opens again on the next sign-in, as on a first visit.
   try {
@@ -435,7 +500,7 @@ export async function deleteAllMyData() {
   } catch {
     /* ignore */
   }
-  await signOut(true);
+  await signOut(true, notice);
 }
 
 if (typeof window !== "undefined") {

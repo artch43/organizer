@@ -172,6 +172,8 @@ class ImageWidget extends WidgetType {
     const img = document.createElement("img");
     img.className = "attach-img cm-attach-img";
     img.alt = this.alt;
+    // A picture from another site doesn't learn which page showed it.
+    img.referrerPolicy = "no-referrer";
     if (this.src.startsWith(ATTACH_PREFIX))
       void attachmentUrl(this.src.slice(ATTACH_PREFIX.length)).then((u) => {
         if (u) img.src = u;

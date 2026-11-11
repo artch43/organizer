@@ -93,4 +93,3 @@ export function buildMascot() {
     mouth: face("acena", "mouth"),
   };
 }
-export type MascotParts = ReturnType<typeof buildMascot>;

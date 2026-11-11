@@ -49,7 +49,7 @@ class Quiet extends Component<{ fallback: ReactNode; children: ReactNode }, { fa
 }
 
 /**
- * The little 3D mascot in the corner (computers and tablets): quiet company. He breathes, blinks and
+ * The little 3D mascot in the corner (on phones, just above the bottom bar): quiet company. He breathes, blinks and
  * looks toward the pointer; waves when it comes near; hops when a task is done and cheers when the day
  * is cleared; does a rare stretch, look-around or yawn; dozes off after a while without activity.
  * He speaks only when clicked. Fades back while a window or panel is open. Can be hidden.
@@ -58,7 +58,6 @@ export function Companion() {
   const enabled = useStore((s) => s.ws.settings.companion !== false);
   const mut = useStore((s) => s.mut);
   const busy = useStore((s) => !!(s.ui.modal || s.ui.peek || s.ui.eventDialog || s.ui.statusDialog));
-  const wide = useMedia("(min-width: 768px)");
   const reduced = useMedia("(prefers-reduced-motion: reduce)");
   const [webgl] = useState(hasWebGL);
   const [assemble] = useState(firstAppearance);
@@ -66,7 +65,7 @@ export function Companion() {
   const [line, setLine] = useState<string | null>(null);
   const lineTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
   useEffect(() => () => clearTimeout(lineTimer.current), []);
-  if (!enabled || !wide) return null;
+  if (!enabled) return null;
 
   const say = () => {
     setLine((cur) => {
@@ -113,7 +112,7 @@ export function Companion() {
         onClick={hide}
         aria-label="Esconder o Clebinho"
         title="Esconder o Clebinho"
-        className="absolute -top-1 -left-1 z-10 flex size-6 items-center justify-center rounded-full bg-card text-muted-foreground opacity-0 shadow-card ring-1 ring-border transition-opacity group-hover/companion:opacity-100 hover:text-foreground focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+        className="touch-hit absolute -top-1 -left-1 z-10 flex size-6 max-md:hidden items-center justify-center rounded-full bg-card text-muted-foreground opacity-0 shadow-card ring-1 ring-border transition-opacity group-hover/companion:opacity-100 pointer-coarse:opacity-40 hover:text-foreground focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
       >
         <X className="size-3.5" />
       </button>

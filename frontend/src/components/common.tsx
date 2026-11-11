@@ -38,9 +38,6 @@ export const areaVar = (a?: Pick<Area, "color"> | null): CSSProperties =>
 export function useAreas() {
   return useStore((s) => s.ws.settings.areas);
 }
-export function useArea(id?: string) {
-  return useStore((s) => (id ? s.ws.settings.areas.find((a) => a.id === id) : undefined));
-}
 
 export function AreaDot({ area, className }: { area?: Pick<Area, "color"> | null; className?: string }) {
   return (
@@ -108,7 +105,6 @@ export function AreaSwatches({ value, onChange }: { value: AreaColor; onChange: 
     </div>
   );
 }
-
 
 /** Today's date ("YYYY-MM-DD"), updated when the day changes while the page stays open. */
 export function useToday() {

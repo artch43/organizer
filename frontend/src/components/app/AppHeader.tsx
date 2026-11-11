@@ -15,7 +15,6 @@ import {
   Search,
   Settings,
   Sprout,
-  Trash2,
   UserRound,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -38,7 +37,7 @@ import { HeaderTrash } from "./TrashDropZone";
 import { openLists } from "../lists/state";
 
 const ICON_BTN =
-  "relative flex size-10 shrink-0 items-center justify-center rounded-xl text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none data-[state=open]:bg-muted data-[state=open]:text-foreground [&_svg]:size-5";
+  "relative flex size-9 shrink-0 items-center justify-center rounded-xl md:size-10 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none data-[state=open]:bg-muted data-[state=open]:text-foreground [&_svg]:size-5";
 
 /** The time now, refreshed every half minute. */
 export function useNow() {
@@ -52,8 +51,7 @@ export function useNow() {
 
 /**
  * The top bar, the same on every page: logo, the pages as tabs, search, and on the right the alarms,
- * the trash, settings and the account. Phones keep the logo, search, alarms and account (the pages
- * are in the bottom bar).
+ * the trash, settings and the account. Phones have the same buttons; the pages are in the bottom bar.
  */
 export function AppHeader() {
   const route = useStore((s) => s.ui.route);
@@ -113,18 +111,18 @@ export function AppHeader() {
         </ul>
       </nav>
 
-      <div className="ml-auto flex min-w-0 items-center gap-1 md:gap-1.5">
+      <div className="ml-auto flex min-w-0 items-center gap-0.5 md:gap-1.5">
         <button
           type="button"
           onClick={() => openModal("search")}
           aria-label="Buscar"
-          className="flex h-10 min-w-10 items-center justify-center gap-2.5 rounded-xl text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none xl:mr-3 xl:w-[21rem] xl:justify-start xl:border xl:bg-card/50 xl:px-3"
+          className="flex size-9 items-center justify-center gap-2.5 md:h-10 md:w-auto md:min-w-10 rounded-xl text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none xl:mr-3 xl:w-[21rem] xl:justify-start xl:border xl:bg-card/50 xl:px-3"
         >
           <Search className="size-5 shrink-0 xl:size-[18px]" aria-hidden="true" />
           <span className="truncate text-[15px] max-xl:hidden">Buscar tarefas, notas e listas</span>
         </button>
         <AlarmsBell />
-        <div className="flex items-center gap-1 max-md:hidden">
+        <div className="flex items-center gap-1">
           <HeaderTrash onOpen={() => openModal("trash")} />
           <button
             type="button"
@@ -137,7 +135,7 @@ export function AppHeader() {
             <Settings aria-hidden="true" />
           </button>
         </div>
-        <AccountMenu habits={habits} />
+        <AccountMenu />
       </div>
     </header>
   );
@@ -211,8 +209,8 @@ function AlarmsBell() {
   );
 }
 
-/** The round initial: the account (e-mail, Sair) and, on phones, the pages that aren't in the bottom bar. */
-function AccountMenu({ habits }: { habits?: string }) {
+/** The round initial: the account (e-mail, Sair) and settings. */
+function AccountMenu() {
   const user = useSync((s) => s.user);
   const status = useSync((s) => s.status);
   const name = useStore((s) => s.ws.settings.name);
@@ -253,19 +251,6 @@ function AccountMenu({ habits }: { habits?: string }) {
           )}
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
-        {/* Phones: Hábitos and the trash live here (the bottom bar has the other pages). */}
-        <DropdownMenuGroup className="md:hidden">
-          {habits && (
-            <DropdownMenuItem onSelect={() => go(habits)}>
-              <Sprout />
-              Hábitos
-            </DropdownMenuItem>
-          )}
-          <DropdownMenuItem onSelect={() => openModal("trash")}>
-            <Trash2 />
-            Lixeira
-          </DropdownMenuItem>
-        </DropdownMenuGroup>
         <DropdownMenuGroup>
           <DropdownMenuItem onSelect={() => openModal("settings")}>
             <Settings />

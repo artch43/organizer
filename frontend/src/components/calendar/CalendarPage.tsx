@@ -94,7 +94,7 @@ function moveEntry(e: Dropped, date: string, minutes?: number) {
     // Dropped on an hour of the week view: that hour too. On a day (or the all-day row): keeps its time.
     const time =
       minutes !== undefined
-        ? "T" + pad(Math.floor(minutes / 60) % 24) + ":" + pad(minutes % 60)
+        ? " " + pad(Math.floor(minutes / 60) % 24) + ":" + pad(minutes % 60)
         : typeof cur === "string"
           ? cur.slice(10)
           : "";

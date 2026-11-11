@@ -383,7 +383,7 @@ function BlockHead({
         <button
           type="button"
           onClick={link.run}
-          className="ml-auto rounded-md px-1 text-[13px] font-semibold text-primary-strong hover:underline focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+          className="touch-hit ml-auto rounded-md px-1 text-[13px] font-semibold text-primary-strong hover:underline focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
         >
           {link.label}
         </button>
@@ -777,7 +777,7 @@ function TaskGroup({
   onReorder?: (keys: string[]) => void;
   onMoveAll?: (day: string | null) => void;
 }) {
-  const id = "grp-" + title;
+  const id = "grp-" + title.toLowerCase().replace(/\s+/g, "-");
   return (
     <section aria-labelledby={id} className="flex flex-col gap-2.5">
       <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">

@@ -685,6 +685,7 @@ function DataTab() {
   const [pending, setPending] = useState<Workspace | null>(null);
   const [err, setErr] = useState("");
   const [confirm, setConfirm] = useState("");
+  const [erasing, setErasing] = useState(false);
   const onFile = async (f?: File) => {
     setErr("");
     setPending(null);
@@ -755,16 +756,24 @@ function DataTab() {
             <Field>
               <FieldLabel htmlFor="erase">Apagar todos os meus dados</FieldLabel>
               <FieldDescription>
-                Apaga para sempre tudo o que está na nuvem e sai da conta. Digite APAGAR para confirmar.
+                Apaga para sempre a sua conta e tudo o que está nela (listas, tarefas, eventos, anotações, anexos e
+                alarmes) e limpa este aparelho. Digite APAGAR para confirmar.
               </FieldDescription>
               <div className="flex gap-2">
                 <Input id="erase" className="max-w-40" value={confirm} onChange={(e) => setConfirm(e.target.value)} />
                 <Button
                   variant="destructive"
-                  disabled={confirm.trim().toUpperCase() !== "APAGAR"}
-                  onClick={() => deleteAllMyData().catch((e: Error) => setErr(e.message))}
+                  disabled={erasing || confirm.trim().toUpperCase() !== "APAGAR"}
+                  onClick={() => {
+                    setErasing(true);
+                    deleteAllMyData().catch((e: Error) => {
+                      setErr(e.message);
+                      setErasing(false);
+                    });
+                  }}
                 >
-                  Apagar tudo
+                  {erasing && <Loader2 data-icon="inline-start" className="animate-spin" />}
+                  {erasing ? "Apagando…" : "Apagar tudo"}
                 </Button>
               </div>
             </Field>

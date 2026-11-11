@@ -117,6 +117,20 @@ describe("filtros e ordenação", () => {
     expect(manual.map((i) => i.order)).toEqual([...manual.map((i) => i.order)].sort((a, b) => a - b));
   });
 
+  it("ordena só pelo prazo pela hora, com os dois formatos salvos (espaço ou T) e sem prazo no fim", () => {
+    find("Logaritmos").props.date = "2026-10-30 14:00";
+    find("Revolução Francesa").props.date = "2026-10-30T09:00";
+    find("Funções do 2º grau").props.date = "2026-10-30T16:00";
+    delete find("Concordância verbal").props.date;
+    const v = { ...view(), sort: { prop: "date", dir: "asc" as const } };
+    expect(applyFilters(ws, "estudos", v, "").map((i) => i.title)).toEqual([
+      "Revolução Francesa",
+      "Logaritmos",
+      "Funções do 2º grau",
+      "Concordância verbal",
+    ]);
+  });
+
   it("ordena por nome", () => {
     const v = { ...view(), sort: { prop: "title", dir: "asc" as const } };
     expect(applyFilters(ws, "estudos", v, "").map((i) => i.title)).toEqual([

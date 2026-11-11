@@ -13,7 +13,7 @@
 //           variables: title and when; default "lembrete"), WHATSAPP_LANG (default "pt_BR")
 // SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY are provided by Supabase automatically.
 // Daily limits per person (last 24 h), so one account can't run up the bill or message strangers:
-//   DAILY_EMAIL_LIMIT (default 50), DAILY_WHATSAPP_LIMIT (default 20), DAILY_WHATSAPP_NUMBERS (default 2).
+//   DAILY_EMAIL_LIMIT (default 50), DAILY_WHATSAPP_LIMIT (default 20), DAILY_WHATSAPP_NUMBERS (default 1).
 import { createClient } from "npm:@supabase/supabase-js@2.45.4";
 import nodemailer from "npm:nodemailer@6.9.16";
 
@@ -151,7 +151,7 @@ Deno.serve(async (req) => {
   const supabase = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
   const appUrl = (Deno.env.get("APP_URL") ?? "") + "/#/calendario";
   let wa = whatsappReady();
-  const limit = { email: num("DAILY_EMAIL_LIMIT", 50), whatsapp: num("DAILY_WHATSAPP_LIMIT", 20), numbers: num("DAILY_WHATSAPP_NUMBERS", 2) };
+  const limit = { email: num("DAILY_EMAIL_LIMIT", 50), whatsapp: num("DAILY_WHATSAPP_LIMIT", 20), numbers: num("DAILY_WHATSAPP_NUMBERS", 1) };
 
   const { data: due, error } = await supabase.rpc("due_reminders", { max_rows: 100 });
   if (error) return new Response(error.message, { status: 500 });

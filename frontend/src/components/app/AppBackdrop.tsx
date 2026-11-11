@@ -1,8 +1,7 @@
-import { Component, Suspense, lazy, useEffect, useState, type ReactNode } from "react";
+import { Component, Suspense, lazy, useEffect, useState, useSyncExternalStore, type ReactNode } from "react";
 import type { CSSProperties } from "react";
-import { useTheme } from "next-themes";
 import { useStore } from "@/store";
-import { backdropMode, showsWallpaper, wallpaperFor } from "@/lib/appearance";
+import { backdropMode, wallpaperShown } from "@/lib/appearance";
 import { useCompanion } from "../companion/reactions";
 
 // The animated gradient (WebGL) only loads on the app's pages, in its own file.
@@ -104,9 +103,8 @@ function Dots({ still }: { still: boolean }) {
  */
 export function AppBackdrop() {
   const mode = useStore((s) => backdropMode(s.ws.settings.backdrop));
-  const wp = useStore((s) => s.ws.settings.wallpaper);
-  const { resolvedTheme } = useTheme();
-  const wallpaper = showsWallpaper(wallpaperFor(wp, resolvedTheme === "dark"));
+  // Only once the picture is really on screen (on a new phone it's still downloading).
+  const wallpaper = useSyncExternalStore(wallpaperShown.subscribe, wallpaperShown.get);
   const reduced = useReducedMotion();
   const [webgl] = useState(hasWebGL);
   // Lets the page style itself for the background in use (e.g. cards see-through only over the gradient).
