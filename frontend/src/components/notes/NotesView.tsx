@@ -950,7 +950,7 @@ function NotePane({ note, editorApi }: { note: Note; editorApi: React.MutableRef
               type="button"
               onClick={() => openPeek(task.id)}
               title="Abrir a tarefa desta nota"
-              className="flex items-center gap-1.5 rounded-md transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+              className="flex items-center gap-1.5 rounded-md font-medium text-purple-700 transition-colors hover:text-purple-800 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none dark:text-purple-400 dark:hover:text-purple-300"
             >
               <Link2 className="size-4" aria-hidden="true" />
               Ligada a “{task.title || "Sem título"}”
