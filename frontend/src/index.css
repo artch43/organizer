@@ -751,13 +751,20 @@ h3 {
 }
 
 /* A window, menu or panel is open: he steps back. */
-/* Phones: smaller, and above the bottom bar (and the home indicator) instead of over it. */
+/* Phones: small, sitting on the bottom bar at the left (the row buttons, arrows and menus are on the
+   right). Taps go through him to the page, so he never covers a button. Hide him in Settings. */
 @media (max-width: 767px) {
   .companion {
-    right: 0.5rem;
-    bottom: calc(5.75rem + env(safe-area-inset-bottom));
-    width: 64px;
-    height: 70px;
+    right: auto;
+    left: 0.25rem;
+    bottom: calc(var(--mobile-nav-h, 4.5rem) + env(safe-area-inset-bottom) - 0.5rem);
+    width: 52px;
+    height: 58px;
+    pointer-events: none;
+  }
+  /* The 3D canvas sets its own pointer-events inline. */
+  .companion * {
+    pointer-events: none !important;
   }
 }
 

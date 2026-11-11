@@ -112,7 +112,7 @@ export function Companion() {
         onClick={hide}
         aria-label="Esconder o Clebinho"
         title="Esconder o Clebinho"
-        className="touch-hit absolute -top-1 -left-1 z-10 flex size-6 items-center justify-center rounded-full bg-card text-muted-foreground opacity-0 shadow-card ring-1 ring-border transition-opacity group-hover/companion:opacity-100 pointer-coarse:opacity-40 hover:text-foreground focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+        className="touch-hit absolute -top-1 -left-1 z-10 flex size-6 max-md:hidden items-center justify-center rounded-full bg-card text-muted-foreground opacity-0 shadow-card ring-1 ring-border transition-opacity group-hover/companion:opacity-100 pointer-coarse:opacity-40 hover:text-foreground focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
       >
         <X className="size-3.5" />
       </button>
