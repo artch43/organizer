@@ -156,7 +156,7 @@ export function ListsSheet() {
   return (
     <>
       <Sheet open={open} onOpenChange={setListsSheet}>
-        <SheetContent side="left" className="w-[19rem] gap-0 p-0" onOpenAutoFocus={(e) => e.preventDefault()}>
+        <SheetContent side="left" className="w-[19rem] gap-0 p-0 data-[side=left]:w-[19rem]" onOpenAutoFocus={(e) => e.preventDefault()}>
           <SheetHeader className="sr-only">
             <SheetTitle>Pastas e listas</SheetTitle>
             <SheetDescription>Escolha uma lista de tarefas.</SheetDescription>

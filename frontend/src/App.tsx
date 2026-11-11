@@ -10,7 +10,7 @@ import { installDeleteShortcut } from "./lib/shortcuts";
 import { installTouchDnd } from "./lib/touchDnd";
 import { installNativeBars } from "./lib/native";
 import { useBackToClose } from "./lib/backClose";
-import { applyAccent, applyWallpaper, uploadLegacyWallpaper } from "./lib/appearance";
+import { applyAccent, applyWallpaper, pruneWallpaperCache, uploadLegacyWallpaper, wallpaperShown } from "./lib/appearance";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { Toaster } from "@/components/ui/sonner";
 import { AppHeader } from "./components/app/AppHeader";
@@ -162,6 +162,13 @@ function ThemeSync() {
   }, [dark, resolvedTheme]);
   useEffect(() => {
     void applyWallpaper(wallpaper, dark);
+    void pruneWallpaperCache(wallpaper);
+    // A picture that couldn't be downloaded (no connection) is tried again when the connection returns.
+    const retry = () => {
+      if (!wallpaperShown.get()) void applyWallpaper(useStore.getState().ws.settings.wallpaper, dark);
+    };
+    window.addEventListener("online", retry);
+    return () => window.removeEventListener("online", retry);
   }, [
     wallpaper?.kind,
     wallpaper?.preset,
@@ -260,8 +267,7 @@ function Workspace() {
   useEffect(() => scrollToTop(), [route, route === "notes" ? noteId : null]);
 
   const settings = route === SETTINGS_ROUTE;
-  const current =
-    page ?? (route === "notes" || settings ? null : useStore.getState().ws.pages.find((p) => p.type === "home"));
+  const current = page ?? (route === "notes" || settings ? null : useStore.getState().ws.pages.find((p) => p.type === "home"));
   useKeyboardShortcuts();
   // The folders and lists show beside a list only; the other pages use the tabs in the top bar.
   const onList = current?.type === "db";
@@ -284,7 +290,7 @@ function Workspace() {
         {onList && <ListsPanel />}
         {route === "notes" ? (
           // Notes scroll inside their own columns: the area is exactly the window below the top bar.
-          <div className="flex h-[calc(100dvh-4rem)] min-w-0 flex-1 max-md:h-[calc(100dvh-4rem-4.75rem-env(safe-area-inset-bottom))]">
+          <div className="flex h-[calc(100dvh-4rem)] min-w-0 flex-1 max-md:h-[calc(100dvh-4rem-var(--mobile-nav-h)-1px-env(safe-area-inset-bottom))]">
             <LoadBoundary>
               <Suspense fallback={<Loading text="Abrindo notas…" inline />}>
                 <NotesView />
