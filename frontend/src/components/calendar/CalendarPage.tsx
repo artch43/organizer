@@ -196,7 +196,7 @@ export function CalendarPage() {
           <CalendarOptions showTasks={cal.showTasks} onShowTasks={(v) => set({ showTasks: v })} />
         </div>
       </header>
-      <div className="grid items-start gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(20rem,24rem)]">
+      <div className="grid grid-cols-[minmax(0,1fr)] items-start gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(20rem,24rem)]">
         <div className="flex min-w-0 flex-col gap-5">
           <div>
             {cal.view === "month" ? (

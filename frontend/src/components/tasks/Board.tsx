@@ -142,7 +142,7 @@ export function Board({ page, db, view, list }: { page: Page; db: Database; view
                 />
               ) : (
                 <button
-                  className="touch-hit min-w-0 truncate rounded-md px-1 py-0.5 text-left text-base font-bold hover:bg-background"
+                  className="min-w-0 truncate rounded-md px-1 py-0.5 text-left text-base font-bold pointer-coarse:-my-2 pointer-coarse:py-2.5 hover:bg-background"
                   title="Clique para renomear"
                   onClick={() => setEditing(o.id)}
                 >
