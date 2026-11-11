@@ -284,7 +284,7 @@ function Workspace() {
         {onList && <ListsPanel />}
         {route === "notes" ? (
           // Notes scroll inside their own columns: the area is exactly the window below the top bar.
-          <div className="flex h-[calc(100dvh-4rem)] min-w-0 flex-1 max-md:h-[calc(100dvh-4rem-4.75rem-env(safe-area-inset-bottom))]">
+          <div className="flex h-[calc(100dvh-4rem)] min-w-0 flex-1 max-md:h-[calc(100dvh-4rem-var(--mobile-nav-h)-1px-env(safe-area-inset-bottom))]">
             <LoadBoundary>
               <Suspense fallback={<Loading text="Abrindo notas…" inline />}>
                 <NotesView />

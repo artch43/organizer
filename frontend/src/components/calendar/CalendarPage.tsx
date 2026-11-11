@@ -140,7 +140,7 @@ export function CalendarPage() {
       <header className="flex flex-wrap items-center gap-x-6 gap-y-3">
         <div className="flex min-w-0 flex-1 basis-full flex-wrap items-center gap-x-5 gap-y-3 lg:basis-auto">
           <h1 className="text-[1.75rem] leading-tight font-extrabold tracking-tight sm:text-3xl">{label}</h1>
-          <div role="group" aria-label="Navegar entre dias" className="flex shrink-0 items-center gap-0.5">
+          <div role="group" aria-label="Navegar entre dias" className="flex shrink-0 items-center gap-0.5 max-sm:w-full max-sm:justify-center">
             <Button
               variant="ghost"
               size="icon"
@@ -166,7 +166,7 @@ export function CalendarPage() {
             </Button>
           </div>
         </div>
-        <div className="flex max-w-full flex-wrap items-center gap-3">
+        <div className="flex max-w-full flex-wrap items-center gap-3 max-sm:w-full max-sm:justify-center">
           <div role="group" aria-label="Visualização do calendário" className="flex shrink-0 rounded-xl bg-muted/50 p-0.5">
             {(
               [

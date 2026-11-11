@@ -8,7 +8,8 @@ import { openLists, setListsSheet } from "../lists/state";
 
 /**
  * Phone only: the same pages as the tabs at the top on a computer (Início, Listas, Calendário, Hábitos,
- * Notas) with "Criar" in the middle. While something is dragged, "Criar" turns into the trash.
+ * Notas), evenly spaced, and "Criar" as a round button floating above the bar's right end. While
+ * something is dragged, "Criar" turns into the trash.
  */
 export function MobileNav() {
   const route = useStore((s) => s.ui.route);
@@ -23,29 +24,28 @@ export function MobileNav() {
     { label: "Início", icon: Home, active: page?.type === "home", run: () => home && go(home) },
     // On a list already: opens the folders and lists.
     { label: "Listas", icon: ListChecks, active: onList, run: () => (onList ? setListsSheet(true) : openLists()) },
-    null,
     { label: "Calendário", icon: CalendarDays, active: page?.type === "calendar", run: () => cal && go(cal) },
     { label: "Hábitos", icon: Sprout, active: page?.type === "habits", run: () => habits && go(habits) },
     { label: "Notas", icon: NotebookPen, active: route === "notes", run: () => openNotes() },
   ];
   return (
-    <nav
-      aria-label="Navegação principal"
-      className="sticky bottom-0 z-20 grid grid-cols-6 items-end border-t bg-chrome/95 pb-[env(safe-area-inset-bottom)] backdrop-blur supports-backdrop-filter:bg-chrome/85 md:hidden"
-    >
-      {items.map((it) =>
-        it ? (
+    <>
+      <nav
+        aria-label="Navegação principal"
+        className="sticky bottom-0 z-20 grid grid-cols-5 items-end border-t bg-chrome/95 pb-[env(safe-area-inset-bottom)] backdrop-blur supports-backdrop-filter:bg-chrome/85 md:hidden"
+      >
+        {items.map((it) => (
           <button
             key={it.label}
             type="button"
             aria-current={it.active ? "page" : undefined}
             onClick={it.run}
             className={cn(
-              "group flex min-w-0 flex-col items-center gap-1 pt-2 pb-2.5 text-[11px] font-medium transition-colors focus-visible:outline-none active:[&>span]:scale-90",
+              "group flex h-(--mobile-nav-h) min-w-0 flex-col items-center justify-center gap-1 text-xs font-medium transition-colors focus-visible:outline-none active:[&>span]:scale-90",
               it.active ? "text-primary-strong" : "text-muted-foreground",
             )}
           >
-            <span className="relative flex h-8 w-11 items-center justify-center rounded-full transition-transform duration-150 ease-out group-focus-visible:ring-2 group-focus-visible:ring-ring">
+            <span className="relative flex h-8 w-12 items-center justify-center rounded-full transition-transform duration-150 ease-out group-focus-visible:ring-2 group-focus-visible:ring-ring">
               {it.active && (
                 <motion.span
                   aria-hidden="true"
@@ -58,30 +58,33 @@ export function MobileNav() {
             </span>
             <span className="max-w-full truncate px-0.5">{it.label}</span>
           </button>
-        ) : (
-          <CenterButton key="criar" />
-        ),
-      )}
-    </nav>
+        ))}
+      </nav>
+      {/* Outside the bar: its backdrop blur would turn "fixed" into "fixed to the bar". */}
+      <CreateFab />
+    </>
   );
 }
 
-/** The raised "+" in the middle: opens "Criar"; while dragging, it is the trash. */
-function CenterButton() {
+/** Above the bar, at the right; phones only. */
+const FAB_PLACE = "fixed right-4 bottom-[calc(var(--mobile-nav-h)+env(safe-area-inset-bottom)+0.75rem)] z-20 md:hidden";
+
+/** The floating "+": opens "Criar"; while something is dragged, it is the trash. */
+function CreateFab() {
   const { drag, over, gulp, handlers, what } = useTrashTarget();
   if (drag)
     return (
-      <div className="flex justify-center pb-2">
+      <div className={FAB_PLACE}>
         <button
           type="button"
           {...handlers}
           onClick={() => openModal("trash")}
           aria-label={over ? `Soltar para excluir ${what}` : "Lixeira"}
           className={cn(
-            "-mt-5 flex size-14 flex-col items-center justify-center rounded-2xl text-[11px] font-semibold transition-[background-color,transform] duration-200 [&_svg]:size-6",
+            "flex size-16 flex-col items-center justify-center rounded-full text-[11px] font-semibold shadow-lift transition-[background-color,transform] duration-200 ease-out [&_svg]:size-6",
             over
               ? "scale-110 bg-destructive text-white"
-              : "bg-destructive/12 text-destructive outline-2 outline-destructive/50 outline-dashed",
+              : "bg-card text-destructive outline-2 -outline-offset-2 outline-destructive/60 outline-dashed",
           )}
         >
           <TrashCan over={over} gulp={gulp} />
@@ -90,12 +93,12 @@ function CenterButton() {
       </div>
     );
   return (
-    <div className="flex justify-center pb-2">
+    <div className={FAB_PLACE}>
       <CreateMenu side="top">
         <button
           type="button"
           aria-label="Criar"
-          className="-mt-5 flex size-14 items-center justify-center rounded-2xl bg-primary text-primary-foreground shadow-lift transition-transform duration-150 ease-out focus-visible:ring-4 focus-visible:ring-ring/40 focus-visible:outline-none active:scale-95"
+          className="flex size-14 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lift transition-transform duration-150 ease-out focus-visible:ring-4 focus-visible:ring-ring/40 focus-visible:outline-none active:scale-95"
         >
           <Plus className="size-7" strokeWidth={2.5} aria-hidden="true" />
         </button>
