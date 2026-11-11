@@ -133,6 +133,7 @@ export function accentVars(accent: string) {
     "--primary": p,
     "--primary-foreground": fg,
     "--primary-strong": strong,
+    "--selected-primary-strong": strong,
     "--ring": p,
     "--sidebar-primary": p,
     "--sidebar-primary-foreground": fg,
@@ -165,7 +166,7 @@ export function applyAccent(accent: string | undefined) {
     tag.id = id;
     document.head.appendChild(tag);
   }
-  tag.textContent = css(":root", v.light) + css(".dark,.ink", v.dark);
+  tag.textContent = css(":root", v.light) + css(".dark,.ink,:root:not(.dark) .ink", v.dark);
 }
 
 /* ---------- the wallpaper picture (kept on this device) ---------- */

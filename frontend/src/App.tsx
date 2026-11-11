@@ -136,11 +136,12 @@ function CloudGate() {
 function ThemeSync() {
   const theme = useStore((s) => s.ws.settings.theme);
   const accent = useStore((s) => s.ws.settings.accent);
+  const accentDark = useStore((s) => s.ws.settings.accentDark);
   const wallpaper = useStore((s) => s.ws.settings.wallpaper);
   const { setTheme, resolvedTheme } = useTheme();
   const dark = resolvedTheme === "dark";
   useEffect(() => setTheme(theme), [theme]);
-  useEffect(() => applyAccent(accent), [accent]);
+  useEffect(() => applyAccent(dark ? accentDark ?? accent : accent), [accent, accentDark, dark]);
   useEffect(() => {
     void applyWallpaper(wallpaper, dark);
   }, [wallpaper?.kind, wallpaper?.preset, wallpaper?.strength, wallpaper?.dark?.kind, wallpaper?.dark?.preset, dark]);

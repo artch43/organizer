@@ -910,7 +910,7 @@ html[data-backdrop="sweep"]:not(.dark):not(.has-wallpaper)
   :is([class*="bg-card"], .bg-background, .bg-popover, .bg-muted, [data-slot="card"], [role="dialog"]) {
   --foreground: #0b1d51;
   --muted-foreground: #4a5578;
-  --primary-strong: #c21a6b;
+  --primary-strong: var(--selected-primary-strong, #c21a6b);
   --warning: #985a00;
   color: var(--foreground);
 }

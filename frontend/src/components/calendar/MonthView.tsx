@@ -1,3 +1,4 @@
+import { useTheme } from "next-themes";
 import { useState } from "react";
 import { Check, ChevronLeft, ChevronRight, Plus, Repeat } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -104,7 +105,8 @@ export function MonthView({
   onSelect?: (date: string) => void;
   max?: number;
 }) {
-  const accent = useStore((s) => s.ws.settings.accent);
+  const { resolvedTheme } = useTheme();
+  const accent = useStore((s) => resolvedTheme === "dark" ? s.ws.settings.accentDark ?? s.ws.settings.accent : s.ws.settings.accent);
   const selectedColor = accent && isHex(accent) ? accent : undefined;
   const selectedForeground = selectedColor
     ? contrast(selectedColor, "#ffffff") >= contrast(selectedColor, "#000000")

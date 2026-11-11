@@ -29,21 +29,29 @@ export function AppearanceTab() {
     mut((w) => {
       w.settings[k] = v;
     });
-  const accent = (st.accent ?? DEFAULT_ACCENT).toLowerCase();
   const wp: NonNullable<Settings["wallpaper"]> = st.wallpaper ?? { kind: "none" };
   const strength = wp.strength ?? 0.35;
   const file = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState(false);
   const { resolvedTheme } = useTheme();
   const isDark = resolvedTheme === "dark";
-  // Which mode's picture is being chosen: starts at the mode on screen.
-  const [slot, setSlot] = useState<WallpaperSlot>(isDark ? "dark" : "light");
+  // Edit the active theme; automatic mode follows the system theme.
+  const slot: WallpaperSlot = (st.theme === "system" ? isDark : st.theme === "dark") ? "dark" : "light";
+  const accent = (slot === "dark" ? st.accentDark ?? st.accent ?? DEFAULT_ACCENT : st.accent ?? DEFAULT_ACCENT).toLowerCase();
+  const chooseAccent = (color: string) => mut((w) => {
+    if (slot === "dark") w.settings.accentDark = color;
+    else {
+      w.settings.accentDark ??= w.settings.accent ?? DEFAULT_ACCENT;
+      w.settings.accent = color;
+    }
+  });
   const lightPick: WallpaperPick = { kind: wp.kind, preset: wp.preset };
-  // The dark mode uses the light-mode picture until it gets its own.
-  const pick: WallpaperPick | null = slot === "light" ? lightPick : (wp.dark ?? null);
-  const nextWith = (p: WallpaperPick | null): NonNullable<Settings["wallpaper"]> =>
-    slot === "light" ? { ...wp, kind: p!.kind, preset: p!.preset } : { ...wp, dark: p ?? undefined };
-  const choose = (p: WallpaperPick | null) => set("wallpaper", nextWith(p));
+  const pick: WallpaperPick = slot === "light" ? lightPick : (wp.dark ?? lightPick);
+  const nextWith = (p: WallpaperPick): NonNullable<Settings["wallpaper"]> =>
+    slot === "light"
+      ? { ...wp, kind: p.kind, preset: p.preset, dark: wp.dark ?? (lightPick.kind === "image" ? { kind: "none" } : lightPick) }
+      : { ...wp, dark: p };
+  const choose = (p: WallpaperPick) => set("wallpaper", nextWith(p));
   const anyShown = wp.kind !== "none" || (!!wp.dark && wp.dark.kind !== "none");
 
   const upload = async (f: File) => {
@@ -73,9 +81,6 @@ export function AppearanceTab() {
           value={st.theme}
           onValueChange={(v) => v && set("theme", v as Settings["theme"])}
         >
-          <ToggleGroupItem value="system" className="px-3">
-            Automático
-          </ToggleGroupItem>
           <ToggleGroupItem value="light" className="px-3">
             Claro
           </ToggleGroupItem>
@@ -101,7 +106,7 @@ export function AppearanceTab() {
                 aria-checked={on}
                 aria-label={a.name}
                 title={a.name}
-                onClick={() => set("accent", a.hex === DEFAULT_ACCENT ? undefined : a.hex)}
+                onClick={() => chooseAccent(a.hex)}
                 className={cn(
                   "flex size-10 items-center justify-center rounded-full ring-offset-2 ring-offset-background transition-transform hover:scale-110 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none",
                   on && "ring-2 ring-foreground",
@@ -126,7 +131,7 @@ export function AppearanceTab() {
               className="absolute inset-0 cursor-pointer opacity-0"
               value={isHex(accent) ? accent : DEFAULT_ACCENT}
               aria-label="Escolher outra cor de destaque"
-              onChange={(e) => set("accent", e.target.value)}
+              onChange={(e) => chooseAccent(e.target.value)}
             />
           </label>
         </div>
@@ -184,35 +189,12 @@ export function AppearanceTab() {
         <FieldDescription>
           Aparece atrás das páginas. Escolha um para o modo claro e outro para o escuro, se quiser.
         </FieldDescription>
-        <ToggleGroup
-          type="single"
-          variant="outline"
-          aria-label="Papel de parede de qual modo"
-          value={slot}
-          onValueChange={(v) => v && setSlot(v as WallpaperSlot)}
-          className="self-start"
-        >
-          <ToggleGroupItem value="light" className="px-3">
-            Modo claro
-          </ToggleGroupItem>
-          <ToggleGroupItem value="dark" className="px-3">
-            Modo escuro
-          </ToggleGroupItem>
-        </ToggleGroup>
         <div
           className="grid grid-cols-3 gap-2 sm:grid-cols-4"
           role="radiogroup"
           aria-label={slot === "dark" ? "Papel de parede do modo escuro" : "Papel de parede do modo claro"}
         >
-          {slot === "dark" && (
-            <WallpaperChoice label="Igual ao claro" selected={pick === null} onClick={() => choose(null)}>
-              <span className="absolute inset-0 bg-background" />
-              <span aria-hidden="true" className="absolute inset-0 flex items-center justify-center text-xs font-semibold text-muted-foreground">
-                = claro
-              </span>
-            </WallpaperChoice>
-          )}
-          <WallpaperChoice label="Nenhum" selected={pick?.kind === "none"} onClick={() => choose({ kind: "none" })}>
+          <WallpaperChoice label="Padrão" selected={pick?.kind === "none"} onClick={() => choose({ kind: "none" })}>
             <span className="absolute inset-0 bg-background" />
           </WallpaperChoice>
           {WALLPAPERS.map((w) => (

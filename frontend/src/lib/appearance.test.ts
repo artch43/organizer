@@ -1,5 +1,5 @@
-import { describe, expect, it } from "vitest";
-import { ACCENTS, accentVars, contrast } from "./appearance";
+import { describe, expect, it, vi } from "vitest";
+import { ACCENTS, accentVars, contrast, applyAccent } from "./appearance";
 
 const LIGHT_BG = ["#ffffff", "#ffffff"],
   DARK_BG = ["#1a1b1e", "#222327"];
@@ -21,4 +21,19 @@ describe("cor de destaque", () => {
       for (const bg of LIGHT_BG) expect(contrast(light["--ring"], bg)).toBeGreaterThanOrEqual(3);
       for (const bg of DARK_BG) expect(contrast(dark["--ring"], bg)).toBeGreaterThanOrEqual(3);
     });
+});
+
+
+describe("accent overrides", () => {
+  it("overrides the light sidebar and exposes the selected surface text color", () => {
+    const tag = { textContent: "" };
+    vi.stubGlobal("document", { getElementById: () => tag });
+    try {
+      applyAccent("#15803d");
+      expect(tag.textContent).toContain(":root:not(.dark) .ink{");
+      expect(tag.textContent).toContain(`--selected-primary-strong:${accentVars("#15803d").light["--primary-strong"]}`);
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
 });

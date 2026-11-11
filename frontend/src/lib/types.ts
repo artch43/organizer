@@ -180,6 +180,8 @@ export interface Settings {
   guideVersion?: number;
   /** Accent color (hex); missing = the default teal. */
   accent?: string;
+  /** Independent dark-theme accent; falls back to the existing accent for older workspaces. */
+  accentDark?: string;
   /** Background behind the pages: one for the light mode and, optionally, another for the dark mode.
    * A photo stays on each device; presets sync. */
   wallpaper?: {
