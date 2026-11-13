@@ -7,11 +7,9 @@
 import { openFilesDb } from "./rename";
 
 export const DEFAULT_ACCENT = "#c6ff3d";
-/** The default before the lime palette: picked by nobody on purpose, so it now means the default. */
-const OLD_DEFAULT_ACCENT = "#1f7a8c";
 
 export const ACCENTS: { name: string; hex: string }[] = [
-  { name: "Padrão (lima no escuro, rosa no claro)", hex: "#c6ff3d" },
+  { name: "Lima", hex: "#c6ff3d" },
   { name: "Petróleo", hex: "#1f7a8c" },
   { name: "Azul", hex: "#2563eb" },
   { name: "Índigo", hex: "#4f46e5" },
@@ -107,18 +105,12 @@ const DARK = { bg: "#1a1b1e", card: "#222327", ink: "#0a0a0a" };
 /** All the CSS variables that follow the accent, for light and dark mode. */
 export function accentVars(accent: string) {
   const hex = isHex(accent) ? accent : DEFAULT_ACCENT;
-  // Light: the color must stand out on the page (3:1) — very pale picks get deepened — and the
-  // button label (white or near-black, whichever reads better) must reach 4.5:1 on it.
-  let lightPrimary = until(hex, "#000000", [LIGHT.bg, LIGHT.card], 3);
-  let lightFg = "#ffffff";
-  if (contrast("#ffffff", lightPrimary) < 4.5) {
-    if (contrast(LIGHT.ink, lightPrimary) >= 4.5) lightFg = LIGHT.ink;
-    else lightPrimary = until(lightPrimary, "#000000", ["#ffffff"], 4.5);
-  }
+  // Preserve the chosen swatch in light mode; only the button label follows its contrast.
+  const lightPrimary = hex;
+  const lightFg = contrast("#ffffff", hex) >= 4.5 ? "#ffffff" : contrast(LIGHT.ink, hex) >= 4.5 ? LIGHT.ink : "#000000";
   const lightAccentBg = toHex(mix(parse(hex), [255, 255, 255], 0.88));
   // Selected buttons sit on a light tint of the accent (bg-primary/10) over the page or a card.
-  const lightTints = [LIGHT.bg, LIGHT.card].map((bg) => toHex(mix(parse(lightPrimary), parse(bg), 0.88)));
-  const lightStrong = until(hex, "#000000", [LIGHT.bg, LIGHT.card, lightAccentBg, ...lightTints], 4.6);
+  const lightStrong = hex;
   // Dark: lighter shades on the dark backgrounds, with a dark label (lightened further if needed).
   let darkPrimary = until(hex, "#ffffff", [DARK.bg, DARK.card], 4.5);
   let darkFg = DARK.ink;
@@ -156,7 +148,7 @@ const css = (sel: string, v: Record<string, string>) =>
 export function applyAccent(accent: string | undefined) {
   const id = "accent-vars";
   let tag = document.getElementById(id) as HTMLStyleElement | null;
-  if (!accent || [DEFAULT_ACCENT, OLD_DEFAULT_ACCENT].includes(accent.toLowerCase())) {
+  if (!accent || !isHex(accent)) {
     tag?.remove();
     return;
   }

@@ -37,11 +37,12 @@ export function AppearanceTab() {
   const isDark = resolvedTheme === "dark";
   // Edit the active theme; automatic mode follows the system theme.
   const slot: WallpaperSlot = (st.theme === "system" ? isDark : st.theme === "dark") ? "dark" : "light";
-  const accent = (slot === "dark" ? st.accentDark ?? st.accent ?? DEFAULT_ACCENT : st.accent ?? DEFAULT_ACCENT).toLowerCase();
+  const accent = (slot === "dark" ? st.accentDark ?? st.accent ?? "default" : st.accent ?? "default").toLowerCase();
+  const defaultColor = slot === "dark" ? DEFAULT_ACCENT : "#ff5fa2";
   const chooseAccent = (color: string) => mut((w) => {
     if (slot === "dark") w.settings.accentDark = color;
     else {
-      w.settings.accentDark ??= w.settings.accent ?? DEFAULT_ACCENT;
+      w.settings.accentDark ??= w.settings.accent ?? "default";
       w.settings.accent = color;
     }
   });
@@ -96,6 +97,15 @@ export function AppearanceTab() {
           Botões, links e o item aberto no menu. Os tons são ajustados para o texto ficar sempre legível.
         </FieldDescription>
         <div className="flex flex-wrap items-center gap-2" role="radiogroup" aria-label="Cor de destaque">
+          <button
+            type="button"
+            role="radio"
+            aria-checked={accent === "default"}
+            onClick={() => chooseAccent("default")}
+            className={cn("h-10 rounded-full border px-3 text-sm font-medium focus-visible:ring-2 focus-visible:ring-ring", accent === "default" && "ring-2 ring-foreground ring-offset-2 ring-offset-background")}
+          >
+            Padrão
+          </button>
           {ACCENTS.map((a) => {
             const on = accent === a.hex;
             return (
@@ -121,15 +131,15 @@ export function AppearanceTab() {
           <label
             className={cn(
               "relative flex h-9 cursor-pointer items-center gap-2 rounded-full border px-3 text-sm font-medium focus-within:ring-2 focus-within:ring-ring",
-              !ACCENTS.some((a) => a.hex === accent) && "ring-2 ring-foreground ring-offset-2 ring-offset-background",
+              accent !== "default" && !ACCENTS.some((a) => a.hex === accent) && "ring-2 ring-foreground ring-offset-2 ring-offset-background",
             )}
           >
-            <span className="size-5 rounded-full border" style={{ background: accent }} aria-hidden="true" />
+            <span className="size-5 rounded-full border" style={{ background: isHex(accent) ? accent : defaultColor }} aria-hidden="true" />
             Outra cor
             <input
               type="color"
               className="absolute inset-0 cursor-pointer opacity-0"
-              value={isHex(accent) ? accent : DEFAULT_ACCENT}
+              value={isHex(accent) ? accent : defaultColor}
               aria-label="Escolher outra cor de destaque"
               onChange={(e) => chooseAccent(e.target.value)}
             />
@@ -155,9 +165,6 @@ export function AppearanceTab() {
           </ToggleGroupItem>
           <ToggleGroupItem value="dots" className="px-3">
             Pontilhado
-          </ToggleGroupItem>
-          <ToggleGroupItem value="animated" className="px-3">
-            Degradê animado
           </ToggleGroupItem>
           <ToggleGroupItem value="plain" className="px-3">
             Liso
