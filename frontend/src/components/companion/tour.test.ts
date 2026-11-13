@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { addBoardFolder } from "@/store";
+import { addBoardFolder, useStore } from "@/store";
 import { TOUR_BEATS, TOUR_PAGES, advanceTour, currentBeat, endTour, startTour, useTour } from "./tour";
 
 const at = () => useTour.getState().at;
@@ -84,6 +84,32 @@ describe("tour do Clebinho", () => {
     vi.advanceTimersByTime(2000);
     expect(at()).toBe(0);
     expect(useTour.getState().settling).toBe(false);
+  });
+
+  it("ao terminar ou pular, apaga os exemplos que deixou; um que ganhou outro nome fica", () => {
+    vi.useFakeTimers();
+    const titles = () => Object.values(useStore.getState().ws.items).map((i) => i.title);
+    // Starting also clears what a tour cut short left behind (earlier tests): count from here.
+    startTour();
+    const before = titles().length;
+    advanceTour();
+    vi.advanceTimersByTime(2000);
+    const made = titles().filter((t) => t.includes("(exemplo)"));
+    if (!made.length) return; // no list with dates in this workspace: nothing was left
+    expect(titles().length).toBe(before + made.length);
+    endTour();
+    expect(titles().length).toBe(before);
+
+    startTour();
+    advanceTour();
+    vi.advanceTimersByTime(2000);
+    const mine = Object.values(useStore.getState().ws.items).find((i) => i.title.includes("(exemplo)"))!;
+    useStore.getState().mut((w) => {
+      w.items[mine.id].title = "Comprar pão";
+    });
+    endTour(true);
+    expect(titles()).toContain("Comprar pão");
+    expect(titles().some((t) => t.includes("(exemplo)"))).toBe(false);
   });
 
   it("avança até a última fala e para nela; pular encerra", () => {

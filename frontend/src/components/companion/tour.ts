@@ -66,6 +66,68 @@ const reveal = (selector: string, block: ScrollLogicalPosition = "nearest") => {
 };
 
 /**
+ * What he left in the account as examples (two tasks in Início, a card to drag, a compromisso). When the
+ * tour ends or is skipped they go away again. Kept on the device, so a reload in the middle of the tour
+ * doesn't leave them behind: the next tour (or its end) clears them.
+ */
+const DEMO_KEY = "organizer:tour-demo";
+const EXAMPLES = {
+  overdue: "Tarefa atrasada (exemplo)",
+  today: "Tarefa de hoje (exemplo)",
+  card: "Arraste-me para outra coluna",
+  event: "Compromisso de exemplo",
+};
+type Demo = { items: string[]; events: string[] };
+/** This visit's examples (where the device keeps nothing, a private window, they are only here). */
+const made: Demo = { items: [], events: [] };
+function loadDemo(): Demo {
+  let d: Partial<Record<keyof Demo, unknown>> | null = null;
+  try {
+    d = JSON.parse(localStorage.getItem(DEMO_KEY) ?? "null");
+  } catch {
+    /* private mode: only this visit's */
+  }
+  const ids = (kind: keyof Demo) => {
+    const kept = d?.[kind];
+    return [...new Set([...(Array.isArray(kept) ? kept.filter((x): x is string => typeof x === "string") : []), ...made[kind]])];
+  };
+  return { items: ids("items"), events: ids("events") };
+}
+function remember(kind: keyof Demo, id: string) {
+  made[kind].push(id);
+  const d = loadDemo();
+  try {
+    localStorage.setItem(DEMO_KEY, JSON.stringify(d));
+  } catch {
+    /* private mode: the examples just stay */
+  }
+}
+/** Takes his examples away. One the person gave another name is theirs now: it stays. */
+function clearDemo() {
+  const d = loadDemo();
+  made.items = [];
+  made.events = [];
+  try {
+    localStorage.removeItem(DEMO_KEY);
+  } catch {
+    /* private mode */
+  }
+  const { ws: w, ui, mut, setUi } = useStore.getState();
+  const titles = new Set(Object.values(EXAMPLES));
+  const items = d.items.filter((id) => w.items[id] && titles.has(w.items[id].title));
+  const events = d.events.filter((id) => w.events[id] && titles.has(w.events[id].title));
+  if (!items.length && !events.length) return;
+  mut((x) => {
+    for (const id of items) delete x.items[id];
+    for (const id of events) delete x.events[id];
+  });
+  if (ui.peek && items.includes(ui.peek))
+    setUi((u) => {
+      u.peek = null;
+    });
+}
+
+/**
  * The calendar opens on the next day with a compromisso (in the month, and in the day beside it), so
  * there is one to open; with none coming up, he leaves one today.
  */
@@ -79,7 +141,7 @@ function showEventDay() {
     mut((x) => {
       x.events[id] = {
         id,
-        title: "Compromisso de exemplo",
+        title: EXAMPLES.event,
         date: T,
         allDay: false,
         start: "19:00",
@@ -92,6 +154,7 @@ function showEventDay() {
         updated: Date.now(),
       };
     });
+    remember("events", id);
   }
   setUi((u) => {
     Object.assign(u.calendar, { view: "month", anchor: day, selected: day });
@@ -120,14 +183,14 @@ function ensureHomeTasks() {
     mut((x) => {
       x.items[id].props[dp.id] = day;
     });
+    remember("items", id);
   };
-  if (!doable("overdue")) add("Tarefa atrasada (exemplo)", addDays(T, -1));
-  if (!doable("day")) add("Tarefa de hoje (exemplo)", T);
+  if (!doable("overdue")) add(EXAMPLES.overdue, addDays(T, -1));
+  if (!doable("day")) add(EXAMPLES.today, T);
 }
 
 /** The card he leaves in the new list, to be dragged. */
 let demoCard: string | null = null;
-const DEMO_TITLE = "Arraste-me para outra coluna";
 
 export const TOUR_PAGES = 5;
 
@@ -198,7 +261,8 @@ export const TOUR_BEATS: Beat[] = [
     enter: () => {
       setListsSheet(false);
       const { ui } = useStore.getState();
-      demoCard = ws().dbs[ui.route] ? newItem(ui.route, {}, DEMO_TITLE) : null;
+      demoCard = ws().dbs[ui.route] ? newItem(ui.route, {}, EXAMPLES.card) : null;
+      if (demoCard) remember("items", demoCard);
     },
     // Moved to another column (or thrown away): either way, the card was dragged.
     watch: () => {
@@ -308,6 +372,8 @@ function begin(at: number) {
 export function startTour() {
   const home = useStore.getState().ws.pages.find((p) => p.type === "home");
   if (home && useStore.getState().ui.route !== home.id) go(home.id);
+  // Examples left by a tour that was cut short (the page was reloaded).
+  clearDemo();
   begin(0);
 }
 
@@ -357,6 +423,7 @@ export function endTour(done = false) {
   useTour.setState({ at: null, settling: false });
   turn++;
   demoCard = null;
+  clearDemo();
   try {
     localStorage.setItem(GUIDE_SEEN_KEY, "1");
   } catch {
