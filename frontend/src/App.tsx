@@ -10,7 +10,7 @@ import { installDeleteShortcut } from "./lib/shortcuts";
 import { installTouchDnd } from "./lib/touchDnd";
 import { installNativeBars } from "./lib/native";
 import { useBackToClose } from "./lib/backClose";
-import { applyAccent, applyWallpaper, pruneWallpaperCache, uploadLegacyWallpaper, wallpaperShown } from "./lib/appearance";
+import { applyAccent, applyWallpaper, pruneWallpaperCache, wallpaperShown } from "./lib/appearance";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { Toaster } from "@/components/ui/sonner";
 import { AppHeader } from "./components/app/AppHeader";
@@ -146,15 +146,25 @@ function CloudGate() {
   return <Workspace />;
 }
 
-/** Keeps the light/dark choice, the accent color and the wallpaper from Settings on the page. */
+/** Keeps the selected theme, accent and custom image on the page. */
 function ThemeSync() {
   const theme = useStore((s) => s.ws.settings.theme);
   const accent = useStore((s) => s.ws.settings.accent);
+  const accentDark = useStore((s) => s.ws.settings.accentDark);
   const wallpaper = useStore((s) => s.ws.settings.wallpaper);
   const { setTheme, resolvedTheme } = useTheme();
   const dark = resolvedTheme === "dark";
   useEffect(() => setTheme(theme), [theme]);
-  useEffect(() => applyAccent(accent), [accent]);
+  useEffect(() => applyAccent(dark ? accentDark ?? accent : accent), [accent, accentDark, dark]);
+  useEffect(() => {
+    void applyWallpaper(wallpaper, dark);
+    const retry = () => {
+      if (!wallpaperShown.get()) void applyWallpaper(useStore.getState().ws.settings.wallpaper, dark);
+    };
+    window.addEventListener("online", retry);
+    return () => window.removeEventListener("online", retry);
+  }, [wallpaper, dark]);
+  useEffect(() => { void pruneWallpaperCache(wallpaper); }, [wallpaper]);
   // The phone's status bar follows the theme chosen here, not only the system's (index.html has the defaults).
   useEffect(() => {
     if (!resolvedTheme) return;
@@ -162,37 +172,6 @@ function ThemeSync() {
       .querySelectorAll<HTMLMetaElement>('meta[name="theme-color"]')
       .forEach((m) => (m.content = dark ? "#08090A" : "#FFFFFF"));
   }, [dark, resolvedTheme]);
-  useEffect(() => {
-    void applyWallpaper(wallpaper, dark);
-    void pruneWallpaperCache(wallpaper);
-    // A picture that couldn't be downloaded (no connection) is tried again when the connection returns.
-    const retry = () => {
-      if (!wallpaperShown.get()) void applyWallpaper(useStore.getState().ws.settings.wallpaper, dark);
-    };
-    window.addEventListener("online", retry);
-    return () => window.removeEventListener("online", retry);
-  }, [
-    wallpaper?.kind,
-    wallpaper?.preset,
-    wallpaper?.image,
-    wallpaper?.strength,
-    wallpaper?.dark?.kind,
-    wallpaper?.dark?.preset,
-    wallpaper?.dark?.image,
-    dark,
-  ]);
-  // A photo chosen before photos went to the account: upload it so the other devices get it too.
-  const legacy =
-    (wallpaper?.kind === "image" && !wallpaper.image) || (wallpaper?.dark?.kind === "image" && !wallpaper.dark.image);
-  useEffect(() => {
-    if (!legacy) return;
-    void uploadLegacyWallpaper(useStore.getState().ws.settings.wallpaper).then((next) => {
-      if (next)
-        useStore.getState().mut((w) => {
-          w.settings.wallpaper = next;
-        });
-    });
-  }, [legacy]);
   return null;
 }
 

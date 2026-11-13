@@ -9,11 +9,9 @@ import { supabase } from "./supabase";
 import { uid } from "./util";
 
 export const DEFAULT_ACCENT = "#c6ff3d";
-/** The default before the lime palette: picked by nobody on purpose, so it now means the default. */
-const OLD_DEFAULT_ACCENT = "#1f7a8c";
 
 export const ACCENTS: { name: string; hex: string }[] = [
-  { name: "Padrão (lima no escuro, rosa no claro)", hex: "#c6ff3d" },
+  { name: "Lima", hex: "#c6ff3d" },
   { name: "Petróleo", hex: "#1f7a8c" },
   { name: "Azul", hex: "#2563eb" },
   { name: "Índigo", hex: "#4f46e5" },
@@ -41,8 +39,8 @@ export const showsWallpaper = (p: WallpaperPick) =>
   p.kind === "image" || (p.kind === "preset" && WALLPAPERS.some((w) => w.id === p.preset));
 
 /** The page background chosen in Settings; nothing chosen (or the retired "still gradient") is the soft gradient. */
-export const backdropMode = (b: string | undefined): "sweep" | "dots" | "animated" | "plain" =>
-  b === "dots" || b === "animated" || b === "plain" ? b : "sweep";
+export const backdropMode = (b: string | undefined): "sweep" | "dots" | "plain" =>
+  b === "dots" || b === "plain" ? b : "sweep";
 
 /** The picture shown in this mode. */
 export function wallpaperFor(w: Wallpaper | undefined, dark: boolean): WallpaperPick {
@@ -109,18 +107,12 @@ const DARK = { bg: "#1a1b1e", card: "#222327", ink: "#0a0a0a" };
 /** All the CSS variables that follow the accent, for light and dark mode. */
 export function accentVars(accent: string) {
   const hex = isHex(accent) ? accent : DEFAULT_ACCENT;
-  // Light: the color must stand out on the page (3:1) — very pale picks get deepened — and the
-  // button label (white or near-black, whichever reads better) must reach 4.5:1 on it.
-  let lightPrimary = until(hex, "#000000", [LIGHT.bg, LIGHT.card], 3);
-  let lightFg = "#ffffff";
-  if (contrast("#ffffff", lightPrimary) < 4.5) {
-    if (contrast(LIGHT.ink, lightPrimary) >= 4.5) lightFg = LIGHT.ink;
-    else lightPrimary = until(lightPrimary, "#000000", ["#ffffff"], 4.5);
-  }
+  // Preserve the chosen swatch in light mode; only the button label follows its contrast.
+  const lightPrimary = hex;
+  const lightFg = contrast("#ffffff", hex) >= 4.5 ? "#ffffff" : contrast(LIGHT.ink, hex) >= 4.5 ? LIGHT.ink : "#000000";
   const lightAccentBg = toHex(mix(parse(hex), [255, 255, 255], 0.88));
   // Selected buttons sit on a light tint of the accent (bg-primary/10) over the page or a card.
-  const lightTints = [LIGHT.bg, LIGHT.card].map((bg) => toHex(mix(parse(lightPrimary), parse(bg), 0.88)));
-  const lightStrong = until(hex, "#000000", [LIGHT.bg, LIGHT.card, lightAccentBg, ...lightTints], 4.6);
+  const lightStrong = hex;
   // Dark: lighter shades on the dark backgrounds, with a dark label (lightened further if needed).
   let darkPrimary = until(hex, "#ffffff", [DARK.bg, DARK.card], 4.5);
   let darkFg = DARK.ink;
@@ -133,8 +125,10 @@ export function accentVars(accent: string) {
   const darkStrong = until(hex, "#ffffff", [DARK.bg, DARK.card, darkAccentBg, ...darkTints], 7);
   const vars = (p: string, fg: string, strong: string, accentBg: string) => ({
     "--primary": p,
+    "--backdrop-accent": hex,
     "--primary-foreground": fg,
     "--primary-strong": strong,
+    "--selected-primary-strong": strong,
     "--ring": p,
     "--sidebar-primary": p,
     "--sidebar-primary-foreground": fg,
@@ -157,7 +151,7 @@ const css = (sel: string, v: Record<string, string>) =>
 export function applyAccent(accent: string | undefined) {
   const id = "accent-vars";
   let tag = document.getElementById(id) as HTMLStyleElement | null;
-  if (!accent || [DEFAULT_ACCENT, OLD_DEFAULT_ACCENT].includes(accent.toLowerCase())) {
+  if (!accent || !isHex(accent)) {
     tag?.remove();
     return;
   }
@@ -167,7 +161,7 @@ export function applyAccent(accent: string | undefined) {
     tag.id = id;
     document.head.appendChild(tag);
   }
-  tag.textContent = css(":root", v.light) + css(".dark,.ink", v.dark);
+  tag.textContent = css(":root", v.light) + css(".dark,.ink,:root:not(.dark) .ink", v.dark);
 }
 
 /* ---------- the wallpaper picture (kept on this device) ---------- */
@@ -187,7 +181,6 @@ async function store<T>(mode: IDBTransactionMode, run: (s: IDBObjectStore) => ID
  * device keeps a copy in IndexedDB so it isn't downloaded again on every visit. Without an account
  * the picture stays in this browser only.
  */
-const MAX_SIDE = 2400;
 /** The server's limit per file (backend/supabase/setup.sql, bucket "anexos"). */
 const MAX_CLOUD_BYTES = 10 * 1024 * 1024;
 const BUCKET = "anexos";
@@ -204,7 +197,7 @@ async function signedInUser(): Promise<string | null> {
 
 async function upload(blob: Blob, id: string) {
   const user = await signedInUser();
-  if (!user || !supabase) return;
+  if (!user || !supabase) return false;
   if (blob.size > MAX_CLOUD_BYTES) throw new Error("A imagem passa de 10 MB. Escolha uma menor.");
   const { error } = await supabase.storage
     .from(BUCKET)
@@ -214,27 +207,18 @@ async function upload(blob: Blob, id: string) {
       throw new Error("O envio de imagens ainda não foi ativado no servidor. Rode o backend/supabase/setup.sql no Supabase.");
     throw new Error("Não foi possível enviar a imagem para a sua conta. Tente de novo.");
   }
+  return true;
 }
 
-/** Shrinks big photos (phones take 4000px+) so the page stays fast; saves a WebP. Returns the picture's id. */
+/** Keep the source bytes and dimensions: each device fits the original to its own viewport. */
 export async function saveWallpaperImage(file: File): Promise<string> {
-  if (!/^image\/(png|jpe?g|webp|gif|avif|heic|heif)$/i.test(file.type)) throw new Error("Escolha uma imagem (JPG, PNG, WebP…).");
+  if (!/^image\/(png|jpe?g|webp|gif|avif)$/i.test(file.type)) throw new Error("Escolha uma imagem (JPG, PNG, WebP, GIF ou AVIF).");
   if (file.size > 25 * 1024 * 1024) throw new Error("A imagem passa de 25 MB.");
-  let blob: Blob = file;
-  try {
-    const bmp = await createImageBitmap(file);
-    const k = Math.min(1, MAX_SIDE / Math.max(bmp.width, bmp.height));
-    const canvas = document.createElement("canvas");
-    canvas.width = Math.round(bmp.width * k);
-    canvas.height = Math.round(bmp.height * k);
-    canvas.getContext("2d")!.drawImage(bmp, 0, 0, canvas.width, canvas.height);
-    blob = await new Promise<Blob>((ok, no) => canvas.toBlob((b) => (b ? ok(b) : no()), "image/webp", 0.85));
-  } catch {
-    /* the browser can't decode it here (e.g. HEIC on some systems): keep the original */
-  }
   const id = uid();
-  await upload(blob, id);
-  await store("readwrite", (s) => s.put(blob, cacheKey(id))).catch(() => undefined);
+  const uploaded = await upload(file, id);
+  await store("readwrite", (s) => s.put(file, cacheKey(id))).catch(() => {
+    if (!uploaded) throw new Error("Não foi possível salvar a imagem neste aparelho. Libere espaço e tente de novo.");
+  });
   return id;
 }
 
@@ -312,7 +296,7 @@ export async function applyWallpaper(w: Wallpaper | undefined, dark: boolean) {
   const run = ++applying;
   const pick = wallpaperFor(w, dark);
   let value = "";
-  if (pick.kind === "preset") value = WALLPAPERS.find((p) => p.id === pick.preset)?.css ?? "";
+  // Retired wallpaper presets stay inactive; only custom images replace the chosen backdrop.
   if (pick.kind === "image") {
     // The dark-mode picture is only its own image when the dark slot has one.
     const blob = await loadWallpaperImage(pick, dark && w?.dark ? "dark" : "light");
@@ -323,6 +307,8 @@ export async function applyWallpaper(w: Wallpaper | undefined, dark: boolean) {
     value = objectUrl ? `url("${objectUrl}") center / cover no-repeat` : "";
   }
   if (!value) {
+    if (objectUrl) URL.revokeObjectURL(objectUrl);
+    objectUrl = null;
     root.classList.remove("has-wallpaper");
     root.style.removeProperty("--wallpaper");
     root.style.removeProperty("--wallpaper-veil");
@@ -331,7 +317,7 @@ export async function applyWallpaper(w: Wallpaper | undefined, dark: boolean) {
   }
   root.classList.add("has-wallpaper");
   root.style.setProperty("--wallpaper", value);
-  root.style.setProperty("--wallpaper-veil", String(1 - Math.min(0.7, Math.max(0.1, w?.strength ?? 0.35))));
+  root.style.setProperty("--wallpaper-veil", String(1 - Math.min(1, Math.max(0.1, w?.strength ?? 0.85))));
   setShown(true);
 }
 

@@ -8,7 +8,7 @@ import type { Area, CalendarEvent, Color, Group, Item, Note, PropValue, Workspac
 import { template, mkDb, DEFAULT_STATUS } from "./lib/template";
 import { applyStatusChange, childrenOf, runReviews, statusProp, streakOf } from "./lib/model";
 import { DEFAULT_LIST_ICON, addDays, diffDays, fmtDate, parseD, today, uid } from "./lib/util";
-import { dailyBody, uniqueTitle } from "./lib/notes";
+import { dailyBody, folderList, uniqueTitle } from "./lib/notes";
 import { STORAGE_KEY, workspaceStorage } from "./lib/storage";
 import { normalizeWorkspace } from "./lib/migrate";
 import { pushRoute } from "./lib/backClose";
@@ -25,8 +25,9 @@ export interface UI {
   calMonth: Record<string, string>;
   search: Record<string, string>;
   modal: Modal;
-  /** "all" or an area id: filters tasks and events everywhere. */
+  /** "all" or an area id for the active page. */
   area: string;
+  areaByRoute: Record<string, string>;
   /** Open event dialog: an event id, or a new event on a day. */
   eventDialog: { id: string | null; date?: string; start?: string } | null;
   statusDialog: string | null;
@@ -57,6 +58,7 @@ const defaultUi: UI = {
   search: {},
   modal: null,
   area: "all",
+  areaByRoute: {},
   eventDialog: null,
   statusDialog: null,
   calendar: { view: "month", anchor: today(), showTasks: true },
@@ -79,7 +81,14 @@ export const useStore = create<Store>()(
         }),
       setUi: (fn) =>
         set((s) => {
+          const previousRoute = s.ui.route;
+          const previousArea = s.ui.area;
           fn(s.ui);
+          if (s.ui.route !== previousRoute) {
+            s.ui.areaByRoute[previousRoute] = previousArea;
+            s.ui.area = s.ui.areaByRoute[s.ui.route] ?? "all";
+          }
+          s.ui.areaByRoute[s.ui.route] = s.ui.area;
         }),
     })),
     {
@@ -98,13 +107,15 @@ export const useStore = create<Store>()(
             // The side panel (Sumário, Tags, Tarefa ligada) now starts open; saves from before this start with it open once.
             notesSideV: 2,
             dismissedNoteTitles: s.ui.dismissedNoteTitles,
-            area: s.ui.area,
+            areaByRoute: s.ui.areaByRoute,
             calendar: { view: s.ui.calendar.view, showTasks: s.ui.calendar.showTasks },
           },
         }) as unknown as Store,
       merge: (persisted, current) => {
         const p = persisted as Partial<Store> | undefined;
         const ui = { ...current.ui, ...(p?.ui ?? {}) } as UI;
+        ui.areaByRoute = p?.ui?.areaByRoute ?? {};
+        ui.area = ui.areaByRoute[ui.route] ?? "all";
         ui.calendar = { ...current.ui.calendar, ...(p?.ui?.calendar ?? {}), anchor: today() };
         if ((p?.ui as { notesSideV?: number } | undefined)?.notesSideV !== 2) ui.notesSide = true;
         return { ...current, ws: p?.ws ? normalizeWorkspace(p.ws) : current.ws, ui };
@@ -719,6 +730,9 @@ export function deleteArea(id: string) {
   });
   setUi((u) => {
     if (u.area === id) u.area = "all";
+    for (const route of Object.keys(u.areaByRoute)) {
+      if (u.areaByRoute[route] === id) u.areaByRoute[route] = "all";
+    }
   });
 }
 
@@ -918,6 +932,24 @@ export function addFolder(path: string) {
     if (!list.includes(clean)) w.settings.noteFolders = [...list, clean];
   });
 }
+/** Move the entire subtree, refusing cycles and name collisions rather than merging folders. */
+export function moveNoteFolder(from: string, parent: string): boolean {
+  const folders = folderList(ws().notes, ws().settings.noteFolders);
+  if (!folders.includes(from) || (parent && !folders.includes(parent))) return false;
+  if (parent === from || parent.startsWith(from + "/")) return false;
+  const dest = [parent, from.split("/").pop()!].filter(Boolean).join("/");
+  if (dest === from) return false;
+  if (folders.includes(dest)) {
+    toast("Já existe uma pasta com esse nome no destino.");
+    return false;
+  }
+  // Retain the original parent even when it only existed implicitly through this subtree.
+  const oldParent = from.split("/").slice(0, -1).join("/");
+  if (oldParent) addFolder(oldParent);
+  renameFolder(from, dest);
+  return true;
+}
+
 export function renameFolder(from: string, to: string) {
   const dest = cleanPath(to);
   if (!dest || dest === from) return;

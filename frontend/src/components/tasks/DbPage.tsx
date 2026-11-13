@@ -343,7 +343,7 @@ function FilterButton({ dbId, view, onAdd }: { dbId: string; view: View; onAdd: 
       <PopoverContent align="end" className="flex w-80 flex-col gap-4">
         {/* The area filter is shared with Início and the calendar. */}
         <div className="flex flex-col gap-1.5">
-          <span className="text-xs font-medium text-muted-foreground">Área (vale para todo o site)</span>
+          <span className="text-xs font-medium text-muted-foreground">Área</span>
           <AreaSwitcher className="min-w-0" />
         </div>
         <Separator />

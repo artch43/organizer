@@ -178,8 +178,10 @@ export interface Settings {
   boardFolderIcons?: Record<string, string>;
   /** Which version of the quick guide note this workspace has. */
   guideVersion?: number;
-  /** Accent color (hex); missing = the default teal. */
+  /** Accent color (hex); missing or "default" uses the theme's palette. */
   accent?: string;
+  /** Independent dark-theme accent; falls back to the existing accent for older workspaces. */
+  accentDark?: string;
   /** Background behind the pages: one for the light mode and, optionally, another for the dark mode.
    * A photo is uploaded to the account (`image` is its id) so every device shows it. */
   wallpaper?: {

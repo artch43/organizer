@@ -120,7 +120,6 @@ function Shell({
                 >
                   Criar conta grátis
                 </button>
-                <span className="text-sm font-medium text-white/70">Grátis, sem cartão.</span>
               </div>
             )}
           </div>
