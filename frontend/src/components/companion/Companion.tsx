@@ -417,6 +417,7 @@ function useWalk(
     if (!touring || !el) return;
     const at = pos.current;
     let last = performance.now();
+    let drawn = "";
     let frame = requestAnimationFrame(function step(now) {
       frame = requestAnimationFrame(step);
       const g = goal.current;
@@ -429,7 +430,9 @@ function useWalk(
       else if (at.x !== g.dx || at.y !== g.dy) damp(at, g.dx, g.dy, dt);
       const left = Math.hypot(g.dx - at.x, g.dy - at.y);
       if (left < 0.5 && Math.hypot(at.vx, at.vy) < 5) Object.assign(at, { x: g.dx, y: g.dy, vx: 0, vy: 0 });
-      el.style.transform = `translate3d(${at.x.toFixed(2)}px, ${at.y.toFixed(2)}px, 0)`;
+      // Standing still (most of the tour): nothing to write.
+      const transform = `translate3d(${at.x.toFixed(2)}px, ${at.y.toFixed(2)}px, 0)`;
+      if (transform !== drawn) el.style.transform = drawn = transform;
       // A real walk hides the bubble until he stands still; a few pixels with the page don't.
       const nowThere = there.current ? left < WALK : left < 1;
       if (nowThere !== there.current) setArrived((there.current = nowThere));

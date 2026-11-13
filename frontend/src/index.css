@@ -843,17 +843,6 @@ h3 {
     width 300ms cubic-bezier(0.22, 1, 0.36, 1),
     height 300ms cubic-bezier(0.22, 1, 0.36, 1);
 }
-/* Nothing to click right now: no ring, no pulse. */
-.tour-spot-still {
-  animation: none;
-  box-shadow:
-    0 0 0 0 transparent,
-    0 0 0 100vmax rgb(0 0 0 / 0.55);
-}
-.tour-spot-still::before,
-.tour-spot-still::after {
-  display: none;
-}
 /* A window is open on top and dims the page itself. */
 .tour-spot-off {
   opacity: 0;
@@ -902,14 +891,20 @@ h3 {
     inset: -14px;
   }
 }
+/* Nothing to click right now: no ring, no pulse (after the area's rule: this one wins). */
+.tour-spot-still {
+  animation: none;
+  box-shadow:
+    0 0 0 0 transparent,
+    0 0 0 100vmax rgb(0 0 0 / 0.55);
+}
+.tour-spot-still::before,
+.tour-spot-still::after {
+  display: none;
+}
 @keyframes tour-breathe {
   50% {
     transform: scale(1.06);
-  }
-}
-@keyframes tour-fade {
-  from {
-    opacity: 0;
   }
 }
 @media (prefers-reduced-motion: reduce) {

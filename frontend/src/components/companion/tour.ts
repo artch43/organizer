@@ -59,6 +59,7 @@ const reveal = (selector: string, block: ScrollLogicalPosition = "nearest") => {
   // Again a moment later: the page it is on may still be opening.
   for (const wait of [60, 400])
     setTimeout(() => {
+      if (useTour.getState().at === null) return;
       const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
       document.querySelector(selector)?.scrollIntoView({ behavior: reduce ? "auto" : "smooth", block });
     }, wait);
@@ -288,9 +289,12 @@ export const currentBeat = (at: number | null): Beat | null => (at === null ? nu
 let base: unknown;
 /** While a beat sets itself up (`enter` may change the workspace), nothing counts as "done" yet. */
 let entering = false;
+/** Counts the beats begun and the tours ended: a wait started before one of those is no longer for the beat on screen. */
+let turn = 0;
 function begin(at: number) {
   const beat = TOUR_BEATS[at];
   entering = true;
+  turn++;
   useTour.setState({ at, settling: false });
   try {
     beat.enter?.();
@@ -335,8 +339,10 @@ export function advanceTour() {
   if (at === null || settling || at >= TOUR_BEATS.length - 1) return;
   useTour.setState({ settling: true });
   const start = performance.now();
+  const mine = turn;
   const check = () => {
-    if (useTour.getState().at !== at) return;
+    // Skipped or started again meanwhile (even back on this same beat): this wait is over.
+    if (turn !== mine) return;
     const waited = performance.now() - start;
     if (waited < SETTLE_MAX && !calm()) return void setTimeout(check, 32);
     begin(at + 1);
@@ -349,6 +355,7 @@ export function advanceTour() {
 export function endTour(done = false) {
   if (useTour.getState().at === null) return;
   useTour.setState({ at: null, settling: false });
+  turn++;
   demoCard = null;
   try {
     localStorage.setItem(GUIDE_SEEN_KEY, "1");
@@ -360,16 +367,17 @@ export function endTour(done = false) {
 
 // "done" beats: the tour moves on when what they watch changes, or their event comes (a moment later,
 // so the window that did it has closed).
-const finish = (at: number | null) => setTimeout(() => useTour.getState().at === at && advanceTour(), 300);
+const finish = () => {
+  const mine = turn;
+  setTimeout(() => turn === mine && advanceTour(), 300);
+};
 useStore.subscribe(() => {
-  const { at } = useTour.getState();
-  const beat = currentBeat(at);
+  const beat = currentBeat(useTour.getState().at);
   if (entering || !beat || beat.on !== "done" || !beat.watch || beat.watch() === base) return;
   base = beat.watch();
-  finish(at);
+  finish();
 });
 for (const signal of new Set(TOUR_BEATS.flatMap((b) => (b.doneOn ? [b.doneOn] : []))))
   signal.add(() => {
-    const { at } = useTour.getState();
-    if (currentBeat(at)?.doneOn === signal) finish(at);
+    if (currentBeat(useTour.getState().at)?.doneOn === signal) finish();
   });

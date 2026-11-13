@@ -75,6 +75,17 @@ describe("tour do Clebinho", () => {
     expect(at()).toBe(folder + 1);
   });
 
+  it("recomeçar no meio de uma espera não pula a primeira fala", () => {
+    vi.useFakeTimers();
+    startTour();
+    advanceTour();
+    endTour();
+    startTour();
+    vi.advanceTimersByTime(2000);
+    expect(at()).toBe(0);
+    expect(useTour.getState().settling).toBe(false);
+  });
+
   it("avança até a última fala e para nela; pular encerra", () => {
     vi.useFakeTimers();
     startTour();
