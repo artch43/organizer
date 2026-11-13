@@ -97,7 +97,7 @@ export function Board({ page, db, view, list }: { page: Page; db: Database; view
 
   return (
     // Phones: columns stacked full width (no sideways scrolling). Bigger screens: side by side, scrolling sideways if needed.
-    <div className="stagger -mx-4 flex items-start gap-3 overflow-x-auto px-4 pb-6 max-sm:flex-col max-sm:items-stretch max-sm:overflow-visible md:-mx-8 md:px-8">
+    <div data-tour="board" className="stagger -mx-4 flex items-start gap-3 overflow-x-auto px-4 pb-6 max-sm:flex-col max-sm:items-stretch max-sm:overflow-visible md:-mx-8 md:px-8">
       {sp.options!.map((o, ci) => {
         const items = list.filter((i) => i.props[sp.id] === o.id);
         return (

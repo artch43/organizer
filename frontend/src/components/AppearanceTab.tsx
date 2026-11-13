@@ -21,6 +21,7 @@ import { useSync } from "@/lib/sync";
 import { Field, FieldDescription, FieldGroup, FieldLabel, FieldSet, FieldLegend } from "@/components/ui/field";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { Button } from "@/components/ui/button";
+import { startTour } from "./companion/tour";
 
 /** Settings → Aparência: light/dark, accent color and wallpaper. */
 export function AppearanceTab() {
@@ -184,6 +185,9 @@ export function AppearanceTab() {
             Esconder
           </ToggleGroupItem>
         </ToggleGroup>
+        <Button variant="outline" className="self-start" onClick={startTour}>
+          Rever o tour do Clebinho
+        </Button>
       </FieldSet>
 
       <FieldSet>

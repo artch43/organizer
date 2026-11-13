@@ -278,6 +278,7 @@ export function Home() {
           {overdue.length > 0 && (
             <TaskGroup
               title="Atrasadas"
+              tour="home-overdue"
               count={overdue.length}
               tone="warning"
               hint="Ficaram de dias anteriores. Conclua ou remarque."
@@ -291,6 +292,7 @@ export function Home() {
             <>
               <TaskGroup
                 title={isToday ? "Hoje" : "A fazer"}
+                tour={isToday ? "home-today" : undefined}
                 count={open.length}
                 items={open}
                 T={T}
@@ -767,7 +769,10 @@ function TaskGroup({
   hideTitle,
   onReorder,
   onMoveAll,
+  tour,
 }: {
+  /** Marks the group for the first visit's tour (it has the person mark a task done). */
+  tour?: string;
   title: string;
   count: number;
   items: Entry[];
@@ -780,7 +785,7 @@ function TaskGroup({
 }) {
   const id = "grp-" + title.toLowerCase().replace(/\s+/g, "-");
   return (
-    <section aria-labelledby={id} className="flex flex-col gap-2.5">
+    <section aria-labelledby={id} data-tour={tour} className="flex flex-col gap-2.5">
       <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
         <h2
           id={id}

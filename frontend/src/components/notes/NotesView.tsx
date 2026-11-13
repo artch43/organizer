@@ -153,7 +153,7 @@ function NotesHome() {
             <CalendarDays data-icon="inline-start" />
             Nota do dia
           </Button>
-          <Button onClick={() => createNote({ folder: folder ?? "" })}>
+          <Button data-tour="new-note" onClick={() => createNote({ folder: folder ?? "" })}>
             <FilePlus2 data-icon="inline-start" />
             Nova nota
           </Button>
@@ -460,7 +460,7 @@ function NotesPanel() {
           Notas
         </button>
         <IconTip label="Nova nota">
-          <Button variant="ghost" size="icon-sm" aria-label="Nova nota" onClick={() => createNote({ folder: currentFolder })}>
+          <Button variant="ghost" size="icon-sm" aria-label="Nova nota" data-tour="new-note" onClick={() => createNote({ folder: currentFolder })}>
             <FilePlus2 />
           </Button>
         </IconTip>

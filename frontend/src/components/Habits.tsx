@@ -173,6 +173,7 @@ function HabitRow({ h, T, i }: { h: Habit; T: string; i: number }) {
           <Button
             variant={on ? "default" : "outline"}
             aria-pressed={on}
+            data-tour="habit-today"
             size="lg"
             className={cn(
               "h-11 min-w-24 shrink-0 text-base sm:min-w-36",

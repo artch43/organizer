@@ -1,7 +1,7 @@
 import { Suspense, lazy, useEffect, useState } from "react";
 import { ThemeProvider, useTheme } from "next-themes";
 import { MotionConfig } from "motion/react";
-import { SETTINGS_ROUTE, checkReviews, closePeek, openModal, openNotes, scrollToTop, useStore } from "./store";
+import { SETTINGS_ROUTE, checkReviews, closePeek, openModal, scrollToTop, useStore } from "./store";
 import { GUIDE_ID, GUIDE_SEEN_KEY } from "./lib/template";
 import { authLink, clearAuthLink, cloudEnabled, supabase } from "./lib/supabase";
 import { NOTICE_KEY, installLocalTrash, startCloud, useSync } from "./lib/sync";
@@ -16,6 +16,8 @@ import { Toaster } from "@/components/ui/sonner";
 import { AppHeader } from "./components/app/AppHeader";
 import { AppBackdrop } from "./components/app/AppBackdrop";
 import { Companion } from "./components/companion/Companion";
+import { TourOverlay } from "./components/companion/TourOverlay";
+import { startTour } from "./components/companion/tour";
 import { ShortcutsDialog, useKeyboardShortcuts } from "./components/app/Shortcuts";
 import { GlobalNewTask } from "./components/app/CreateButton";
 import { ListsPanel, ListsSheet } from "./components/lists/ListsPanel";
@@ -217,7 +219,7 @@ function Workspace() {
       });
       history.replaceState(history.state, "", "#/" + start);
     };
-    // First time on this device: the guide ("Comece por aqui") opens instead of the start page.
+    // First time on this device: the mascot gives the tour of the pages (the guide note stays in Notas).
     const seen = (() => {
       try {
         return !!localStorage.getItem(GUIDE_SEEN_KEY);
@@ -228,13 +230,9 @@ function Workspace() {
     // Only when arriving at the start (a link straight to a page still opens that page).
     const atStart = !location.hash || location.hash === "#/" || location.hash === "#/" + startPage();
     if (!seen && atStart && useStore.getState().ws.notes[GUIDE_ID]) {
-      try {
-        localStorage.setItem(GUIDE_SEEN_KEY, "1");
-      } catch {
-        /* private mode */
-      }
-      if (!location.hash) history.replaceState(history.state, "", "#/" + startPage());
-      openNotes(GUIDE_ID);
+      // Marked as seen when the tour ends (or is skipped): a reload in the middle doesn't lose it.
+      toStart();
+      startTour();
     } else if (!routeFromHash()) toStart();
     checkReviews();
     const onHash = () => {
@@ -311,6 +309,7 @@ function Workspace() {
       </main>
       <MobileNav />
       <Companion />
+      <TourOverlay />
       <ListsSheet />
       <TrashDrops />
       <TaskSheet />

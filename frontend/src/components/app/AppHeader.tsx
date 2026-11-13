@@ -88,6 +88,7 @@ export function AppHeader() {
               <button
                 type="button"
                 onClick={t.run}
+                data-tour={t.key}
                 aria-current={t.active ? "page" : undefined}
                 title={t.label}
                 className={cn(

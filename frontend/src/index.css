@@ -739,15 +739,21 @@ h3 {
   font-variant-numeric: normal;
 }
 
-/* The little 3D mascot in the corner (src/components/companion/Companion.tsx): small, out of the way. */
+/* The little 3D mascot (src/components/companion/Companion.tsx). On desktop he starts at the bottom
+   left, big enough to see, and can be dragged anywhere (the spot is remembered per device). */
 .companion {
   position: fixed;
-  right: 1rem;
-  bottom: 0.25rem;
+  left: 1.5rem;
+  bottom: 1.5rem;
   z-index: 25;
-  width: 84px;
-  height: 92px;
+  width: 120px;
+  height: 132px;
+  cursor: grab;
+  touch-action: none;
   transition: opacity 250ms ease;
+}
+.companion-dragging {
+  cursor: grabbing;
 }
 
 /* A window, menu or panel is open: he steps back. */
@@ -775,6 +781,151 @@ h3 {
 .companion-dim {
   opacity: 0.25;
   pointer-events: none;
+}
+
+/* ---------- The first-visit tour (src/components/companion/TourOverlay.tsx) ---------- */
+/* He stands above the dimmed page, and his bubble takes clicks even on phones. */
+.companion-tour {
+  /* Above the toasts too (Sonner's own layer): "Lista criada" must not cover "Pular". */
+  z-index: 1000000000;
+  cursor: default;
+  /* He walks to what he talks about: Companion.tsx (useWalk) moves him a frame at a time. */
+  will-change: transform;
+}
+/* His bubble waits while he walks, then pops up beside him. */
+.tour-bubble-away {
+  visibility: hidden;
+}
+.tour-bubble-in {
+  animation: auth-bubble 220ms cubic-bezier(0.34, 1.4, 0.64, 1) both;
+}
+@media (prefers-reduced-motion: reduce) {
+  .tour-bubble-in {
+    animation: none;
+  }
+}
+/* His bubble works even with a window open (which turns the rest of the page off). */
+.companion-tour .tour-bubble {
+  pointer-events: auto;
+}
+@media (max-width: 767px) {
+  .companion-tour .tour-bubble,
+  .companion-tour .tour-bubble * {
+    pointer-events: auto !important;
+  }
+}
+/* The dimmed page, for the whole tour (one layer: it never blinks between beats), with a hole over
+   the thing to click and a ring that keeps pulsing outward. Nothing lit: the hole is a point. */
+.tour-spot {
+  position: fixed;
+  z-index: 55;
+  pointer-events: none;
+  border-radius: 1rem;
+  box-shadow:
+    0 0 0 2px var(--primary),
+    0 0 0 100vmax rgb(0 0 0 / 0.55);
+  animation: tour-breathe 1.4s ease-in-out infinite;
+  transition: opacity 250ms ease;
+}
+@starting-style {
+  .tour-spot {
+    opacity: 0;
+  }
+}
+/* On to the next thing: the hole glides there. */
+.tour-spot-glide {
+  transition:
+    opacity 250ms ease,
+    left 300ms cubic-bezier(0.22, 1, 0.36, 1),
+    top 300ms cubic-bezier(0.22, 1, 0.36, 1),
+    width 300ms cubic-bezier(0.22, 1, 0.36, 1),
+    height 300ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+/* Nothing to click right now: no ring, no pulse. */
+.tour-spot-still {
+  animation: none;
+  box-shadow:
+    0 0 0 0 transparent,
+    0 0 0 100vmax rgb(0 0 0 / 0.55);
+}
+.tour-spot-still::before,
+.tour-spot-still::after {
+  display: none;
+}
+/* A window is open on top and dims the page itself. */
+.tour-spot-off {
+  opacity: 0;
+}
+.tour-spot::before,
+.tour-spot::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  border: 2px solid var(--primary);
+  animation: tour-pulse 1.4s cubic-bezier(0.22, 1, 0.36, 1) infinite;
+}
+.tour-spot::after {
+  animation-delay: 0.7s;
+}
+@keyframes tour-pulse {
+  from {
+    opacity: 0.9;
+    transform: scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: scale(1.35, 1.7);
+  }
+}
+/* A whole area to work in (a board, the month): lit more softly, and the ring grows by a fixed
+   amount instead of in proportion to its size. */
+.tour-spot-area {
+  animation: none;
+  box-shadow:
+    0 0 0 2px var(--primary),
+    0 0 0 100vmax rgb(0 0 0 / 0.4);
+}
+.tour-spot-area::before,
+.tour-spot-area::after {
+  animation-name: tour-pulse-area;
+}
+@keyframes tour-pulse-area {
+  from {
+    opacity: 0.9;
+    inset: 0;
+  }
+  to {
+    opacity: 0;
+    inset: -14px;
+  }
+}
+@keyframes tour-breathe {
+  50% {
+    transform: scale(1.06);
+  }
+}
+@keyframes tour-fade {
+  from {
+    opacity: 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .tour-spot-glide {
+    transition: opacity 250ms ease;
+  }
+  .tour-spot,
+  .tour-spot::before,
+  .tour-spot::after {
+    animation: none;
+  }
+  .tour-spot::before {
+    inset: -5px;
+    opacity: 0.6;
+  }
+  .tour-spot::after {
+    display: none;
+  }
 }
 
 /* ---------- The page background (src/components/app/AppBackdrop.tsx) ---------- */

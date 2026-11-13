@@ -516,6 +516,8 @@ export function setPageFolder(id: string, folder: string, announce = false) {
 }
 
 /* ---------- task-list folders (sidebar) ---------- */
+/** Told each time a folder is made, also with a name that already existed (the first visit's tour waits for it). */
+export const onFolderMade = new Set<() => void>();
 export function addBoardFolder(path: string) {
   const clean = cleanPath(path);
   if (!clean) return;
@@ -523,6 +525,8 @@ export function addBoardFolder(path: string) {
     const list = w.settings.boardFolders ?? [];
     if (!list.includes(clean)) w.settings.boardFolders = [...list, clean];
   });
+  // Even when the folder already existed (then nothing changes in the workspace).
+  for (const f of onFolderMade) f();
   const at = clean.includes("/") ? clean.slice(0, clean.lastIndexOf("/")) : "";
   celebrate(
     `Pasta “${clean.split("/").pop()}” criada`,

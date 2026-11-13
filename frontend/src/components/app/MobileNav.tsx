@@ -21,12 +21,12 @@ export function MobileNav() {
     habits = id("habits");
   const onList = page?.type === "db";
   const items = [
-    { label: "Início", icon: Home, active: page?.type === "home", run: () => home && go(home) },
+    { key: "home", label: "Início", icon: Home, active: page?.type === "home", run: () => home && go(home) },
     // On a list already: opens the folders and lists.
-    { label: "Listas", icon: ListChecks, active: onList, run: () => (onList ? setListsSheet(true) : openLists()) },
-    { label: "Calendário", icon: CalendarDays, active: page?.type === "calendar", run: () => cal && go(cal) },
-    { label: "Hábitos", icon: Sprout, active: page?.type === "habits", run: () => habits && go(habits) },
-    { label: "Notas", icon: NotebookPen, active: route === "notes", run: () => openNotes() },
+    { key: "lists", label: "Listas", icon: ListChecks, active: onList, run: () => (onList ? setListsSheet(true) : openLists()) },
+    { key: "cal", label: "Calendário", icon: CalendarDays, active: page?.type === "calendar", run: () => cal && go(cal) },
+    { key: "habits", label: "Hábitos", icon: Sprout, active: page?.type === "habits", run: () => habits && go(habits) },
+    { key: "notes", label: "Notas", icon: NotebookPen, active: route === "notes", run: () => openNotes() },
   ];
   return (
     <>
@@ -39,6 +39,7 @@ export function MobileNav() {
             key={it.label}
             type="button"
             aria-current={it.active ? "page" : undefined}
+            data-tour={it.key}
             onClick={it.run}
             className={cn(
               "group flex h-(--mobile-nav-h) min-w-0 flex-col items-center justify-center gap-1 text-xs font-medium transition-colors focus-visible:outline-none active:[&>span]:scale-90",

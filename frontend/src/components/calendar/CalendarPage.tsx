@@ -292,6 +292,8 @@ function DayPanel({ day, entries, onPick }: { day: string; entries: Entry[]; onP
                 <button
                   type="button"
                   data-del={e.fixed ? undefined : `${e.kind}:${e.id}`}
+                  // The first visit's tour has the person open a compromisso of the day.
+                  data-tour={e.kind === "event" ? "cal-entry" : undefined}
                   onClick={() => openEntry(e)}
                   style={areaVar(e.area)}
                   className="flex w-full items-start gap-4 rounded-xl border bg-background/40 p-4 text-left transition-colors hover:border-primary-strong/40 hover:bg-muted/50 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
