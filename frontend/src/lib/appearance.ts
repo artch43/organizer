@@ -39,8 +39,8 @@ export const showsWallpaper = (p: WallpaperPick) =>
   p.kind === "image" || (p.kind === "preset" && WALLPAPERS.some((w) => w.id === p.preset));
 
 /** The page background chosen in Settings; nothing chosen (or the retired "still gradient") is the soft gradient. */
-export const backdropMode = (b: string | undefined): "sweep" | "dots" | "animated" | "plain" =>
-  b === "dots" || b === "animated" || b === "plain" ? b : "sweep";
+export const backdropMode = (b: string | undefined): "sweep" | "dots" | "plain" =>
+  b === "dots" || b === "plain" ? b : "sweep";
 
 /** The picture shown in this mode. */
 export function wallpaperFor(w: Wallpaper | undefined, dark: boolean): WallpaperPick {
@@ -125,6 +125,7 @@ export function accentVars(accent: string) {
   const darkStrong = until(hex, "#ffffff", [DARK.bg, DARK.card, darkAccentBg, ...darkTints], 7);
   const vars = (p: string, fg: string, strong: string, accentBg: string) => ({
     "--primary": p,
+    "--backdrop-accent": hex,
     "--primary-foreground": fg,
     "--primary-strong": strong,
     "--selected-primary-strong": strong,
@@ -180,7 +181,6 @@ async function store<T>(mode: IDBTransactionMode, run: (s: IDBObjectStore) => ID
  * device keeps a copy in IndexedDB so it isn't downloaded again on every visit. Without an account
  * the picture stays in this browser only.
  */
-const MAX_SIDE = 2400;
 /** The server's limit per file (backend/supabase/setup.sql, bucket "anexos"). */
 const MAX_CLOUD_BYTES = 10 * 1024 * 1024;
 const BUCKET = "anexos";
@@ -197,7 +197,7 @@ async function signedInUser(): Promise<string | null> {
 
 async function upload(blob: Blob, id: string) {
   const user = await signedInUser();
-  if (!user || !supabase) return;
+  if (!user || !supabase) return false;
   if (blob.size > MAX_CLOUD_BYTES) throw new Error("A imagem passa de 10 MB. Escolha uma menor.");
   const { error } = await supabase.storage
     .from(BUCKET)
@@ -207,27 +207,18 @@ async function upload(blob: Blob, id: string) {
       throw new Error("O envio de imagens ainda não foi ativado no servidor. Rode o backend/supabase/setup.sql no Supabase.");
     throw new Error("Não foi possível enviar a imagem para a sua conta. Tente de novo.");
   }
+  return true;
 }
 
-/** Shrinks big photos (phones take 4000px+) so the page stays fast; saves a WebP. Returns the picture's id. */
+/** Keep the source bytes and dimensions: each device fits the original to its own viewport. */
 export async function saveWallpaperImage(file: File): Promise<string> {
-  if (!/^image\/(png|jpe?g|webp|gif|avif|heic|heif)$/i.test(file.type)) throw new Error("Escolha uma imagem (JPG, PNG, WebP…).");
+  if (!/^image\/(png|jpe?g|webp|gif|avif)$/i.test(file.type)) throw new Error("Escolha uma imagem (JPG, PNG, WebP, GIF ou AVIF).");
   if (file.size > 25 * 1024 * 1024) throw new Error("A imagem passa de 25 MB.");
-  let blob: Blob = file;
-  try {
-    const bmp = await createImageBitmap(file);
-    const k = Math.min(1, MAX_SIDE / Math.max(bmp.width, bmp.height));
-    const canvas = document.createElement("canvas");
-    canvas.width = Math.round(bmp.width * k);
-    canvas.height = Math.round(bmp.height * k);
-    canvas.getContext("2d")!.drawImage(bmp, 0, 0, canvas.width, canvas.height);
-    blob = await new Promise<Blob>((ok, no) => canvas.toBlob((b) => (b ? ok(b) : no()), "image/webp", 0.85));
-  } catch {
-    /* the browser can't decode it here (e.g. HEIC on some systems): keep the original */
-  }
   const id = uid();
-  await upload(blob, id);
-  await store("readwrite", (s) => s.put(blob, cacheKey(id))).catch(() => undefined);
+  const uploaded = await upload(file, id);
+  await store("readwrite", (s) => s.put(file, cacheKey(id))).catch(() => {
+    if (!uploaded) throw new Error("Não foi possível salvar a imagem neste aparelho. Libere espaço e tente de novo.");
+  });
   return id;
 }
 
@@ -305,7 +296,7 @@ export async function applyWallpaper(w: Wallpaper | undefined, dark: boolean) {
   const run = ++applying;
   const pick = wallpaperFor(w, dark);
   let value = "";
-  if (pick.kind === "preset") value = WALLPAPERS.find((p) => p.id === pick.preset)?.css ?? "";
+  // Retired wallpaper presets stay inactive; only custom images replace the chosen backdrop.
   if (pick.kind === "image") {
     // The dark-mode picture is only its own image when the dark slot has one.
     const blob = await loadWallpaperImage(pick, dark && w?.dark ? "dark" : "light");
@@ -316,6 +307,8 @@ export async function applyWallpaper(w: Wallpaper | undefined, dark: boolean) {
     value = objectUrl ? `url("${objectUrl}") center / cover no-repeat` : "";
   }
   if (!value) {
+    if (objectUrl) URL.revokeObjectURL(objectUrl);
+    objectUrl = null;
     root.classList.remove("has-wallpaper");
     root.style.removeProperty("--wallpaper");
     root.style.removeProperty("--wallpaper-veil");
@@ -324,7 +317,7 @@ export async function applyWallpaper(w: Wallpaper | undefined, dark: boolean) {
   }
   root.classList.add("has-wallpaper");
   root.style.setProperty("--wallpaper", value);
-  root.style.setProperty("--wallpaper-veil", String(1 - Math.min(0.7, Math.max(0.1, w?.strength ?? 0.35))));
+  root.style.setProperty("--wallpaper-veil", String(1 - Math.min(1, Math.max(0.1, w?.strength ?? 0.85))));
   setShown(true);
 }
 

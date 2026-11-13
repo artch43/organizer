@@ -6,23 +6,21 @@ import type { Settings } from "@/lib/types";
 import {
   ACCENTS,
   DEFAULT_ACCENT,
-  WALLPAPERS,
-  applyWallpaper,
   backdropMode,
   isHex,
-  type WallpaperPick,
-  type WallpaperSlot,
-  removeWallpaperImage,
+  wallpaperFor,
   saveWallpaperImage,
+  removeWallpaperImage,
+  type WallpaperPick,
 } from "@/lib/appearance";
 import { useTheme } from "next-themes";
 import { useStore } from "@/store";
 import { useSync } from "@/lib/sync";
+import { Button } from "@/components/ui/button";
 import { Field, FieldDescription, FieldGroup, FieldLabel, FieldSet, FieldLegend } from "@/components/ui/field";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
-import { Button } from "@/components/ui/button";
 
-/** Settings → Aparência: light/dark, accent color and wallpaper. */
+/** Settings → Aparência: theme, accent, backdrop and a custom image for each theme. */
 export function AppearanceTab() {
   const st = useStore((s) => s.ws.settings);
   const mut = useStore((s) => s.mut);
@@ -30,16 +28,59 @@ export function AppearanceTab() {
     mut((w) => {
       w.settings[k] = v;
     });
-  const wp: NonNullable<Settings["wallpaper"]> = st.wallpaper ?? { kind: "none" };
-  const strength = wp.strength ?? 0.35;
-  const file = useRef<HTMLInputElement>(null);
-  const [busy, setBusy] = useState(false);
   const { resolvedTheme } = useTheme();
   const isDark = resolvedTheme === "dark";
   // Edit the active theme; automatic mode follows the system theme.
-  const slot: WallpaperSlot = (st.theme === "system" ? isDark : st.theme === "dark") ? "dark" : "light";
+  const slot: "light" | "dark" = (st.theme === "system" ? isDark : st.theme === "dark") ? "dark" : "light";
   const accent = (slot === "dark" ? st.accentDark ?? st.accent ?? "default" : st.accent ?? "default").toLowerCase();
   const defaultColor = slot === "dark" ? DEFAULT_ACCENT : "#ff5fa2";
+  const fileInput = useRef<HTMLInputElement>(null);
+  const [busy, setBusy] = useState(false);
+  const signedIn = useSync((s) => !!s.user);
+  const pick = wallpaperFor(st.wallpaper, slot === "dark");
+  const strength = st.wallpaper?.strength ?? 0.85;
+  const chooseWallpaper = (nextPick: WallpaperPick, newStrength?: number) => {
+    const previous = wallpaperFor(useStore.getState().ws.settings.wallpaper, slot === "dark");
+    mut((w) => {
+      const current = w.settings.wallpaper ?? { kind: "none" as const };
+      const light = { kind: current.kind, preset: current.preset, image: current.image };
+      w.settings.wallpaper = slot === "light"
+        ? { ...current, kind: nextPick.kind, preset: nextPick.preset, image: nextPick.image, dark: current.dark ?? light }
+        : { ...current, dark: nextPick };
+      if (newStrength !== undefined) w.settings.wallpaper.strength = newStrength;
+    });
+    // A picture shared by both themes must survive changing just one of them.
+    const next = useStore.getState().ws.settings.wallpaper;
+    const other = wallpaperFor(next, slot !== "dark");
+    if (previous.kind === "image" && !(other.kind === "image" && other.image === previous.image)) {
+      void removeWallpaperImage(previous, slot);
+    }
+  };
+  const uploadImage = async (file: File) => {
+    setBusy(true);
+    let preview: string | undefined;
+    try {
+      const limit = signedIn ? 10 : 25;
+      if (file.size > limit * 1024 * 1024) throw new Error(`A imagem passa de ${limit} MB. Escolha uma menor.`);
+      // Check that this device can display the source before replacing the current background.
+      preview = URL.createObjectURL(file);
+      const image = new Image();
+      image.src = preview;
+      await image.decode().catch(() => {
+        throw new Error("Não foi possível abrir essa imagem. Escolha um JPG, PNG, WebP, GIF ou AVIF válido.");
+      });
+      const id = await saveWallpaperImage(file);
+      chooseWallpaper({ kind: "image", image: id }, strength);
+      toast.success(`Imagem de fundo do modo ${slot === "dark" ? "escuro" : "claro"} aplicada`, {
+        description: signedIn ? "O arquivo original também fica disponível nos seus outros aparelhos." : "O arquivo original foi salvo neste aparelho.",
+      });
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Não foi possível usar essa imagem.");
+    } finally {
+      if (preview) URL.revokeObjectURL(preview);
+      setBusy(false);
+    }
+  };
   const chooseAccent = (color: string) => mut((w) => {
     if (slot === "dark") w.settings.accentDark = color;
     else {
@@ -47,40 +88,6 @@ export function AppearanceTab() {
       w.settings.accent = color;
     }
   });
-  const lightPick: WallpaperPick = { kind: wp.kind, preset: wp.preset, image: wp.image };
-  const pick: WallpaperPick = slot === "light" ? lightPick : (wp.dark ?? lightPick);
-  const nextWith = (p: WallpaperPick): NonNullable<Settings["wallpaper"]> =>
-    slot === "light"
-      ? { ...wp, kind: p.kind, preset: p.preset, image: p.image, dark: wp.dark ?? (lightPick.kind === "image" ? { kind: "none" } : lightPick) }
-      : { ...wp, dark: p };
-  const choose = (p: WallpaperPick) => {
-    const next = nextWith(p);
-    const other = slot === "light" ? next.dark : lightPick;
-    if (pick.kind === "image" && !(other?.kind === "image" && other.image === pick.image)) {
-      void removeWallpaperImage(pick, slot);
-    }
-    set("wallpaper", next);
-  };
-  const anyShown = wp.kind !== "none" || (!!wp.dark && wp.dark.kind !== "none");
-  const signedIn = useSync((s) => !!s.user);
-
-  const upload = async (f: File) => {
-    setBusy(true);
-    try {
-      const image = await saveWallpaperImage(f);
-      const next = nextWith({ kind: "image", image });
-      choose({ kind: "image", image });
-      // Show it now (without waiting for the next render).
-      await applyWallpaper(next, isDark);
-      toast.success(slot === "dark" ? "Papel de parede do modo escuro aplicado" : "Papel de parede do modo claro aplicado", {
-        description: signedIn ? "Aparece também nos seus outros aparelhos." : "Entre na sua conta para levar a imagem aos outros aparelhos.",
-      });
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Não foi possível usar essa imagem.");
-    }
-    setBusy(false);
-  };
-
   return (
     <FieldGroup>
       <Field>
@@ -159,15 +166,20 @@ export function AppearanceTab() {
       <FieldSet>
         <FieldLegend variant="label">Fundo</FieldLegend>
         <FieldDescription>
-          O que fica atrás das páginas. Um papel de parede, se escolhido, fica no lugar dele.
+          Escolha entre o degradê na cor de destaque, o pontilhado e o fundo liso do tema.
         </FieldDescription>
         <ToggleGroup
           type="single"
           variant="outline"
           className="flex-wrap"
           aria-label="Fundo"
-          value={backdropMode(st.backdrop)}
-          onValueChange={(v) => v && set("backdrop", v === "sweep" ? undefined : (v as Settings["backdrop"]))}
+          value={pick.kind === "image" ? "" : backdropMode(st.backdrop)}
+          disabled={busy}
+          onValueChange={(v) => {
+            if (!v) return;
+            set("backdrop", v === "sweep" ? undefined : (v as Settings["backdrop"]));
+            if (pick.kind !== "none") chooseWallpaper({ kind: "none" });
+          }}
         >
           <ToggleGroupItem value="sweep" className="px-3">
             Degradê suave
@@ -179,6 +191,64 @@ export function AppearanceTab() {
             Liso
           </ToggleGroupItem>
         </ToggleGroup>
+      </FieldSet>
+
+      <FieldSet>
+        <FieldLegend variant="label">Imagem personalizada</FieldLegend>
+        <FieldDescription>
+          Escolha uma imagem para o modo {slot === "dark" ? "escuro" : "claro"}. Ela preenche a tela sem esticar,
+          preservando o arquivo original. Algumas bordas podem ser recortadas para caber.
+        </FieldDescription>
+        <div className="flex flex-wrap items-center gap-2">
+          <Button type="button" variant="outline" disabled={busy} onClick={() => fileInput.current?.click()}>
+            <ImagePlus data-icon="inline-start" />
+            {busy ? "Preparando imagem…" : pick.kind === "image" ? "Trocar imagem" : "Escolher imagem"}
+          </Button>
+          {pick.kind === "image" && (
+            <Button type="button" variant="ghost" disabled={busy} onClick={() => chooseWallpaper({ kind: "none" })}>
+              <Trash2 data-icon="inline-start" />
+              Remover imagem
+            </Button>
+          )}
+        </div>
+        <input
+          ref={fileInput}
+          type="file"
+          accept="image/jpeg,image/png,image/webp,image/gif,image/avif"
+          aria-label="Escolher imagem de fundo personalizada"
+          hidden
+          onChange={(event) => {
+            const file = event.target.files?.[0];
+            event.target.value = "";
+            if (file) void uploadImage(file);
+          }}
+        />
+        <FieldDescription>
+          JPG, PNG, WebP, GIF ou AVIF. Até {signedIn ? "10" : "25"} MB.
+          {signedIn ? " Sincronizada com seus outros aparelhos." : " Salva neste aparelho."}
+        </FieldDescription>
+        {busy && <p role="status" className="text-sm text-muted-foreground">Salvando a imagem original…</p>}
+        {pick.kind === "image" && (
+          <Field>
+            <FieldLabel htmlFor="wallpaper-strength">
+              Intensidade da imagem <span className="font-normal text-muted-foreground tabular-nums">{Math.round(strength * 100)}%</span>
+            </FieldLabel>
+            <input
+              id="wallpaper-strength"
+              type="range"
+              min={10}
+              max={100}
+              step={5}
+              value={Math.round(strength * 100)}
+              disabled={busy}
+              onChange={(event) => mut((w) => {
+                if (w.settings.wallpaper) w.settings.wallpaper.strength = Number(event.target.value) / 100;
+              })}
+              className="w-full accent-(--primary)"
+            />
+            <FieldDescription>Diminua a intensidade se precisar de mais contraste para ler.</FieldDescription>
+          </Field>
+        )}
       </FieldSet>
 
       <FieldSet>
@@ -200,130 +270,6 @@ export function AppearanceTab() {
         </ToggleGroup>
       </FieldSet>
 
-      <FieldSet>
-        <FieldLegend variant="label">Papel de parede</FieldLegend>
-        <FieldDescription>
-          Aparece atrás das páginas. Escolha um para o modo claro e outro para o escuro, se quiser.
-        </FieldDescription>
-        <div
-          className="grid grid-cols-3 gap-2 sm:grid-cols-4"
-          role="radiogroup"
-          aria-label={slot === "dark" ? "Papel de parede do modo escuro" : "Papel de parede do modo claro"}
-        >
-          <WallpaperChoice label="Padrão" selected={pick?.kind === "none"} onClick={() => choose({ kind: "none" })}>
-            <span className="absolute inset-0 bg-background" />
-          </WallpaperChoice>
-          {WALLPAPERS.map((w) => (
-            <WallpaperChoice
-              key={w.id}
-              label={w.name}
-              selected={pick?.kind === "preset" && pick.preset === w.id}
-              onClick={() => choose({ kind: "preset", preset: w.id })}
-            >
-              <span className="absolute inset-0 bg-background" />
-              <span className="absolute inset-0" style={{ background: w.css }} />
-            </WallpaperChoice>
-          ))}
-          <WallpaperChoice label="Sua imagem" selected={pick?.kind === "image"} onClick={() => file.current?.click()}>
-            <span className="absolute inset-0 flex items-center justify-center bg-muted text-muted-foreground">
-              <ImagePlus className="size-6" aria-hidden="true" />
-            </span>
-          </WallpaperChoice>
-        </div>
-        <input
-          ref={file}
-          type="file"
-          accept="image/*"
-          hidden
-          onChange={(e) => {
-            const f = e.target.files?.[0];
-            e.target.value = "";
-            if (f) void upload(f);
-          }}
-        />
-        {busy && <p className="text-sm text-muted-foreground">Preparando a imagem…</p>}
-        {pick?.kind === "image" && (
-          <div className="flex flex-wrap items-center gap-2">
-            <Button type="button" variant="outline" size="sm" onClick={() => file.current?.click()}>
-              <ImagePlus data-icon="inline-start" />
-              Trocar imagem
-            </Button>
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              className="text-destructive"
-              onClick={async () => {
-                choose({ kind: "none" });
-              }}
-            >
-              <Trash2 data-icon="inline-start" />
-              Remover imagem
-            </Button>
-            <span className="text-sm text-muted-foreground">
-              {signedIn ? "Salva na sua conta." : "Fica só neste aparelho."}
-            </span>
-          </div>
-        )}
-        {anyShown && (
-          <Field>
-            <FieldLabel htmlFor="wp-strength">
-              Intensidade <span className="font-normal text-muted-foreground tabular-nums">{Math.round(strength * 100)}%</span>
-            </FieldLabel>
-            <input
-              id="wp-strength"
-              type="range"
-              min={10}
-              max={70}
-              step={5}
-              value={Math.round(strength * 100)}
-              onChange={(e) => set("wallpaper", { ...wp, strength: Number(e.target.value) / 100 })}
-              className="w-full accent-(--primary)"
-            />
-            <FieldDescription>Mais baixo deixa o texto mais fácil de ler.</FieldDescription>
-          </Field>
-        )}
-      </FieldSet>
     </FieldGroup>
-  );
-}
-
-function WallpaperChoice({
-  label,
-  selected,
-  onClick,
-  children,
-}: {
-  label: string;
-  selected: boolean;
-  onClick: () => void;
-  children: React.ReactNode;
-}) {
-  return (
-    <button
-      type="button"
-      role="radio"
-      aria-checked={selected}
-      onClick={onClick}
-      className={cn(
-        "group flex flex-col gap-1 rounded-xl text-left text-sm focus-visible:outline-none",
-        selected ? "font-semibold text-foreground" : "text-muted-foreground",
-      )}
-    >
-      <span
-        className={cn(
-          "relative block aspect-[4/3] w-full overflow-hidden rounded-xl border transition-shadow group-focus-visible:ring-2 group-focus-visible:ring-ring",
-          selected && "ring-2 ring-primary-strong ring-offset-2 ring-offset-background",
-        )}
-      >
-        {children}
-        {selected && (
-          <span className="absolute top-1.5 right-1.5 flex size-5 items-center justify-center rounded-full bg-primary text-primary-foreground">
-            <Check className="size-3.5" aria-hidden="true" />
-          </span>
-        )}
-      </span>
-      {label}
-    </button>
   );
 }
