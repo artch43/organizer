@@ -52,6 +52,7 @@ import {
   openNotes,
   openPeek,
   renameFolder,
+  moveNoteFolder,
   renameNote,
   toast,
   updateNote,
@@ -297,6 +298,7 @@ function NotesPanel() {
       return next;
     });
   const [drag, setDrag] = useState<string | null>(null);
+  const [dragFolder, setDragFolder] = useState<string | null>(null);
   const [over, setOver] = useState<string | null>(null);
   const [folderDialog, setFolderDialog] = useState<{ mode: "new" | "rename"; path: string } | null>(null);
   const fileInput = useRef<HTMLInputElement>(null);
@@ -320,23 +322,34 @@ function NotesPanel() {
           .sort(byTitle)
       : null;
 
-  // Drop on a folder to move a note; the list background is the root.
+  // Folder rows accept notes and whole subtrees; the list background is the root.
   const dropProps = (folder: string) => ({
     onDragOver: (e: React.DragEvent) => {
-      if (!drag) return;
+      if (!drag && !dragFolder) return;
+      if (dragFolder && (folder === dragFolder || folder.startsWith(dragFolder + "/"))) {
+        e.stopPropagation();
+        e.dataTransfer.dropEffect = "none";
+        return;
+      }
       e.preventDefault();
       e.stopPropagation();
+      e.dataTransfer.dropEffect = "move";
       if (over !== folder) setOver(folder);
     },
     onDragLeave: () => setOver((o) => (o === folder ? null : o)),
     onDrop: (e: React.DragEvent) => {
       e.preventDefault();
       e.stopPropagation();
+      if (dragFolder && moveNoteFolder(dragFolder, folder)) {
+        setClosed((c) => ({ ...c, [folder]: false }));
+        toast(`Pasta movida para ${folder || "Notas (raiz)"}`);
+      }
       if (drag && notes[drag] && notes[drag].folder !== folder) {
         updateNote(drag, { folder });
         toast(`Movida para ${folder || "Notas (sem pasta)"}`);
       }
       setDrag(null);
+      setDragFolder(null);
       setOver(null);
     },
   });
@@ -395,11 +408,22 @@ function NotesPanel() {
         return (
           <div key={"f:" + f}>
             <div
-              className={cn("group flex items-center rounded-xl hover:bg-muted/60", over === f && "ring-2 ring-primary")}
+              className={cn("group flex items-center rounded-xl hover:bg-muted/60", over === f && "ring-2 ring-primary", dragFolder === f && "opacity-50")}
               style={{ paddingLeft: 2 + depth * 14 }}
               {...dropProps(f)}
             >
               <button
+                draggable
+                onDragStart={(e) => {
+                  e.stopPropagation();
+                  e.dataTransfer.effectAllowed = "move";
+                  e.dataTransfer.setData("application/x-organizer-note-folder", f);
+                  setDragFolder(f);
+                }}
+                onDragEnd={() => {
+                  setDragFolder(null);
+                  setOver(null);
+                }}
                 className="flex min-w-0 flex-1 rounded-lg focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none items-center gap-1.5 py-3 text-left text-base font-medium"
                 onClick={() => setClosed((c) => ({ ...c, [f]: open }))}
                 aria-expanded={open}
@@ -543,14 +567,14 @@ function NotesPanel() {
           <p className="px-2 text-sm text-muted-foreground">Nenhuma nota ainda. Crie a primeira no botão acima.</p>
         )}
         {/* While a note from a folder is dragged: where to drop it to take it out. */}
-        {drag && notes[drag]?.folder && (
+        {(dragFolder || (drag && notes[drag]?.folder)) && (
           <div
             className={cn(
               "mt-2 rounded-lg border-2 border-dashed px-3 py-3 text-center text-sm text-muted-foreground",
               over === "" ? "border-primary bg-primary/10 text-primary-strong" : "border-border",
             )}
           >
-            Solte aqui para tirar da pasta
+            Solte aqui para mover para a raiz
           </div>
         )}
         {/* Tags live in the panel beside an open note; with none open, here. */}
