@@ -1,5 +1,5 @@
 import type { AlertChannel, Workspace } from "./types";
-import { alertLabel, eventsByDay, inArea, startOf } from "./events";
+import { eventsByDay, inArea, startOf } from "./events";
 import { groupOf } from "./model";
 import { addDays, fmtDate, ymd } from "./util";
 
@@ -84,7 +84,3 @@ export function untilLabel(at: number, now: number) {
   }
   return fmtDate(dayOfMs(at)).toLowerCase();
 }
-
-/** "30 min antes das 17:00" / "na hora". */
-export const beforeLabel = (a: Pick<Alarm, "minutes" | "start">) =>
-  a.minutes === 0 ? "na hora" : `${alertLabel(a.minutes)} das ${a.start}`;

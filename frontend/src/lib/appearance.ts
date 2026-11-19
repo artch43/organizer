@@ -34,10 +34,6 @@ export type Wallpaper = WallpaperPick & {
 };
 export type WallpaperSlot = "light" | "dark";
 
-/** Whether this picture shows anything (a preset that no longer exists shows nothing). */
-export const showsWallpaper = (p: WallpaperPick) =>
-  p.kind === "image" || (p.kind === "preset" && WALLPAPERS.some((w) => w.id === p.preset));
-
 /** The page background chosen in Settings; nothing chosen (or the retired "still gradient") is the soft gradient. */
 export const backdropMode = (b: string | undefined): "sweep" | "dots" | "plain" =>
   b === "dots" || b === "plain" ? b : "sweep";
@@ -250,30 +246,6 @@ export async function removeWallpaperImage(pick: WallpaperPick | null | undefine
       .from(BUCKET)
       .remove([cloudPath(user, pick.image)])
       .catch(() => undefined);
-}
-
-/**
- * A picture chosen before pictures were uploaded lives only on the device that chose it. Once the
- * person is signed in there, it's uploaded and given an id; returns the wallpaper to save, or null.
- */
-export async function uploadLegacyWallpaper(w: Wallpaper | undefined): Promise<Wallpaper | null> {
-  if (!w || !(await signedInUser())) return null;
-  let next: Wallpaper = w;
-  for (const slot of ["light", "dark"] as const) {
-    const pick = slot === "light" ? w : w.dark;
-    if (pick?.kind !== "image" || pick.image) continue;
-    const blob = await store<Blob | undefined>("readonly", (s) => s.get(legacyKey(slot))).catch(() => undefined);
-    if (!blob) continue;
-    const id = uid();
-    try {
-      await upload(blob, id);
-    } catch {
-      continue;
-    }
-    await store("readwrite", (s) => s.put(blob, cacheKey(id))).catch(() => undefined);
-    next = slot === "light" ? { ...next, image: id } : { ...next, dark: { ...next.dark!, image: id } };
-  }
-  return next === w ? null : next;
 }
 
 /**
