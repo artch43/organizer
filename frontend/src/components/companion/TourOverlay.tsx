@@ -40,13 +40,11 @@ function union(boxes: Box[]): Box | null {
   };
 }
 /** Tells the mascot what to stay clear of; only when it moved (this runs every frame). */
-function publish(rect: Box | null, area: boolean) {
+function publish(rect: Box | null, area: boolean, popups: Box | null = null) {
   const old = useTourSpot.getState();
-  const same =
-    old.area === area &&
-    (old.rect === rect ||
-      (!!old.rect && !!rect && (["x", "y", "w", "h"] as const).every((k) => Math.abs(old.rect![k] - rect[k]) < 0.5)));
-  if (!same) useTourSpot.setState({ rect, area });
+  const near = (a: Box | null, b: Box | null) =>
+    a === b || (!!a && !!b && (["x", "y", "w", "h"] as const).every((k) => Math.abs(a[k] - b[k]) < 0.5));
+  if (old.area !== area || !near(old.rect, rect) || !near(old.popups, popups)) useTourSpot.setState({ rect, area, popups });
 }
 
 /**
@@ -90,7 +88,12 @@ export function TourOverlay() {
       // walking back to his corner and out again.
       const clear = beat.keepClear ? findTarget(beat.keepClear) : null;
       if (el || !lit)
-        publish(union([...(el ? [boxOf(el)] : []), ...(el && clear ? [boxOf(clear)] : []), ...open]), !!el && !!beat.area);
+        publish(
+          union([...(el ? [boxOf(el)] : []), ...(el && clear ? [boxOf(clear)] : []), ...open]),
+          !!el && !!beat.area,
+          // Over a whole area he doesn't keep clear of it, but still of the menus opened in it.
+          union(open),
+        );
       if (lit && !el) {
         // Out of sight: bring it back (a closed panel), or move on when it isn't there at all.
         const now = performance.now();

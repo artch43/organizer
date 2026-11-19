@@ -48,6 +48,8 @@ export interface Beat {
 }
 
 const tab = (key: string) => `[data-tour="${key}"]`;
+/** The phone's bottom bar: next to one of its tabs he stands above it, not on the tabs beside. */
+const BOTTOM_BAR = 'nav[aria-label="Navegação principal"]';
 const ws = () => useStore.getState().ws;
 const phone = () => typeof matchMedia !== "undefined" && matchMedia("(max-width: 767px)").matches;
 /** The folders and lists: beside the list on a computer, in a sheet on a phone. */
@@ -220,6 +222,7 @@ export const TOUR_BEATS: Beat[] = [
     target: 'button[aria-label="Próximo dia"]',
     optional: true,
     text: "As setas mostram os outros dias. Clique na seta e veja o resumo de **amanhã**.",
+    touchText: "As setas mostram os outros dias. Toque na seta e veja o resumo de **amanhã**.",
   },
   {
     page: 0,
@@ -227,7 +230,7 @@ export const TOUR_BEATS: Beat[] = [
     look: 'button[aria-label^="Escolher data"]',
     text: "Viu? O **Hoje** virou **Amanhã**: cada dia tem o seu resumo.",
   },
-  { page: 0, on: "click", target: tab("lists"), text: "Agora, vamos para as **Listas**!" },
+  { page: 0, on: "click", target: tab("lists"), keepClear: BOTTOM_BAR, text: "Agora, vamos para as **Listas**!" },
 
   // ---- Listas
   {
@@ -279,6 +282,7 @@ export const TOUR_BEATS: Beat[] = [
     page: 1,
     on: "click",
     target: tab("cal"),
+    keepClear: BOTTOM_BAR,
     text: "Isso! Abrindo uma tarefa você põe data, prioridade e **alarme**. Ele chega do jeito que você escolher: na hora que quiser, por **e-mail** ou **WhatsApp**.",
   },
 
@@ -290,11 +294,14 @@ export const TOUR_BEATS: Beat[] = [
     enter: showEventDay,
     optional: true,
     text: "O **Calendário** junta as tarefas com data e os seus eventos numa visão só. Escolhi um dia que tem um **compromisso**: clique nele para abrir.",
+    touchText:
+      "O **Calendário** junta as tarefas com data e os seus eventos numa visão só. Escolhi um dia que tem um **compromisso**: toque nele para abrir.",
   },
   {
     page: 2,
     on: "click",
     target: tab("habits"),
+    keepClear: BOTTOM_BAR,
     text: "Aqui você muda o compromisso, e ele também tem **alarme**: é você quem decide quando e por onde ele chega. Para marcar outro, clique duas vezes num dia. Feche a janela e vamos aos **Hábitos**.",
     touchText:
       "Aqui você muda o compromisso, e ele também tem **alarme**: é você quem decide quando e por onde ele chega. Para marcar outro, toque no **+**. Feche a janela e vamos aos **Hábitos**.",
@@ -312,6 +319,7 @@ export const TOUR_BEATS: Beat[] = [
     page: 3,
     on: "click",
     target: tab("notes"),
+    keepClear: BOTTOM_BAR,
     text: "A sequência conta os dias seguidos, e o histórico mostra o mês inteiro.",
   },
 
@@ -345,7 +353,11 @@ export const useTour = create<{
  * What he is talking about, on screen (the lit element and the menus it opened, or a window open on
  * top): he goes next to it without covering it. `area` = a whole area to work in (he stays home).
  */
-export const useTourSpot = create<{ rect: Rect | null; area: boolean }>(() => ({ rect: null, area: false }));
+export const useTourSpot = create<{ rect: Rect | null; area: boolean; popups: Rect | null }>(() => ({
+  rect: null,
+  area: false,
+  popups: null,
+}));
 
 export const currentBeat = (at: number | null): Beat | null => (at === null ? null : (TOUR_BEATS[at] ?? null));
 

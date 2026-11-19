@@ -585,7 +585,8 @@ function NotesPanel() {
           </div>
         )}
       </nav>
-      <div className="flex flex-wrap gap-1 border-t p-2">
+      {/* On phones the mascot stands at the bottom left: the buttons start after him. */}
+      <div className="flex flex-wrap gap-1 border-t p-2 max-md:pl-16">
         <Button variant="ghost" size="sm" disabled={!list.length} onClick={() => exportNotesZip(notes)}>
           <Download data-icon="inline-start" />
           Exportar .zip

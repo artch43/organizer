@@ -14,7 +14,7 @@ import { X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toast, useStore } from "@/store";
 import { Mascot } from "../brand/Brand";
-import { firstAppearance } from "./reactions";
+import { firstAppearance, reactCompanion } from "./reactions";
 import { TOUR_BEATS, TOUR_PAGES, advanceTour, endTour, useTour, useTourSpot } from "./tour";
 import { place, type Placement } from "./placement";
 
@@ -63,12 +63,18 @@ function savePos(p: Pos) {
   }
 }
 
+/** The phone's bottom bar, when it is on screen: he isn't left on top of its tabs. */
+function bottomBarTop() {
+  const nav = document.querySelector('nav[aria-label="Navegação principal"]');
+  return nav?.getClientRects().length ? nav.getBoundingClientRect().top : innerHeight;
+}
+
 function clampPos(p: Pos, el: HTMLElement | null): Pos {
   const w = el?.offsetWidth ?? 120,
     h = el?.offsetHeight ?? 132;
   return {
     x: Math.max(0, Math.min(innerWidth - w, p.x)),
-    y: Math.max(0, Math.min(innerHeight - h, p.y)),
+    y: Math.max(0, Math.min(Math.min(innerHeight, bottomBarTop()) - h, p.y)),
   };
 }
 
@@ -95,7 +101,8 @@ class Quiet extends Component<{ fallback: ReactNode; children: ReactNode }, { fa
  * The little 3D mascot in the corner (on phones, just above the bottom bar): quiet company. He breathes, blinks and
  * looks toward the pointer; waves when it comes near; hops when a task is done and cheers when the day
  * is cleared; does a rare stretch, look-around or yawn; dozes off after a while without activity.
- * He speaks only when clicked. Fades back while a window or panel is open. Can be hidden.
+ * He speaks only when clicked (tapped). Can be dragged anywhere, on phones too. Fades back while a window
+ * or panel is open. Can be hidden.
  */
 export function Companion() {
   const tour = useTour((s) => s.at);
@@ -111,10 +118,12 @@ export function Companion() {
   const [line, setLine] = useState<string | null>(null);
   const lineTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
   useEffect(() => () => clearTimeout(lineTimer.current), []);
-  const desktop = useMedia("(min-width: 768px)");
   const [pos, setPos] = useState<Pos | null>(loadPos);
   // A drag ends with a click on him: that one is not a poke.
   const swallowClick = useRef(false);
+  // When he last spoke, and whether the last press on him was a finger.
+  const spoke = useRef(0);
+  const touch = useRef(false);
   const bubble = useRef<HTMLDivElement>(null);
   // In the tour he can be dragged too: he stays where he is put until the next thing he talks about.
   const [held, setHeld] = useState<{ at: number; x: number; y: number } | null>(null);
@@ -122,14 +131,13 @@ export function Companion() {
   const spot = useTourPlacement(tour, anchor, bubble, held && held.at === tour ? held : null);
   const arrived = useWalk(anchor, spot, reduced, dragging);
 
-  // Keep him inside the window when it shrinks.
+  // Keep him inside the window when it shrinks (or a phone turns), and off the bottom bar.
   useEffect(() => {
-    if (!desktop) return;
     const fit = () => setPos((p) => (p ? clampPos(p, anchor.current) : p));
     fit();
     addEventListener("resize", fit);
     return () => removeEventListener("resize", fit);
-  }, [desktop, enabled]);
+  }, [enabled]);
 
   useEffect(() => {
     const el = anchor.current;
@@ -148,7 +156,8 @@ export function Companion() {
   if (!enabled) return null;
 
   const startDrag = (e: ReactPointerEvent<HTMLDivElement>) => {
-    if (!desktop || e.button !== 0 || (e.target as Element).closest("[data-no-drag]")) return;
+    touch.current = e.pointerType === "touch";
+    if (e.button !== 0 || (e.target as Element).closest("[data-no-drag]")) return;
     const el = anchor.current;
     if (!el) return;
     swallowClick.current = false;
@@ -158,11 +167,13 @@ export function Companion() {
     const sx = e.clientX,
       sy = e.clientY;
     let moved = false;
+    // A finger wobbles a little on a tap: that is still a tap (he talks), not a drag.
+    const slop = e.pointerType === "touch" ? 10 : 4;
     const move = (ev: PointerEvent) => {
       const dx = ev.clientX - sx,
         dy = ev.clientY - sy;
       if (!moved) {
-        if (Math.hypot(dx, dy) < 4) return;
+        if (Math.hypot(dx, dy) < slop) return;
         moved = true;
         el.classList.add("companion-dragging");
         document.body.style.cursor = "grabbing";
@@ -197,9 +208,10 @@ export function Companion() {
   };
 
   // The speech bubble opens toward the middle of the window.
-  const onLeft = !desktop || (pos ? pos.x + 60 < innerWidth / 2 : true);
+  const onLeft = pos ? pos.x + (anchor.current?.offsetWidth ?? 120) / 2 < innerWidth / 2 : true;
 
   const say = () => {
+    spoke.current = performance.now();
     setLine((cur) => {
       const options = LINES.filter((l) => l !== cur);
       return options[Math.floor(Math.random() * options.length)];
@@ -223,15 +235,12 @@ export function Companion() {
     <div
       ref={anchor}
       onPointerDown={startDrag}
-      title={desktop ? "Arraste para mudar o Clebinho de lugar" : undefined}
+      title="Arraste para mudar o Clebinho de lugar"
       // In the tour he starts at the bottom left (not where he was dropped) and walks to what he talks
       // about (useWalk moves him); the tour lets him be dragged (`data-tour-ui`).
       data-tour-ui={tour !== null ? "" : undefined}
-      style={tour === null && desktop && pos ? { left: pos.x, top: pos.y, right: "auto", bottom: "auto" } : undefined}
-      className={cn(
-        "companion group/companion select-none",
-        tour !== null ? "companion-tour" : busy && "companion-dim",
-      )}
+      style={tour === null && pos ? { left: pos.x, top: pos.y, right: "auto", bottom: "auto" } : undefined}
+      className={cn("companion group/companion select-none", tour !== null ? "companion-tour" : busy && "companion-dim")}
     >
       {tour !== null && <TourBubble at={tour} ref={bubble} place={spot?.bubble ?? null} away={!arrived || settling} />}
       {line && tour === null && (
@@ -246,19 +255,34 @@ export function Companion() {
           {line}
         </p>
       )}
+      {/* Shown on hover; on a touch screen (no hover), while he talks after a tap. */}
       {tour === null && (
-      <button
-        type="button"
-        data-no-drag
-        onClick={hide}
-        aria-label="Esconder o Clebinho"
-        title="Esconder o Clebinho"
-        className="touch-hit absolute -top-1 -left-1 cursor-pointer z-10 flex size-6 max-md:hidden items-center justify-center rounded-full bg-card text-muted-foreground opacity-0 shadow-card ring-1 ring-border transition-opacity group-hover/companion:opacity-100 pointer-coarse:opacity-40 hover:text-foreground focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
-      >
-        <X className="size-3.5" />
-      </button>
+        <button
+          type="button"
+          data-no-drag
+          onClick={hide}
+          aria-label="Esconder o Clebinho"
+          title="Esconder o Clebinho"
+          className={cn(
+            "absolute -top-1 -left-1 cursor-pointer pointer-coarse:after:absolute pointer-coarse:after:-inset-2 z-10 flex size-6 items-center justify-center rounded-full bg-card text-muted-foreground opacity-0 shadow-card ring-1 ring-border transition-opacity group-hover/companion:opacity-100 hover:text-foreground focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none",
+            // Unseen, a tap on his corner must not hide him by accident.
+            line ? "opacity-100" : "pointer-coarse:pointer-events-none",
+          )}
+        >
+          <X className="size-3.5" />
+        </button>
       )}
-      <div className="size-full" aria-hidden="true">
+      <div
+        className="size-full"
+        aria-hidden="true"
+        // A finger is bigger than he is on a phone: a tap anywhere on his box counts, not only on his
+        // cubes (the 3D scene answers those itself, just before this).
+        onClick={() => {
+          if (!touch.current || !webgl || performance.now() - spoke.current < 300) return;
+          reactCompanion("hop");
+          say();
+        }}
+      >
         {webgl ? (
           <Quiet fallback={flat}>
             <Suspense fallback={flat}>
@@ -283,6 +307,19 @@ function rich(text: string) {
 type Spot = { dx: number; dy: number; bubble: Placement["bubble"] };
 
 /**
+ * The part of the window he and his bubble can use: without the scrollbar and, on a phone, without
+ * what the keyboard covers (the bubble's buttons must not end up under it).
+ */
+function visibleArea() {
+  const w = document.documentElement.clientWidth;
+  const h = document.documentElement.clientHeight;
+  const vv = window.visualViewport;
+  // Zoomed in, the visible part is no guide to the keyboard: the whole window then.
+  if (!vv || vv.scale > 1.01) return { w, h };
+  return { w, h: Math.max(200, Math.min(h, Math.round(vv.offsetTop + vv.height))) };
+}
+
+/**
  * During the tour: where he stands (as an offset from his corner) and where his bubble opens, so that
  * neither covers what he talks about. Nothing to point at, or a whole area: he stays in his corner.
  * `held`: where the person dragged him (only his bubble moves then).
@@ -293,7 +330,7 @@ function useTourPlacement(
   bubble: RefObject<HTMLDivElement | null>,
   held: Pos | null,
 ): Spot | null {
-  const { rect, area } = useTourSpot();
+  const { rect, area, popups } = useTourSpot();
   const [spot, setSpot] = useState<Spot | null>(null);
   // The window's size and the bubble's (each line has its own length) change where he fits.
   const [tick, setTick] = useState(0);
@@ -302,10 +339,16 @@ function useTourPlacement(
     if (!touring) return;
     const bump = () => setTick((t) => t + 1);
     addEventListener("resize", bump);
+    // A phone's keyboard opening or closing changes only the visible part of the page.
+    const vv = window.visualViewport;
+    vv?.addEventListener("resize", bump);
+    vv?.addEventListener("scroll", bump);
     const ro = typeof ResizeObserver !== "undefined" ? new ResizeObserver(bump) : null;
     if (bubble.current) ro?.observe(bubble.current);
     return () => {
       removeEventListener("resize", bump);
+      vv?.removeEventListener("resize", bump);
+      vv?.removeEventListener("scroll", bump);
       ro?.disconnect();
     };
   }, [touring, bubble]);
@@ -318,12 +361,12 @@ function useTourPlacement(
     const corner = { x: me.offsetLeft, y: me.offsetTop, w: me.offsetWidth, h: me.offsetHeight };
     const p = place({
       home: held ? { ...corner, ...held } : corner,
-      stay: !!held || !!TOUR_BEATS[tour]?.corner,
-      avoid: area ? null : rect,
+      // Over a board he stays put; only a menu opened in it (move a card) is kept clear.
+      stay: !!held || !!TOUR_BEATS[tour]?.corner || area,
+      avoid: area ? popups : rect,
       // A quiet beat has no bubble (it is not displayed: 0 × 0).
       bubble: { w: b?.offsetWidth ?? 0, h: b?.offsetHeight ?? 0 },
-      // Without the scrollbar.
-      view: { w: document.documentElement.clientWidth, h: document.documentElement.clientHeight },
+      view: visibleArea(),
       // Over a board the bubble goes beside him, low, out of its way.
       prefer: area ? ["right", "above"] : undefined,
     });
@@ -338,7 +381,7 @@ function useTourPlacement(
         ? old
         : next,
     );
-  }, [touring, tour, rect, area, tick, anchor, bubble, held]);
+  }, [touring, tour, rect, area, popups, tick, anchor, bubble, held]);
   return touring ? spot : null;
 }
 
@@ -392,12 +435,7 @@ const WALK = 40;
  * of starting over. Writes the transform directly (no re-render per frame). Returns whether he is
  * there: his bubble waits until then, instead of flying across the page with him.
  */
-function useWalk(
-  anchor: RefObject<HTMLDivElement | null>,
-  spot: Spot | null,
-  reduced: boolean,
-  dragging: RefObject<boolean>,
-) {
+function useWalk(anchor: RefObject<HTMLDivElement | null>, spot: Spot | null, reduced: boolean, dragging: RefObject<boolean>) {
   const [arrived, setArrived] = useState(true);
   const goal = useRef<Spot | null>(null);
   // Where he is (from his corner), and whether he counts as there.
@@ -499,7 +537,11 @@ function TourBubble({
               key={i}
               className={cn(
                 "h-1.5 rounded-full transition-[width,background-color] duration-200 ease-out",
-                i === beat.page ? "w-4 bg-primary-strong" : i < beat.page ? "w-1.5 bg-primary-strong/60" : "w-1.5 bg-muted-foreground/30",
+                i === beat.page
+                  ? "w-4 bg-primary-strong"
+                  : i < beat.page
+                    ? "w-1.5 bg-primary-strong/60"
+                    : "w-1.5 bg-muted-foreground/30",
               )}
             />
           ))}

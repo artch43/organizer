@@ -56,4 +56,48 @@ describe("onde o Clebinho fica no tour", () => {
     expect(hits(b, tab)).toBe(false);
     expect(inside(b, phone)).toBe(true);
   });
+
+  it("no celular, com uma janela quase da altura da tela, o balão nunca sai da tela", () => {
+    const phone = { w: 390, h: 844 };
+    const small: Rect = { x: 4, y: 714, w: 52, h: 58 };
+    const wide = { w: 320, h: 120 };
+    const dialog: Rect = { x: 16, y: 180, w: 358, h: 485 };
+    for (const stay of [false, true]) {
+      const p = place({ home: small, avoid: dialog, bubble: wide, view: phone, stay });
+      const b = { x: p.x + p.bubble.x, y: p.y + p.bubble.y, ...wide };
+      expect(inside(b, phone)).toBe(true);
+      expect(hits(b, dialog)).toBe(false);
+    }
+  });
+
+  it("no celular, com o teclado aberto, ele e o balão ficam acima do teclado", () => {
+    const visible = { w: 390, h: 450 };
+    const small: Rect = { x: 4, y: 714, w: 52, h: 58 };
+    const wide = { w: 320, h: 140 };
+    for (const avoid of [null, { x: 240, y: 80, w: 44, h: 44 }]) {
+      for (const stay of [false, true]) {
+        const p = place({ home: small, avoid, bubble: wide, view: visible, stay });
+        const m = { x: p.x, y: p.y, w: small.w, h: small.h };
+        const b = { x: p.x + p.bubble.x, y: p.y + p.bubble.y, ...wide };
+        expect(inside(m, visible)).toBe(true);
+        expect(inside(b, visible)).toBe(true);
+      }
+    }
+  });
+
+  it("no celular, com uma janela do tamanho da tela, fica embaixo (o título e o X da janela ficam à vista)", () => {
+    const phone = { w: 390, h: 844 };
+    const small: Rect = { x: 4, y: 714, w: 52, h: 58 };
+    const wide = { w: 320, h: 183 };
+    const dialog: Rect = { x: 16, y: 42, w: 358, h: 760 };
+    const close: Rect = { x: 330, y: 50, w: 32, h: 32 };
+    for (const stay of [false, true]) {
+      const p = place({ home: small, avoid: dialog, bubble: wide, view: phone, stay });
+      const m = { x: p.x, y: p.y, w: small.w, h: small.h };
+      const b = { x: p.x + p.bubble.x, y: p.y + p.bubble.y, ...wide };
+      expect(inside(b, phone)).toBe(true);
+      expect(hits(b, close) || hits(m, close)).toBe(false);
+      expect(b.y).toBeGreaterThan(phone.h / 2);
+    }
+  });
 });

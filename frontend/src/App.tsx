@@ -91,7 +91,11 @@ export default function App() {
       <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
         <TooltipProvider>
           {cloudEnabled ? <CloudGate /> : <Workspace />}
-          <Toaster position="bottom-center" />
+          {/* On phones, above the bottom bar (and the mascot's tour) instead of over its tabs. */}
+          <Toaster
+            position="bottom-center"
+            mobileOffset={{ bottom: "calc(var(--mobile-nav-h) + env(safe-area-inset-bottom) + 0.5rem)" }}
+          />
         </TooltipProvider>
       </ThemeProvider>
     </MotionConfig>

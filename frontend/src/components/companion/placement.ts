@@ -21,6 +21,12 @@ const overlap = (a: Rect, b: Rect) =>
 const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v));
 const fits = (r: Rect, view: { w: number; h: number }) =>
   r.x >= MARGIN - 0.5 && r.y >= MARGIN - 0.5 && r.x + r.w <= view.w - MARGIN + 0.5 && r.y + r.h <= view.h - MARGIN + 0.5;
+/** The same rectangle, moved back inside the window (as far as its size allows). */
+const inView = <R extends Rect>(r: R, view: { w: number; h: number }): R => ({
+  ...r,
+  x: clamp(r.x, MARGIN, Math.max(MARGIN, view.w - MARGIN - r.w)),
+  y: clamp(r.y, MARGIN, Math.max(MARGIN, view.h - MARGIN - r.h)),
+});
 const pad = (r: Rect, p: number): Rect => ({ x: r.x - p, y: r.y - p, w: r.w + 2 * p, h: r.h + 2 * p });
 /** From a point to the nearest point of a rectangle. */
 const distTo = (px: number, py: number, r: Rect) =>
@@ -70,8 +76,17 @@ export function place({
   });
 
   if (!avoid) {
+    // His corner can be under a phone's keyboard: then just above it.
+    home = { ...home, y: Math.min(home.y, Math.max(MARGIN, view.h - MARGIN - home.h)) };
     const list = bubbles(home, bubble, view, prefer);
-    return at(home, list.find((b) => fits(b, view)) ?? list[0]);
+    const ok = list.find((b) => fits(b, view));
+    if (ok) return at(home, ok);
+    // Nowhere it fits beside him (a small phone): on screen anyway, as little over him as can be.
+    const kept = list.map((b) => inView(b, view));
+    return at(
+      home,
+      kept.reduce((best, b) => (overlap(b, home) < overlap(best, home) ? b : best)),
+    );
   }
 
   const { w, h } = home;
@@ -85,24 +100,43 @@ export function place({
     below: [cx, r.x, r.x + r.w - w].map((x) => [x, r.y + r.h + g]),
     above: [cx, r.x, r.x + r.w - w].map((x) => [x, r.y - g - h]),
   };
-  const spots: [number, number][] = stay
-    ? [[home.x, home.y]]
-    : (["right", "left", "below", "above"] as const).flatMap((side) => sides[side]);
+  const around = (["right", "left", "below", "above"] as const).flatMap((side) => sides[side]);
   const keep = pad(r, 6);
-  let best: { p: Placement; score: number } | null = null;
+  const huge = r.w * r.h > (view.w * view.h) / 2;
   let order = 0;
-  for (const [sx, sy] of spots) {
-    const m = { x: clamp(sx, MARGIN, view.w - MARGIN - w), y: clamp(sy, MARGIN, view.h - MARGIN - h), w, h };
-    const covering = overlap(m, keep);
-    for (const b of bubbles(m, bubble, view, prefer)) {
-      order++;
-      const outside = fits(b, view) ? 0 : 1;
-      // Covering the thing is the worst; then a bubble off the screen; then being far from it.
-      const covered = overlap(b, keep) + covering;
-      const score =
-        (covered ? 1e7 + covered : 0) + outside * 1e5 + (stay ? 0 : distTo(m.x + w / 2, m.y + h / 2, r)) + order * 0.01;
-      if (!best || score < best.score) best = { p: at(m, b), score };
+  const tryFrom = (spots: [number, number][], stay: boolean) => {
+    let best: { p: Placement; score: number } | null = null;
+    for (const [sx, sy] of spots) {
+      const m = { x: clamp(sx, MARGIN, view.w - MARGIN - w), y: clamp(sy, MARGIN, view.h - MARGIN - h), w, h };
+      const covering = overlap(m, keep);
+      for (const natural of bubbles(m, bubble, view, prefer)) {
+        order++;
+        // A bubble is never left off the screen (its buttons, "Pular" too, must stay reachable): one that
+        // doesn't fit is pushed back in, and is then judged by what it covers there.
+        const outside = fits(natural, view) ? 0 : 1;
+        const b = outside ? inView(natural, view) : natural;
+        // Covering the thing is the worst; then the bubble over him; then a bubble pushed in; then being far.
+        const covered = overlap(b, keep) + covering;
+        const overHim = overlap(b, m);
+        // When there's no way around it (a window as big as a phone's screen), as low as can be: a
+        // window's title and its close button are at its top.
+        const low = covered && huge ? (view.h - Math.min(b.y, m.y)) * 50 : 0;
+        const score =
+          (covered ? 1e7 + covered + low : 0) +
+          (overHim ? 1e5 + overHim : 0) +
+          outside * 1e3 +
+          (stay ? 0 : distTo(m.x + w / 2, m.y + h / 2, r)) +
+          order * 0.01;
+        if (!best || score < best.score) best = { p: at(m, b), score };
+      }
     }
-  }
-  return best!.p;
+    return best!;
+  };
+  if (!stay) return tryFrom(around, false).p;
+  const here = tryFrom([[home.x, home.y]], true);
+  // From where he stands, his bubble can only cover the thing or him (a window open over most of a
+  // phone's screen): he does move, if somewhere else it covers nothing.
+  if (here.score < 1e5) return here.p;
+  const moved = tryFrom(around, false);
+  return moved.score < 1e7 ? moved.p : here.p;
 }
