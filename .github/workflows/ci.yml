@@ -1,4 +1,5 @@
-# Checks every pull request (and every push to main): lint, types, tests and the build.
+# Checks every pull request (and every push to main): the frontend (lint, types, tests, build) and the
+# backend (setup.sql in sync, Edge Functions type-check and lint, database tests).
 name: Checagens
 
 on:
@@ -24,3 +25,33 @@ jobs:
       - run: npm run typecheck
       - run: npm test
       - run: npm run build
+
+  backend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend/supabase
+    # A plain Postgres for the database tests (tests/supabase-stub.sql adds what Supabase would have).
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: test
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd pg_isready --health-interval 2s --health-timeout 5s --health-retries 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+      - name: setup.sql em dia com as migrations
+        run: bash build-setup.sh --check
+      - name: Edge Functions (tipos e lint)
+        run: |
+          deno check functions/send-reminders/index.ts functions/delete-account/index.ts
+          deno lint functions
+      - name: Testes do banco (cota, limites, RLS, permissões)
+        run: bash tests/run-db-tests.sh
+        env:
+          DATABASE_URL: postgres://postgres:test@localhost:5432/postgres
