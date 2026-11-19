@@ -8,3 +8,8 @@ dist
 
 # Supabase CLI (link local)
 backend/supabase/.temp/
+
+# Arquivos gerados por ferramentas (não fazem parte do projeto)
+*.tsbuildinfo
+.impeccable/
+PRODUCT.md
