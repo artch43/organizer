@@ -17,6 +17,7 @@ import { Logo, Mascot } from "./brand/Brand";
 import { isNativeApp, SITE_URL } from "@/lib/native";
 import { passwordProblem } from "@/lib/password";
 import { PasswordRules } from "./PasswordRules";
+import { Captcha, TURNSTILE_SITE_KEY } from "./Captcha";
 import { Stage } from "./auth3d/Stage";
 import { blurMood, celebrate, focusMood, setMood, useAuthMood } from "./auth3d/mood";
 
@@ -32,6 +33,7 @@ function msgOf(e: { message?: string; name?: string } | null) {
   if (!e) return "";
   const m = e.message ?? "";
   if (ERRORS[m]) return ERRORS[m];
+  if (/captcha/i.test(m)) return "A verificação de segurança falhou ou expirou. Confirme de novo e tente outra vez.";
   if (/fetch|network/i.test(m) || e.name === "AuthRetryableFetchError")
     return "Não foi possível conectar ao servidor. Verifique sua internet.";
   // The e-mail service refused to send (address not allowed or too many e-mails in the last hour).
@@ -202,6 +204,9 @@ export function Auth({ error: outer, startMode }: { error?: string; startMode?: 
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(outer ?? "");
   const [info, setInfo] = useState("");
+  // Turnstile's token (one use each): a new check after every attempt.
+  const [captcha, setCaptcha] = useState<string | null>(null);
+  const [captchaReset, setCaptchaReset] = useState(0);
   const switchTo = (m: Mode) => {
     setMode(m);
     setError("");
@@ -231,10 +236,15 @@ export function Auth({ error: outer, startMode }: { error?: string; startMode?: 
     setInfo("");
     // In the phone apps the page lives inside the app, which an e-mail link can't open: use the site.
     const redirect = isNativeApp ? SITE_URL + "/" : location.origin + location.pathname;
+    if (mode === "signin" && waitLeft() > 0) return setBusy(false);
+    if (TURNSTILE_SITE_KEY && !captcha) {
+      setError("Aguarde a verificação de segurança logo acima do botão e tente de novo.");
+      return setBusy(false);
+    }
+    const captchaToken = captcha ?? undefined;
     if (mode === "signin") {
-      if (waitLeft() > 0) return setBusy(false);
       // Signed in: the mascot cheers (the app opens right after his little jump).
-      const { error } = await supabase.auth.signInWithPassword({ email, password }).then((r) => {
+      const { error } = await supabase.auth.signInWithPassword({ email, password, options: { captchaToken } }).then((r) => {
         if (!r.error) celebrate();
         return r;
       });
@@ -254,14 +264,20 @@ export function Auth({ error: outer, startMode }: { error?: string; startMode?: 
         setError(weak);
         return setBusy(false);
       }
-      const { data, error } = await supabase.auth.signUp({ email, password, options: { emailRedirectTo: redirect } });
+      const { data, error } = await supabase.auth.signUp({
+        email,
+        password,
+        options: { emailRedirectTo: redirect, captchaToken },
+      });
       if (error) setError(msgOf(error));
       else if (data.session) celebrate();
-      else
-        setInfo(`Enviamos um link de confirmação para ${email}. Abra o e-mail e clique nele para ativar a conta.`);
+      else setInfo(`Enviamos um link de confirmação para ${email}. Abra o e-mail e clique nele para ativar a conta.`);
     } else {
       // ?tipo=recuperar tells the app, when the link opens, to ask for the new password.
-      const { error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo: redirect + "?tipo=recuperar" });
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: redirect + "?tipo=recuperar",
+        captchaToken,
+      });
       if (error) setError(msgOf(error));
       else {
         setResendAt(Date.now() + 60_000);
@@ -270,6 +286,7 @@ export function Auth({ error: outer, startMode }: { error?: string; startMode?: 
         );
       }
     }
+    setCaptchaReset((n) => n + 1);
     setBusy(false);
   };
 
@@ -363,6 +380,7 @@ export function Auth({ error: outer, startMode }: { error?: string; startMode?: 
               />
             </Field>
           )}
+          <Captcha onToken={setCaptcha} resetKey={captchaReset} />
           {!error && mode === "signin" && locked > 0 && (
             <Alert variant="destructive" role="alert">
               <AlertDescription>

@@ -49,6 +49,7 @@ import { AppearanceTab } from "./AppearanceTab";
 import { PasswordInput } from "./Auth";
 import { passwordProblem } from "@/lib/password";
 import { PasswordRules } from "./PasswordRules";
+import { Captcha, TURNSTILE_SITE_KEY } from "./Captcha";
 
 type Tab = "conta" | "aparencia" | "areas" | "alertas" | "dados";
 const TABS: { id: Tab; label: string; icon: typeof UserRound }[] = [
@@ -497,6 +498,9 @@ function ChangePassword({ email }: { email: string }) {
   const [again, setAgain] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  // Confirming the current password is a sign-in, so it needs the same anti-bot check.
+  const [captcha, setCaptcha] = useState<string | null>(null);
+  const [captchaReset, setCaptchaReset] = useState(0);
   const reset = () => {
     setCurrent("");
     setNext("");
@@ -510,15 +514,23 @@ function ChangePassword({ email }: { email: string }) {
     if (weak) return setError(weak);
     if (next !== again) return setError("As duas senhas novas não são iguais.");
     if (next === current) return setError("A nova senha precisa ser diferente da atual.");
+    if (TURNSTILE_SITE_KEY && !captcha) return setError("Aguarde a verificação de segurança e tente de novo.");
     setBusy(true);
     // Confirms it's really you: the current password must be right.
-    const check = await supabase!.auth.signInWithPassword({ email, password: current });
+    const check = await supabase!.auth.signInWithPassword({
+      email,
+      password: current,
+      options: { captchaToken: captcha ?? undefined },
+    });
+    setCaptchaReset((n) => n + 1);
     if (check.error) {
       setBusy(false);
       return setError(
         check.error.message === "Invalid login credentials"
           ? "A senha atual está incorreta."
-          : "Não foi possível confirmar sua senha agora. Tente de novo em instantes.",
+          : /captcha/i.test(check.error.message)
+            ? "A verificação de segurança falhou ou expirou. Confirme de novo e tente outra vez."
+            : "Não foi possível confirmar sua senha agora. Tente de novo em instantes.",
       );
     }
     const { error: upd } = await supabase!.auth.updateUser({ password: next });
@@ -593,6 +605,7 @@ function ChangePassword({ email }: { email: string }) {
           onChange={(e) => setAgain(e.target.value)}
         />
       </Field>
+      <Captcha onToken={setCaptcha} resetKey={captchaReset} />
       {error && (
         <Alert variant="destructive" role="alert">
           <AlertDescription>{error}</AlertDescription>
