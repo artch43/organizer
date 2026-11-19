@@ -35,7 +35,7 @@ Supabase (pegue com quem já tem acesso ao projeto, nunca pelo Git).
    `feat: calendário no histórico dos hábitos`, `fix: botão voltar no celular`, `docs: …`.
 4. **Antes de abrir o PR**, rode da raiz:
    ```bash
-   npm run lint && npm test && npm run build
+   npm run lint && npm run typecheck && npm test && npm run build
    ```
 5. **Abra um Pull Request** para a `main` e preencha o modelo. As checagens rodam sozinhas no GitHub.
 6. **O outro revisa.** Depois de aprovado e com as checagens verdes, faça o merge (de preferência *Squash and merge*).
@@ -44,9 +44,15 @@ Supabase (pegue com quem já tem acesso ao projeto, nunca pelo Git).
 ## Banco de dados
 
 - Toda mudança no banco vira uma **nova migration** em `backend/supabase/migrations/` (próximo número, por
-  exemplo `008_...sql`), e o mesmo SQL é acrescentado ao `setup.sql`. Nunca edite uma migration que já rodou.
-- Comandos do Supabase rodam **dentro de `backend/`**: `cd backend && npx supabase ...`.
-- A função dos alarmes é publicada com `npx supabase functions deploy send-reminders --no-verify-jwt`.
+  exemplo `013_...sql`, dentro de `begin; … commit;`). Nunca edite uma migration que já rodou.
+- Depois, regere o `setup.sql` com `bash backend/supabase/build-setup.sh` (o CI confere se ele está em dia).
+- Os testes do banco rodam com `bash backend/supabase/tests/run-db-tests.sh` (precisa do Docker): eles aplicam
+  o `setup.sql` num Postgres que imita o Supabase e conferem cota, limites, RLS e permissões. Toda regra nova
+  ganha uma verificação em `tests/db.test.sql`.
+- Função nova em `public` nasce **sem** permissão para `anon`/`authenticated` (migration 009): se ela precisar ser
+  chamada pelo app, conceda o `grant execute` de propósito.
+- Comandos do Supabase rodam **dentro de `backend/`**: `cd backend && npx supabase ...`. O `config.toml` já diz
+  quais funções verificam o login, então o deploy é só `npx supabase functions deploy <nome>`.
 
 ## Segredos
 

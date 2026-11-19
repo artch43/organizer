@@ -31,7 +31,8 @@ Sem o arquivo `frontend/.env.local`, o app roda **sem login**, com os dados no n
 
 1. Crie uma conta gratuita em [supabase.com](https://supabase.com) e um projeto novo.
 2. Em **SQL Editor → New query**, cole o conteúdo de `backend/supabase/setup.sql` e clique em **Run**.
-   Ele cria tudo de uma vez (equivale às migrações `001` a `008` de `backend/supabase/migrations/`, que também podem ser rodadas em ordem):
+   Ele cria tudo de uma vez (equivale às migrações `001` a `012` de `backend/supabase/migrations/`, que também podem ser rodadas em ordem)
+   e pode ser rodado de novo sem problema:
    tabelas `records` e `reminders`, regras de acesso, limites, o armazenamento privado `anexos` para imagens e PDF
    e a limpeza diária (lixeira com mais de 30 dias e alarmes antigos). A limpeza usa o `pg_cron`: se o SQL reclamar,
    ative-o em **Database → Extensions** e rode de novo.
@@ -44,12 +45,10 @@ Sem o arquivo `frontend/.env.local`, o app roda **sem login**, com os dados no n
 **Recomendações para abrir o site a outras pessoas:**
 
 - **E-mails de cadastro e de senha:** o envio padrão do Supabase só chega a membros do projeto e tem limite baixo.
-  Configure um SMTP em **Authentication → Emails → SMTP Settings** (por exemplo, Gmail: host `smtp.gmail.com`,
-  porta `465`, usuário e **senha de app**).
+  Configure um SMTP próprio: veja [E-mails de cadastro e de nova senha](#e-mails-de-cadastro-e-de-nova-senha-brevo).
 - **Link de nova senha que funciona em qualquer aparelho** (opcional): em **Authentication → Emails → Templates → Reset Password**,
   use o link `{{ .SiteURL }}/?token_hash={{ .TokenHash }}&type=recovery`. O app já reconhece esse formato.
-- **Tentativas de login:** além do limite no app, ajuste **Authentication → Rate Limits** (por exemplo, 10 entradas a cada 5 minutos).
-- **Privacidade:** preencha o contato em `frontend/public/privacidade.html`.
+- **Proteção contra abuso:** antes de divulgar o site, siga [Antes de divulgar](#antes-de-divulgar-proteção-contra-abuso).
 
 > A chave `anon` é pública por definição (as regras de acesso protegem os dados). Nunca coloque a
 > `service_role` ou outras chaves secretas no site ou no repositório; o `.env.local` já está no `.gitignore`.
@@ -82,7 +81,9 @@ Os alarmes são enviados pela função `backend/supabase/functions/send-reminder
 
 - **Gmail** (grátis, sem domínio; até ~500 e-mails por dia): crie um Gmail só para o app, ative a
   verificação em duas etapas e gere uma **senha de app** em myaccount.google.com/apppasswords.
-- **Resend** (precisa de um domínio verificado para enviar a outras pessoas): crie uma API key em resend.com.
+- **Resend** (grátis até 100 e-mails por dia): crie uma API key em resend.com. **Sem um domínio verificado, o Resend
+  só entrega para o e-mail do dono da conta**: os alarmes das outras pessoas são recusados (a função desiste
+  desses e segue com os demais).
 - Outro SMTP (como o Brevo) também funciona: use `SMTP_HOST`, `SMTP_PORT` (465) e `SMTP_FROM`.
 
 ### 2. Publique a função
@@ -99,13 +100,13 @@ npx supabase secrets set SMTP_USER=seu.app@gmail.com SMTP_PASS=<senha de app> CR
 # ou Resend:
 npx supabase secrets set RESEND_API_KEY=re_xxx REMINDER_FROM="Organizer <alertas@seudominio.com>" CRON_SECRET=<uma-senha-longa> APP_URL=https://seu-site.vercel.app
 
-npx supabase functions deploy send-reminders --no-verify-jwt
+npx supabase functions deploy send-reminders
 npx supabase functions deploy delete-account
 ```
 
-A `delete-account` é a que apaga a conta quando a pessoa usa **Configurações → Dados → Apagar todos os meus dados**.
-Ela é publicada **com** a verificação de login (sem `--no-verify-jwt`). Sem ela, os dados são apagados, mas o e-mail
-continua cadastrado no Supabase.
+O `backend/supabase/config.toml` diz a verificação de login de cada uma: a `send-reminders` é chamada pelo
+agendamento com o `CRON_SECRET` (sem login); a `delete-account`, que apaga a conta quando a pessoa usa
+**Configurações → Dados → Apagar todos os meus dados**, só aceita a sessão da própria pessoa.
 
 Uma senha longa para o `CRON_SECRET` pode ser gerada com `openssl rand -hex 32`. Se Gmail e Resend
 estiverem configurados, vale o Gmail.
@@ -130,13 +131,43 @@ Enquanto o WhatsApp não estiver configurado, os avisos marcados como WhatsApp c
 
 Depois, publique a função de novo.
 
-### Limites (por pessoa, a cada 24 h)
+### Limites (a cada 24 h)
 
-| Segredo                  | Padrão               |
-| ------------------------ | -------------------- |
-| `DAILY_EMAIL_LIMIT`      | 50 e-mails           |
-| `DAILY_WHATSAPP_LIMIT`   | 20 mensagens         |
-| `DAILY_WHATSAPP_NUMBERS` | 1 número             |
+| Segredo                    | Padrão                         |
+| -------------------------- | ------------------------------ |
+| `DAILY_EMAIL_LIMIT`        | 20 e-mails por pessoa          |
+| `DAILY_WHATSAPP_LIMIT`     | 20 mensagens por pessoa        |
+| `DAILY_WHATSAPP_NUMBERS`   | 1 número por pessoa            |
+| `GLOBAL_DAILY_EMAIL_LIMIT` | 80 e-mails somando todo mundo  |
+
+O limite global fica abaixo do limite do serviço de e-mail (Resend grátis: 100 por dia; Gmail: ~500). Ao chegar
+nele, os alarmes ficam esperando e saem quando houver espaço; um alarme com mais de 6 horas de atraso não é mais enviado.
+
+---
+
+## Antes de divulgar: proteção contra abuso
+
+A chave `anon` é pública: qualquer pessoa pode chamar a API do Supabase sem passar pelo site. Por isso as
+proteções ficam no banco (migrations 009 a 012: cota por conta, limite de escrita, cota de anexos) e nas
+configurações abaixo. Os limites só do app (como as tentativas de login) ajudam quem usa o site, mas não param
+um script.
+
+1. **CAPTCHA (Cloudflare Turnstile):** em dash.cloudflare.com → Turnstile, crie um widget (modo *Managed*) com os
+   domínios do site (e `localhost`). Coloque a **Site Key** em `VITE_TURNSTILE_SITE_KEY` (Vercel e `.env.local`) e a
+   **Secret Key** no Supabase, em **Authentication → Attack Protection → CAPTCHA** (provedor Turnstile).
+2. **Authentication → Providers → Email:** ligue **Confirm email**, **Secure email change** e
+   **Secure password change**; senha mínima de 8 caracteres com letras e números; **Email OTP Expiration** = 1800.
+3. **Authentication → Rate Limits** (por IP): cadastros e entradas 15 a cada 5 min; e-mails 30 por hora;
+   verificações 30 a cada 5 min; renovação de sessão 150 a cada 5 min.
+4. **Authentication → URL Configuration:** só o endereço do site em **Site URL** e `https://seu-site.vercel.app/**`
+   em **Redirect URLs**. Nunca `https://*.vercel.app/**`: qualquer pessoa pode publicar um site em `.vercel.app`
+   e receberia os links de login.
+5. No **SQL Editor**, rode `backend/supabase/verify.sql`: cada linha deve mostrar ✅.
+6. Em **Database → Advisors → Security Advisor**, rode a análise. No plano grátis, o aviso de proteção contra senhas
+   vazadas é esperado (o recurso é do plano Pro).
+
+Para testar as proteções de verdade, use um segundo projeto (de staging) e `backend/supabase/tests/abuse.mjs`:
+as instruções estão no começo do arquivo. Nunca rode esse teste no projeto de produção.
 
 ---
 
@@ -144,7 +175,8 @@ Depois, publique a função de novo.
 
 1. Envie o código para o GitHub.
 2. Em [vercel.com](https://vercel.com), **Add New → Project** e importe o repositório. O `vercel.json` da raiz já diz como instalar e gerar o site a partir de `frontend/`.
-3. Em **Environment Variables**, adicione `VITE_SUPABASE_URL` e `VITE_SUPABASE_ANON_KEY`.
+3. Em **Environment Variables**, adicione `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY` e, com o CAPTCHA ligado,
+   `VITE_TURNSTILE_SITE_KEY`.
 4. Publique, e coloque o endereço da Vercel no Supabase (Site URL e Redirect URLs).
 
 Pelo Terminal também dá, da raiz do projeto: `npx vercel deploy --prod`.
@@ -168,7 +200,8 @@ frontend/                   o site e os apps (React + Vite + Capacitor)
       migrate.ts              atualiza dados salvos por versões antigas
       template.ts             espaço inicial: o guia "Comece por aqui" e os exemplos
       appearance.ts           cor de destaque (com contraste garantido) e papel de parede
-      attachments.ts          imagens e PDF das anotações
+      syncErrors.ts           o que fazer quando o servidor recusa um envio (cota, limite, linha grande)
+      attachments.ts, attachmentGc.ts  imagens e PDF das anotações, e a limpeza dos que ninguém usa mais
       backClose.ts            botão Voltar do celular fecha menus e janelas
       password.ts, loginLimit.ts  regras de senha e limite de tentativas de login
       touchDnd.ts             arrastar e soltar no toque
@@ -182,14 +215,18 @@ frontend/                   o site e os apps (React + Vite + Capacitor)
       tasks/                  página da lista, quadro, tabela, calendário, painel e nova tarefa
       calendar/               calendário (mês/semana), evento e alarme
       notes/                  anotações: lista e editor (CodeMirror)
+      Captcha.tsx             verificação anti-robô (Cloudflare Turnstile) do login e do cadastro
       Home.tsx, Habits.tsx, Search.tsx, Settings.tsx, Auth.tsx…
   public/                     privacidade.html, ícones do app (PWA)
   docs/                       este guia, o dos apps e as imagens do README
   android/, ios/, assets/     apps nativos (Capacitor) e os ícones de origem
 backend/
   supabase/
-    setup.sql                 todo o banco de uma vez
-    migrations/               001 a 008, em ordem
+    setup.sql                 todo o banco de uma vez (gerado por build-setup.sh)
+    migrations/               001 a 012, em ordem
+    verify.sql                confere se o banco de produção tem tudo das migrations
+    tests/                    testes do banco (Docker) e de abuso contra um projeto de staging
+    config.toml               verificação de login de cada função
     functions/send-reminders  envio dos alarmes (e-mail e WhatsApp)
     functions/delete-account  exclusão da conta pela própria pessoa (LGPD)
     cron.sql                  agenda a função a cada minuto
