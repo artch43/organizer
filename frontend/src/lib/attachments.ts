@@ -42,6 +42,23 @@ export function attachmentMarkdown(a: { id: string; name: string; kind: Attachme
   return a.kind === "image" ? `![${name}](${ATTACH_PREFIX}${a.id})` : `[📄 ${name}](${ATTACH_PREFIX}${a.id})`;
 }
 
+/**
+ * What to tell the person when Storage refuses an upload. The server checks the type, the size and,
+ * since migration 012, the account's quota: a refusal by the access rules (we always upload into the
+ * person's own folder) means the quota is full.
+ */
+export function uploadErrorMessage(message: string): string {
+  // The storage space is created by backend/supabase/migrations/005_attachments.sql (or setup.sql).
+  if (/bucket not found/i.test(message))
+    return "Os anexos ainda não foram ativados no servidor. Rode o arquivo backend/supabase/setup.sql no Supabase.";
+  if (/row-level security|security policy/i.test(message))
+    return "Você chegou ao limite de anexos da conta (100 arquivos ou 25 MB). Tire anexos de notas antigas: o espaço é liberado em até um dia.";
+  if (/mime|content type|not supported/i.test(message))
+    return "O servidor recusou esse tipo de arquivo. Rode o backend/supabase/setup.sql atualizado no Supabase.";
+  if (/size|too large|exceed/i.test(message)) return "O arquivo passa do limite de tamanho do servidor.";
+  return "Não foi possível enviar o arquivo. Tente de novo.";
+}
+
 /* ---------- this browser only (no login) ---------- */
 const db = () => openFilesDb("anexos");
 async function idb<T>(mode: IDBTransactionMode, run: (s: IDBObjectStore) => IDBRequest): Promise<T> {
@@ -72,15 +89,7 @@ export async function saveAttachment(file: File) {
     const { error } = await supabase.storage
       .from(BUCKET)
       .upload(`${await userId()}/${id}`, file, { contentType: type, upsert: false });
-    if (error) {
-      // The storage space is created by backend/supabase/migrations/005_attachments.sql (or setup.sql).
-      if (/bucket not found/i.test(error.message))
-        throw new Error("Os anexos ainda não foram ativados no servidor. Rode o arquivo backend/supabase/setup.sql no Supabase.");
-      if (/mime|content type|not supported/i.test(error.message))
-        throw new Error("O servidor recusou esse tipo de arquivo. Rode o backend/supabase/setup.sql atualizado no Supabase.");
-      if (/size|too large|exceed/i.test(error.message)) throw new Error("O arquivo passa do limite de tamanho do servidor.");
-      throw new Error("Não foi possível enviar o arquivo. Tente de novo.");
-    }
+    if (error) throw new Error(uploadErrorMessage(error.message));
   } else {
     await idb("readwrite", (s) => s.put(file, id));
   }

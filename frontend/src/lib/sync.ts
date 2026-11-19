@@ -11,6 +11,7 @@ import { STORAGE_KEY } from "./storage";
 import { eraseFilesDbs } from "./rename";
 import { useStore } from "../store";
 import { toast as sonner } from "sonner";
+import { orphanFiles, referencedIds } from "./attachmentGc";
 import { classifySyncError, problemLabel, problemNotice, retryDelay, sendIsolating, type SyncProblem } from "./syncErrors";
 
 /**
@@ -291,10 +292,13 @@ export async function pull() {
     });
     if (rows.length) applyQuietly((ws) => applyRecords(ws, rows));
     advance(rows);
+    pulledAt = Date.now();
   } catch {
     setStatus(navigator.onLine ? "error" : "offline");
   }
 }
+/** When the last pull succeeded: the attachment clean-up only trusts an up-to-date workspace. */
+let pulledAt = 0;
 function advance(rows: Rec[]) {
   for (const r of rows) if (r.updated_at && r.updated_at > lastSync) lastSync = r.updated_at;
   saveMeta();
@@ -457,6 +461,7 @@ function begin() {
   flush();
   purgeOld();
   setTimeout(refreshAllReminders, 3000);
+  setTimeout(collectOrphanAttachments, 60_000);
   clearInterval(pollTimer);
   pollTimer = window.setInterval(() => {
     if (!document.hidden) pull();
@@ -661,6 +666,46 @@ export function restoreRows(rows: Rec[]) {
     ),
   );
 }
+/**
+ * Once a day: removes attached files that no note (nor any note in the trash) points to any more,
+ * so they stop using the account's Storage quota. See attachmentGc.ts for why this is safe.
+ */
+async function collectOrphanAttachments() {
+  if (!supabase || !uid || useSync.getState().phase !== "ready" || !navigator.onLine) return;
+  const key = "organizer:attachments-gc:" + uid;
+  try {
+    if (Date.now() - Number(localStorage.getItem(key) || 0) < 24 * 60 * 60 * 1000) return;
+  } catch {
+    return;
+  }
+  // Everything from this device is saved and everything from the others has arrived.
+  await flushAll();
+  await pull();
+  if (pending.size || Date.now() - pulledAt > 30_000) return;
+  const trash = await loadTrash();
+  // Only with the whole trash in view (a trashed note can be restored with its pictures).
+  if (trash.local || trash.rows.length >= 1000) return;
+  const refs = referencedIds([JSON.stringify(useStore.getState().ws), JSON.stringify(trash.rows)]);
+  const bucket = supabase.storage.from("anexos");
+  const files: { name: string; created_at?: string | null }[] = [];
+  for (let offset = 0; ; offset += 1000) {
+    const { data, error } = await bucket.list(uid, { limit: 1000, offset });
+    if (error) return;
+    files.push(...data);
+    if (data.length < 1000) break;
+  }
+  const gone = orphanFiles(files, refs, Date.now());
+  for (let i = 0; i < gone.length; i += 1000) {
+    const { error } = await bucket.remove(gone.slice(i, i + 1000).map((n) => `${uid}/${n}`));
+    if (error) return;
+  }
+  try {
+    localStorage.setItem(key, String(Date.now()));
+  } catch {
+    /* tried again next start */
+  }
+}
+
 export async function deleteForever(rows: { kind: Kind; id: string }[]) {
   const gone = new Set(rows.map((r) => keyOf(r.kind, r.id)));
   writeLocalTrash(readLocalTrash().filter((r) => !gone.has(keyOf(r.kind, r.id))));

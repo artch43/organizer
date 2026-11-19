@@ -4,6 +4,7 @@
  * WCAG AA against the backgrounds they sit on, in light and in dark mode.
  */
 
+import { uploadErrorMessage } from "./attachments";
 import { openFilesDb } from "./rename";
 import { supabase } from "./supabase";
 import { uid } from "./util";
@@ -35,8 +36,7 @@ export type Wallpaper = WallpaperPick & {
 export type WallpaperSlot = "light" | "dark";
 
 /** The page background chosen in Settings; nothing chosen (or the retired "still gradient") is the soft gradient. */
-export const backdropMode = (b: string | undefined): "sweep" | "dots" | "plain" =>
-  b === "dots" || b === "plain" ? b : "sweep";
+export const backdropMode = (b: string | undefined): "sweep" | "dots" | "plain" => (b === "dots" || b === "plain" ? b : "sweep");
 
 /** The picture shown in this mode. */
 export function wallpaperFor(w: Wallpaper | undefined, dark: boolean): WallpaperPick {
@@ -198,17 +198,14 @@ async function upload(blob: Blob, id: string) {
   const { error } = await supabase.storage
     .from(BUCKET)
     .upload(cloudPath(user, id), blob, { contentType: blob.type || "image/webp", upsert: false });
-  if (error) {
-    if (/bucket not found/i.test(error.message))
-      throw new Error("O envio de imagens ainda não foi ativado no servidor. Rode o backend/supabase/setup.sql no Supabase.");
-    throw new Error("Não foi possível enviar a imagem para a sua conta. Tente de novo.");
-  }
+  if (error) throw new Error(uploadErrorMessage(error.message));
   return true;
 }
 
 /** Keep the source bytes and dimensions: each device fits the original to its own viewport. */
 export async function saveWallpaperImage(file: File): Promise<string> {
-  if (!/^image\/(png|jpe?g|webp|gif|avif)$/i.test(file.type)) throw new Error("Escolha uma imagem (JPG, PNG, WebP, GIF ou AVIF).");
+  if (!/^image\/(png|jpe?g|webp|gif|avif)$/i.test(file.type))
+    throw new Error("Escolha uma imagem (JPG, PNG, WebP, GIF ou AVIF).");
   if (file.size > 25 * 1024 * 1024) throw new Error("A imagem passa de 25 MB.");
   const id = uid();
   const uploaded = await upload(file, id);
