@@ -4,7 +4,7 @@ import { Capacitor } from "@capacitor/core";
 export const isNativeApp = Capacitor.isNativePlatform();
 
 /** The public site. E-mail links (confirm the account, new password) from the apps open it. */
-export const SITE_URL = (import.meta.env.VITE_SITE_URL as string | undefined) || "https://organizerapp.vercel.app";
+export const SITE_URL = (import.meta.env.VITE_SITE_URL as string | undefined) || "https://organizerapp.vercel.app"; // keep in sync with DEFAULT_SITE_URL in vite.config.ts
 
 /**
  * In the phone apps, the system status bar (clock, battery) follows the theme: dark icons on the
