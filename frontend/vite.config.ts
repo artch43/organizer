@@ -4,8 +4,35 @@ import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
 import { VitePWA } from "vite-plugin-pwa";
 
+/**
+ * The phone apps don't get the site's security headers (vercel.json), so their copy of index.html
+ * carries the same Content-Security-Policy as a <meta> tag. (frame-ancestors only works as a header,
+ * and isn't needed inside an app.)
+ */
+const APP_CSP = [
+  "default-src 'self'",
+  "script-src 'self' https://challenges.cloudflare.com",
+  "style-src 'self' 'unsafe-inline'",
+  "img-src 'self' data: blob: https:",
+  "font-src 'self' data:",
+  "connect-src 'self' https://*.supabase.co wss://*.supabase.co",
+  "media-src 'self' blob: https://*.supabase.co",
+  "frame-src https://challenges.cloudflare.com",
+  "object-src 'none'",
+  "base-uri 'self'",
+  "form-action 'self'",
+].join("; ");
+
 export default defineConfig({
   plugins: [
+    {
+      name: "app-csp",
+      apply: "build",
+      transformIndexHtml: (html) =>
+        process.env.APP_BUILD === "1"
+          ? html.replace('<meta charset="UTF-8" />', `<meta charset="UTF-8" />\n    <meta http-equiv="Content-Security-Policy" content="${APP_CSP}" />`)
+          : html,
+    },
     react(),
     tailwindcss(),
     // Installable app with offline support: the app shell is cached; data still syncs through Supabase.

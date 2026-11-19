@@ -269,8 +269,26 @@ describe("links no editor de anotações", () => {
     expect(host.querySelector(".cm-link-preview")).toBeNull();
   });
 
-  it("não permite endereços que executem scripts", () => {
-    editor("[Site](javascript:alert(1)) ");
+  it.each([
+    "[Site](javascript:alert(1)) ",
+    "[Site](JaVaScRiPt:alert(1)) ",
+    "[Site](&#106;avascript:alert(1)) ",
+    "[Site](data:text/html;base64,PHNjcmlwdD5hbGVydCgxKTwvc2NyaXB0Pg==) ",
+    "[Site](vbscript:msgbox(1)) ",
+  ])("não permite endereços que executem scripts: %s", (source) => {
+    editor(source);
     expect(host.querySelector(".cm-link-preview a[href]")).toBeNull();
+  });
+
+  it("tira HTML perigoso do texto do link", () => {
+    editor('[<img src=x onerror="alert(1)">Site<script>alert(1)</script>](https://example.com) ');
+    const preview = host.querySelector(".cm-link-preview")!;
+    expect(preview.querySelector("img, script, [onerror]")).toBeNull();
+    expect(preview.querySelector("a")!.getAttribute("href")).toBe("https://example.com");
+  });
+
+  it("mantém links de e-mail", () => {
+    editor("[Fale comigo](mailto:oi@example.com) ");
+    expect(host.querySelector<HTMLAnchorElement>(".cm-link-preview a")!.getAttribute("href")).toBe("mailto:oi@example.com");
   });
 });

@@ -132,6 +132,18 @@ class BulletWidget extends WidgetType {
 }
 const bullet = Decoration.replace({ widget: new BulletWidget() });
 
+/**
+ * What a link preview may contain. The text is the person's own, but notes can be imported from
+ * files, so it is treated as untrusted: only inline formatting, and only web and e-mail addresses
+ * (no javascript:, data: or vbscript: links). DOMPurify's defaults already block scripts; this
+ * narrows it further and states the intent.
+ */
+const LINK_PREVIEW_HTML = {
+  ALLOWED_TAGS: ["a", "strong", "em", "b", "i", "del", "s", "code", "br"],
+  ALLOWED_ATTR: ["href", "title"],
+  ALLOWED_URI_REGEXP: /^(?:https?:|mailto:)/i,
+};
+
 /** A clickable link while the cursor is outside its Markdown source, even on the same line. */
 class LinkWidget extends WidgetType {
   constructor(readonly source: string) {
@@ -143,7 +155,7 @@ class LinkWidget extends WidgetType {
   toDOM() {
     const el = document.createElement("span");
     el.className = "cm-link-preview";
-    el.innerHTML = DOMPurify.sanitize(marked.parseInline(this.source, { async: false }) as string);
+    el.innerHTML = DOMPurify.sanitize(marked.parseInline(this.source, { async: false }) as string, LINK_PREVIEW_HTML);
     for (const a of el.querySelectorAll("a[href]")) {
       a.setAttribute("target", "_blank");
       a.setAttribute("rel", "noopener noreferrer");
