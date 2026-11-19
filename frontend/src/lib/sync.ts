@@ -10,6 +10,8 @@ import { groupOf } from "./model";
 import { STORAGE_KEY } from "./storage";
 import { eraseFilesDbs } from "./rename";
 import { useStore } from "../store";
+import { toast as sonner } from "sonner";
+import { classifySyncError, problemLabel, problemNotice, retryDelay, sendIsolating, type SyncProblem } from "./syncErrors";
 
 /**
  * Cloud sync. The Zustand store stays the source of truth for the UI (and is cached
@@ -27,8 +29,17 @@ interface SyncState {
   /** Data found in this browser from before the account existed, offered on first login. */
   candidate: Workspace | null;
   recovery: boolean;
+  /** Why saving is failing, in a few words (shown under the account name), or null. */
+  problem: string | null;
 }
-export const useSync = create<SyncState>(() => ({ phase: "auth", status: "idle", user: null, candidate: null, recovery: false }));
+export const useSync = create<SyncState>(() => ({
+  phase: "auth",
+  status: "idle",
+  user: null,
+  candidate: null,
+  recovery: false,
+  problem: null,
+}));
 const setStatus = (status: SyncStatus) => useSync.setState({ status });
 
 const TABLE = "records";
@@ -42,6 +53,12 @@ let pending = new Map<string, Rec>();
 let lastSync = EPOCH;
 let flushTimer: number | undefined;
 let flushing = false;
+/** Failed sends in a row, for the growing wait between retries (see syncErrors.ts). */
+let failures = 0;
+/** After "too many writes", nothing is sent before this moment (ms). */
+let blockedUntil = 0;
+/** The last problem already told to the person, so the same notice doesn't repeat every retry. */
+let lastNotice: SyncProblem | null = null;
 /** Keys of the batch being sent right now: a pull that lands meanwhile must not put the older server copy back. */
 let sending = new Set<string>();
 let unsubscribe: (() => void) | null = null;
@@ -101,6 +118,8 @@ function onStoreChange(ws: Workspace) {
   lastAlerts = alerts;
   prev = next;
   saveMeta();
+  // While the server asks to slow down, the retry already scheduled sends this too.
+  if (Date.now() < blockedUntil) return;
   setStatus("saving");
   clearTimeout(flushTimer);
   flushTimer = window.setTimeout(flush, 800);
@@ -172,30 +191,70 @@ async function refreshAllReminders() {
   }
 }
 
+/** Rows the server refused for being too big stay on this device only: say which. */
+function tellTooBig(rows: Rec[]) {
+  const names = rows.map((r) => `“${(r.data as { title?: string })?.title || "Sem título"}”`);
+  const list = names.length > 3 ? `${names.slice(0, 3).join(", ")} e mais ${names.length - 3}` : names.join(", ");
+  sonner.warning(
+    `${list} ${rows.length > 1 ? "passaram" : "passou"} do tamanho máximo (512 KB) e não ${rows.length > 1 ? "foram salvos" : "foi salvo"} na nuvem. Continua neste aparelho; diminua o texto para voltar a sincronizar.`,
+    { duration: 15_000 },
+  );
+}
+
 export async function flush() {
-  if (!supabase || !uid || flushing || !pending.size) return;
+  if (!supabase || !uid || flushing || !pending.size || Date.now() < blockedUntil) return;
   flushing = true;
-  const batch = [...pending.entries()];
+  // Deletions go first, in their own requests: when the account is over its quota the server
+  // refuses any statement that grows it, and freeing space must still work.
+  const batch = [...pending.entries()].sort(([, a], [, b]) => Number(!a.deleted_at) - Number(!b.deleted_at));
   pending = new Map();
   sending = new Set(batch.map(([k]) => k));
+  let done = 0;
+  const refused: Rec[] = [];
   try {
-    for (let i = 0; i < batch.length; i += 500) {
-      const rows = batch
-        .slice(i, i + 500)
-        .map(([, r]) => ({ user_id: uid, kind: r.kind, id: r.id, data: r.data, deleted_at: r.deleted_at ?? null }));
-      const { error } = await supabase.from(TABLE).upsert(rows, { onConflict: "user_id,kind,id" });
-      if (error) throw error;
+    for (let i = 0; i < batch.length;) {
+      const deletions = !!batch[i][1].deleted_at;
+      let end = i;
+      while (end < batch.length && end - i < 500 && !!batch[end][1].deleted_at === deletions) end++;
+      const chunk = batch.slice(i, end).map(([, r]) => r);
+      refused.push(
+        ...(await sendIsolating(chunk, async (part) => {
+          const rows = part.map((r) => ({
+            user_id: uid,
+            kind: r.kind,
+            id: r.id,
+            data: r.data,
+            deleted_at: r.deleted_at ?? null,
+          }));
+          return (await supabase!.from(TABLE).upsert(rows, { onConflict: "user_id,kind,id" })).error;
+        })),
+      );
+      done = i = end;
     }
+    failures = 0;
+    lastNotice = null;
+    useSync.setState({ problem: null });
+    if (refused.length) tellTooBig(refused);
     // Reminders are best-effort: a failure here must not hold back saving the data itself.
     // Their signatures stay unchanged, so they are retried on the next edit or app start.
     await syncReminders(batch.map(([, r]) => r)).catch(() => undefined);
     setStatus(pending.size ? "saving" : "saved");
-  } catch {
-    // Keep anything that failed, unless a newer change for the same entity arrived meanwhile.
-    for (const [k, r] of batch) if (!pending.has(k)) pending.set(k, r);
-    setStatus(navigator.onLine ? "error" : "offline");
+  } catch (e) {
+    // Keep what wasn't sent, unless a newer change for the same entity arrived meanwhile.
+    for (const [k, r] of batch.slice(done)) if (!pending.has(k)) pending.set(k, r);
+    const problem = navigator.onLine ? classifySyncError(e) : "network";
+    failures++;
+    const wait = retryDelay(problem, failures);
+    // Too many writes: the server would refuse anything for a while, so edits wait too.
+    // In every other case the next edit tries again right away (e.g. after freeing space).
+    if (problem === "rate") blockedUntil = Date.now() + wait;
+    setStatus(problem === "network" ? "offline" : "error");
+    useSync.setState({ problem: problemLabel(problem) });
+    const notice = problemNotice(problem);
+    if (notice && problem !== lastNotice) sonner.warning(notice, { duration: 10_000 });
+    lastNotice = problem;
     clearTimeout(flushTimer);
-    flushTimer = window.setTimeout(flush, 10_000);
+    flushTimer = window.setTimeout(flush, wait);
   } finally {
     flushing = false;
     sending = new Set();

@@ -214,6 +214,7 @@ function AlarmsBell() {
 function AccountMenu() {
   const user = useSync((s) => s.user);
   const status = useSync((s) => s.status);
+  const why = useSync((s) => s.problem);
   const name = useStore((s) => s.ws.settings.name);
   const initial = (name || user?.email || "").trim().charAt(0).toUpperCase();
   const problem = cloudEnabled && (status === "offline" || status === "error");
@@ -248,7 +249,9 @@ function AccountMenu() {
             {cloudEnabled ? (user?.email ?? "") : "Dados salvos neste navegador"}
           </span>
           {problem && (
-            <span className="text-xs font-normal text-warning">{status === "offline" ? "Sem conexão" : "Tentando salvar"}</span>
+            <span className="text-xs font-normal text-warning">
+              {why ?? (status === "offline" ? "Sem conexão" : "Tentando salvar")}
+            </span>
           )}
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
