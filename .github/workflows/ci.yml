@@ -48,9 +48,11 @@ jobs:
       - name: setup.sql em dia com as migrations
         run: bash build-setup.sh --check
       - name: Edge Functions (tipos e lint)
+        # The repository's package.json would make Deno look for npm packages in node_modules; the
+        # functions import them as npm:... (Supabase's way), so Deno downloads them itself.
         run: |
-          deno check functions/send-reminders/index.ts functions/delete-account/index.ts
-          deno lint functions
+          deno check --no-lock --node-modules-dir=none functions/send-reminders/index.ts functions/delete-account/index.ts
+          deno lint --rules-exclude=no-import-prefix functions
       - name: Testes do banco (cota, limites, RLS, permissões)
         run: bash tests/run-db-tests.sh
         env:
