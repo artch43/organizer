@@ -1,0 +1,12 @@
+# Supabase CLI settings. Run the CLI from backend/, e.g.: npx supabase functions deploy send-reminders
+# Having verify_jwt here means a deploy can't forget the right flag.
+project_id = "organizer"
+
+[functions.send-reminders]
+# Called every minute by pg_cron with CRON_SECRET, not with a person's session: the function checks
+# the secret itself, so the gateway's login check must be off.
+verify_jwt = false
+
+[functions.delete-account]
+# Only a signed-in person can call it, with their own session (the function checks it again).
+verify_jwt = true

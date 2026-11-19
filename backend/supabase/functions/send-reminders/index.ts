@@ -13,9 +13,12 @@
 //           variables: title and when; default "lembrete"), WHATSAPP_LANG (default "pt_BR")
 // SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY are provided by Supabase automatically.
 // Daily limits per person (last 24 h), so one account can't run up the bill or message strangers:
-//   DAILY_EMAIL_LIMIT (default 50), DAILY_WHATSAPP_LIMIT (default 20), DAILY_WHATSAPP_NUMBERS (default 1).
-import { createClient } from "npm:@supabase/supabase-js@2.45.4";
-import nodemailer from "npm:nodemailer@6.9.16";
+//   DAILY_EMAIL_LIMIT (default 20), DAILY_WHATSAPP_LIMIT (default 20), DAILY_WHATSAPP_NUMBERS (default 1).
+// And for everyone together, below the e-mail provider's own daily limit (Resend's free plan: 100):
+//   GLOBAL_DAILY_EMAIL_LIMIT (default 80). When it is reached, reminders stay pending and go out as
+//   soon as there is room again (a reminder more than 6 hours late is no longer sent: see due_reminders).
+import { createClient } from "npm:@supabase/supabase-js@2.119.0";
+import nodemailer from "npm:nodemailer@7.0.13";
 
 const esc = (s: string) => s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]!);
 
@@ -96,7 +99,19 @@ async function sendEmail(to: string, title: string, when: string, appUrl: string
     headers: { Authorization: `Bearer ${Deno.env.get("RESEND_API_KEY")}`, "Content-Type": "application/json" },
     body: JSON.stringify({ from, to: [to], subject: `Lembrete: ${title}`, html: emailHtml(title, when, appUrl), text: `${title}\n${when}\n\n${appUrl}` }),
   });
-  return res.ok ? { ok: true } : { ok: false, status: res.status, reason: `${res.status} ${await res.text()}` };
+  if (res.ok) return { ok: true };
+  const body = await res.text();
+  // Resend answers 403 both for a bad key and for a recipient it won't deliver to (e.g. an unverified
+  // domain only reaches the account owner). Only a bad key should stop the run; a refused recipient
+  // must not hold up everyone else's reminders.
+  let name = "";
+  try {
+    name = JSON.parse(body).name ?? "";
+  } catch {
+    /* not JSON */
+  }
+  const status = res.status === 403 && name !== "validation_error" ? 401 : res.status;
+  return { ok: false, status, reason: `Resend ${res.status} ${name} ${body}`.slice(0, 500) };
 }
 
 const whatsappReady = () => {
@@ -140,21 +155,34 @@ async function sendWhatsApp(phone: string, title: string, when: string, appUrl: 
   return res.ok ? { ok: true } : { ok: false, status: res.status, reason: `WhatsApp ${res.status} ${await res.text()}` };
 }
 
+/** Details go to the function's logs (Supabase → Edge Functions → Logs), never to the caller. */
+function fail(what: string, detail: unknown) {
+  console.error(what, detail);
+  return Response.json({ error: what }, { status: 500 });
+}
+
 Deno.serve(async (req) => {
+  if (req.method !== "POST") return new Response("method not allowed", { status: 405, headers: { Allow: "POST" } });
   const secret = Deno.env.get("CRON_SECRET");
   if (!secret || !sameSecret(req.headers.get("authorization") ?? "", `Bearer ${secret}`))
     return new Response("unauthorized", { status: 401 });
   // Without a way to send e-mail every send would fail and the reminders would be given up on: stop here instead.
   if (!smtpReady() && !Deno.env.get("RESEND_API_KEY"))
-    return new Response("Set SMTP_USER and SMTP_PASS (Gmail) or RESEND_API_KEY", { status: 500 });
+    return fail("no e-mail provider configured", "Set SMTP_USER and SMTP_PASS (Gmail) or RESEND_API_KEY");
 
   const supabase = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
   const appUrl = (Deno.env.get("APP_URL") ?? "") + "/#/calendario";
   let wa = whatsappReady();
-  const limit = { email: num("DAILY_EMAIL_LIMIT", 50), whatsapp: num("DAILY_WHATSAPP_LIMIT", 20), numbers: num("DAILY_WHATSAPP_NUMBERS", 1) };
+  const limit = { email: num("DAILY_EMAIL_LIMIT", 20), whatsapp: num("DAILY_WHATSAPP_LIMIT", 20), numbers: num("DAILY_WHATSAPP_NUMBERS", 1) };
 
-  const { data: due, error } = await supabase.rpc("due_reminders", { max_rows: 100 });
-  if (error) return new Response(error.message, { status: 500 });
+  // E-mails everyone received in the last 24 hours: past the global limit, nothing more goes out today.
+  const { data: total, error: tErr } = await supabase.rpc("reminders_sent_total_today");
+  if (tErr) return fail("could not count today's e-mails", tErr.message);
+  let room = num("GLOBAL_DAILY_EMAIL_LIMIT", 80) - Number(total ?? 0);
+  if (room <= 0) return Response.json({ due: null, sent: 0, failed: 0, deferred: "global daily limit reached" });
+
+  const { data: due, error } = await supabase.rpc("due_reminders", { max_rows: Math.min(100, room) });
+  if (error) return fail("could not load due reminders", error.message);
 
   // What each person in this batch already received today.
   const users = [...new Set((due ?? []).map((r: { user_id: string }) => r.user_id))];
@@ -162,7 +190,7 @@ Deno.serve(async (req) => {
   const use = (u: string) => usage.get(u) ?? (usage.set(u, { email: 0, whatsapp: 0, phones: new Set() }), usage.get(u)!);
   if (users.length) {
     const { data: rows, error: uErr } = await supabase.rpc("reminders_sent_today", { ids: users });
-    if (uErr) return new Response(uErr.message, { status: 500 });
+    if (uErr) return fail("could not load today's usage", uErr.message);
     for (const r of rows ?? []) {
       const u = use(r.user_id);
       if (r.channel === "whatsapp") {
@@ -171,12 +199,17 @@ Deno.serve(async (req) => {
       } else u.email += Number(r.sent);
     }
   }
-  const giveUp = (id: string, reason: string) =>
-    supabase.from("reminders").update({ sent_at: new Date().toISOString(), last_error: reason }).eq("id", id);
+  // The person can read last_error (it's their reminder), so it gets a short code; details go to the logs.
+  const giveUp = (id: string, code: string, detail?: string) => {
+    if (detail) console.error(`reminder ${id}: ${detail}`);
+    return supabase.from("reminders").update({ sent_at: new Date().toISOString(), last_error: code }).eq("id", id);
+  };
 
   let sent = 0;
   const failed: string[] = [];
   for (const r of due ?? []) {
+    // Out of room for today: the rest stays pending, untouched.
+    if (room <= 0) break;
     const u = use(r.user_id);
     // WhatsApp only while under the daily limits; otherwise (or when not set up) the reminder goes by e-mail.
     const waOk =
@@ -190,7 +223,8 @@ Deno.serve(async (req) => {
     let res = viaWa ? await sendWhatsApp(r.phone, r.title, r.when_label, appUrl) : await sendEmail(r.email, r.title, r.when_label, appUrl);
     if (viaWa && !res.ok && (res.status === 401 || res.status === 403)) {
       // WhatsApp keys are wrong: stop using WhatsApp in this run and deliver by e-mail instead.
-      failed.push(`${r.id}: ${res.reason}`);
+      failed.push(`${r.id}: whatsapp ${res.status}`);
+      console.error(`reminder ${r.id}: ${res.reason}`);
       wa = false;
       viaWa = false;
       res = await sendEmail(r.email, r.title, r.when_label, appUrl);
@@ -200,15 +234,20 @@ Deno.serve(async (req) => {
       if (viaWa) {
         u.whatsapp++;
         u.phones.add(r.phone);
-      } else u.email++;
+      } else {
+        u.email++;
+        room--;
+      }
       sent++;
       continue;
     }
-    failed.push(`${r.id}: ${res.reason}`);
-    // 401/403 mean a wrong or missing key on our side: keep the reminder and try again next minute.
-    // Other 4xx (except rate limits) will fail the same way every time: give up on this one.
-    if (res.status === 401 || res.status === 403) break;
-    if (res.status >= 400 && res.status < 500 && res.status !== 429) await giveUp(r.id, res.reason.slice(0, 500));
+    failed.push(`${r.id}: ${res.status}`);
+    console.error(`reminder ${r.id}: ${res.reason}`);
+    // 401 means a wrong or missing key on our side: keep the reminder and try again next minute.
+    // Other 4xx (except rate limits) will fail the same way every time, e.g. Resend's 403 for a
+    // recipient it won't deliver to: give up on this one and go on with the others.
+    if (res.status === 401) break;
+    if (res.status >= 400 && res.status < 500 && res.status !== 429) await giveUp(r.id, `rejected (${res.status})`, res.reason);
   }
   smtp?.close();
   smtp = null;

@@ -4,7 +4,7 @@
 // attached files are removed here too, in case the app couldn't do it first.
 // Deploy WITH JWT verification (the default): npx supabase functions deploy delete-account
 // SUPABASE_URL, SUPABASE_ANON_KEY and SUPABASE_SERVICE_ROLE_KEY are provided by Supabase automatically.
-import { createClient } from "npm:@supabase/supabase-js@2.45.4";
+import { createClient } from "npm:@supabase/supabase-js@2.119.0";
 
 // Any origin may call it: it only acts with the caller's own session token (no cookies are involved),
 // so another site can't make a visitor delete their account.
