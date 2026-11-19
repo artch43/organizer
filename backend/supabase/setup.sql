@@ -1,6 +1,9 @@
 -- Organizer: full database setup in one go (same as running migrations 001 to 012 in order).
 -- Safe to run more than once.
 
+-- Re-running: lets migration 002 recreate this function (006, 007 and 009 redefine it after).
+drop function if exists public.due_reminders(int);
+
 
 -- ===== 001_init.sql =====
 -- Organizer: one table holds every piece of a person's workspace.

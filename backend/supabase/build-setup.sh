@@ -11,7 +11,12 @@ last=$(basename "${files[${#files[@]}-1]}" | cut -c1-3)
 
 build() {
   printf -- '-- Organizer: full database setup in one go (same as running migrations %s to %s in order).\n' "$first" "$last"
-  printf -- '-- Safe to run more than once.\n\n'
+  printf -- '-- Safe to run more than once.\n'
+  # Migration 002 creates due_reminders with fewer columns than 006/007 give it later, and Postgres
+  # can't "create or replace" a function into a different return type: without this, running the
+  # whole file a second time stopped at 002. The later migrations recreate the function.
+  printf -- '\n-- Re-running: lets migration 002 recreate this function (006, 007 and 009 redefine it after).\n'
+  printf -- 'drop function if exists public.due_reminders(int);\n\n'
   for f in "${files[@]}"; do
     printf '\n-- ===== %s =====\n' "$(basename "$f")"
     cat "$f"
