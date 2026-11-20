@@ -113,9 +113,9 @@ export function Companion() {
         onClick={hide}
         aria-label="Esconder o Clebinho"
         title="Esconder o Clebinho"
-        className="absolute -top-1 -left-1 z-10 flex size-6 items-center justify-center rounded-full bg-card text-muted-foreground opacity-0 shadow-card ring-1 ring-border transition-opacity group-hover/companion:opacity-100 hover:text-foreground focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+        className="absolute -top-1 -left-1 z-10 flex size-6 items-center justify-center rounded-full text-muted-foreground opacity-0 transition-opacity group-hover/companion:opacity-100 hover:text-foreground focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none pointer-coarse:opacity-100"
       >
-        <X className="size-3.5" />
+        <X className="size-2.5" aria-hidden="true" />
       </button>
       <div className="size-full" aria-hidden="true">
         {webgl ? (

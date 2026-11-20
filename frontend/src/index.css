@@ -725,13 +725,30 @@ h3 {
   font-variant-numeric: normal;
 }
 
+[data-app-root] {
+  --companion-width: 84px;
+  --companion-right: 1rem;
+}
+
+.task-board-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in oklab, var(--muted-foreground) 65%, transparent) transparent;
+}
+
+@media (min-width: 48rem) {
+  [data-app-root]:has(.companion) .task-board-scroll {
+    /* Account for the list's md:px-8 so the track ends to the left of the mascot. */
+    margin-right: calc(var(--companion-width) + var(--companion-right) + 0.5rem - 2rem);
+  }
+}
+
 /* The little 3D mascot in the corner (src/components/companion/Companion.tsx): small, out of the way. */
 .companion {
   position: fixed;
-  right: 1rem;
+  right: var(--companion-right);
   bottom: max(1rem, env(safe-area-inset-bottom, 0px));
   z-index: 25;
-  width: 84px;
+  width: var(--companion-width);
   height: 92px;
   transition: opacity 250ms ease;
 }

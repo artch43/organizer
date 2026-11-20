@@ -4,7 +4,7 @@ import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { CalendarPage } from "./CalendarPage";
 import { useStore } from "@/store";
-import { template } from "@/lib/template";
+import { DEFAULT_STATUS, mkDb, template } from "@/lib/template";
 import { today } from "@/lib/util";
 
 vi.mock("../app/Topbar", () => ({ AreaSwitcher: () => null }));
@@ -102,4 +102,39 @@ it.each([
   expect(before).toBeDefined();
   clickHeaderArrow(direction);
   expect(gridLabel()).toBe(before);
+});
+
+it.each(["month", "week"] as const)("alterna tarefas em %s e na agenda do dia sem ocultar eventos", (view) => {
+  const { ui, setUi, mut } = useStore.getState();
+  const date = ui.calendar.anchor;
+  setUi((u) => { u.calendar.view = view; });
+  mut((ws) => {
+    ws.dbs.tasks = mkDb(DEFAULT_STATUS);
+    ws.items.task = {
+      id: "task", db: "tasks", title: "Tarefa de teste", props: { date },
+      notes: "", created: 1, updated: 1, order: 0, log: [],
+    };
+    ws.events.event = {
+      id: "event", title: "Evento de teste", date, allDay: true, start: "", end: "",
+      location: "", notes: "", alerts: [], created: 1, updated: 1,
+    };
+  });
+  act(() => root.render(<CalendarPage />));
+  const toggle = [...host.querySelectorAll("button")].find((b) => b.textContent === "Mostrar tarefas");
+  expect(toggle).toBeDefined();
+  const panel = host.querySelector('[aria-labelledby="day-panel"]')!;
+  const checkEntries = (showTasks: boolean) => {
+    expect(toggle!.getAttribute("aria-pressed")).toBe(String(showTasks));
+    const events = [...host.querySelectorAll('[data-del="event:event"]')];
+    const tasks = [...host.querySelectorAll('[data-del="task:task"]')];
+    expect(events.some((entry) => panel.contains(entry))).toBe(true);
+    expect(events.some((entry) => !panel.contains(entry))).toBe(true);
+    expect(tasks.some((entry) => panel.contains(entry))).toBe(showTasks);
+    expect(tasks.some((entry) => !panel.contains(entry))).toBe(showTasks);
+  };
+  checkEntries(true);
+  act(() => toggle!.click());
+  checkEntries(false);
+  act(() => toggle!.click());
+  checkEntries(true);
 });
