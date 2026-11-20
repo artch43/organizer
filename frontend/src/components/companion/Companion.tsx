@@ -264,12 +264,12 @@ export function Companion() {
           aria-label="Esconder o Clebinho"
           title="Esconder o Clebinho"
           className={cn(
-            "absolute -top-1 -left-1 cursor-pointer pointer-coarse:after:absolute pointer-coarse:after:-inset-2 z-10 flex size-6 items-center justify-center rounded-full bg-card text-muted-foreground opacity-0 shadow-card ring-1 ring-border transition-opacity group-hover/companion:opacity-100 hover:text-foreground focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none",
+            "absolute -top-1 -left-1 cursor-pointer pointer-coarse:after:absolute pointer-coarse:after:-inset-2 z-10 flex size-6 items-center justify-center rounded-full text-muted-foreground opacity-0 transition-opacity group-hover/companion:opacity-100 hover:text-foreground focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none",
             // Unseen, a tap on his corner must not hide him by accident.
             line ? "opacity-100" : "pointer-coarse:pointer-events-none",
           )}
         >
-          <X className="size-3.5" />
+          <X className="size-2.5" aria-hidden="true" />
         </button>
       )}
       <div

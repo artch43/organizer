@@ -1,7 +1,7 @@
 import { Mascot } from "@/components/brand/Brand";
 import { useEffect, useRef, useState } from "react";
 import { withMotion } from "@/lib/motion";
-import { ChevronLeft, ChevronRight, Mail, MessageCircle, Plus, Repeat, SlidersHorizontal } from "lucide-react";
+import { Check, ChevronLeft, ChevronRight, ListTodo, Mail, MessageCircle, Plus, Repeat, SlidersHorizontal } from "lucide-react";
 import { motion } from "motion/react";
 import { alarmTimes, CHANNEL, hhmm } from "@/lib/alarms";
 import { cn } from "@/lib/utils";
@@ -11,8 +11,7 @@ import { dateOf, groupOf } from "@/lib/model";
 import { addDays, pad, parseD, today } from "@/lib/util";
 import { go, moveEvent, openEvent, openPeek, setProp, useStore } from "@/store";
 import { Button } from "@/components/ui/button";
-import { Switch } from "@/components/ui/switch";
-import { Label } from "@/components/ui/label";
+import { Toggle } from "@/components/ui/toggle";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { DRAG_TYPE, EntryChip, MonthView, type Entry } from "./MonthView";
 import { areaVar } from "../common";
@@ -193,7 +192,16 @@ export function CalendarPage() {
               </button>
             ))}
           </div>
-          <CalendarOptions showTasks={cal.showTasks} onShowTasks={(v) => set({ showTasks: v })} />
+          <Toggle
+            variant="outline"
+            className="h-11 gap-2 px-3 text-[15px]"
+            pressed={cal.showTasks}
+            onPressedChange={(showTasks) => set({ showTasks })}
+          >
+            {cal.showTasks ? <Check aria-hidden="true" /> : <ListTodo aria-hidden="true" />}
+            Mostrar tarefas
+          </Toggle>
+          <CalendarAreaFilter />
         </div>
       </header>
       <div className="grid grid-cols-[minmax(0,1fr)] items-start gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(20rem,24rem)]">
@@ -224,8 +232,7 @@ export function CalendarPage() {
   );
 }
 
-/** Area filter and whether tasks show, in one small menu. */
-function CalendarOptions({ showTasks, onShowTasks }: { showTasks: boolean; onShowTasks: (v: boolean) => void }) {
+function CalendarAreaFilter() {
   const area = useStore((s) => s.ui.area);
   const areas = useStore((s) => s.ws.settings.areas);
   const current = areas.find((a) => a.id === area);
@@ -239,17 +246,12 @@ function CalendarOptions({ showTasks, onShowTasks }: { showTasks: boolean; onSho
             <SlidersHorizontal data-icon="inline-start" />
           )}
           <span className="max-w-36 truncate">{current ? current.name : "Todas as áreas"}</span>
-          {!showTasks && <span className="size-1.5 rounded-full bg-primary-strong" aria-label="Tarefas ocultas" />}
         </Button>
       </PopoverTrigger>
-      <PopoverContent align="end" className="flex w-80 flex-col gap-4">
+      <PopoverContent align="end" className="flex w-80 flex-col">
         <div className="flex flex-col gap-1.5">
           <span className="text-xs font-medium text-muted-foreground">Área</span>
           <AreaSwitcher className="min-w-0" />
-        </div>
-        <div className="flex items-center justify-between gap-3 border-t pt-3">
-          <Label htmlFor="show-tasks">Mostrar tarefas no calendário</Label>
-          <Switch id="show-tasks" checked={showTasks} onCheckedChange={onShowTasks} />
         </div>
       </PopoverContent>
     </Popover>

@@ -749,6 +749,11 @@ h3 {
   font-variant-numeric: normal;
 }
 
+.task-board-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in oklab, var(--muted-foreground) 65%, transparent) transparent;
+}
+
 /* The little 3D mascot (src/components/companion/Companion.tsx). On desktop he starts at the bottom
    left, big enough to see, and can be dragged anywhere (the spot is remembered per device). */
 .companion {

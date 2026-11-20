@@ -87,6 +87,7 @@ interface Entry {
   /** Say the day, not just the time (the list of all tasks mixes days). */
   showDay?: boolean;
   onOpen?: () => void;
+  onOpenList?: () => void;
   /** Mark done / not done (absent when the list has no "done" column). */
   onToggle?: () => void;
   /** Move to another day (null = no date). */
@@ -101,7 +102,7 @@ const ALARM_DAYS = 7;
 const CARD = "rounded-2xl border bg-card shadow-card";
 
 /**
- * Início, in blocks: today's tasks (the biggest block), with habits, the next alarm and the agenda beside them. Done and "remarcar" in one tap; a click on a task opens its list.
+ * Início, in blocks: today's tasks (the biggest block), with habits, the next alarm and the agenda beside them.
  * Another day can be picked in the header to see that day's tasks and events.
  */
 export function Home() {
@@ -166,7 +167,8 @@ export function Home() {
       done: isDone,
       order: it.created,
       day,
-      onOpen: page ? () => go(page.id) : undefined,
+      onOpen: () => openPeek(it.id),
+      onOpenList: page ? () => go(page.id) : undefined,
       onToggle: firstOptInGroup(db, "done") ? () => toggleItemDone(it.id) : undefined,
       onMove: (to) => moveItemDay(it.id, to),
     };
@@ -940,7 +942,6 @@ function Row({
           {sub}
         </span>
       </span>
-      {e.onOpen && <ChevronRight className="size-5 shrink-0 text-muted-foreground" aria-hidden="true" />}
     </>
   );
   return (
@@ -975,17 +976,35 @@ function Row({
           {e.done ? <CircleCheck className="pop size-6" /> : <Circle className="size-6" strokeWidth={1.75} />}
         </button>
       )}
-      {e.onOpen ? (
+      {e.onOpenList ? (
         <button
+          type="button"
           data-home-drag-surface
-          onClick={e.onOpen}
+          onClick={e.onOpenList}
           title="Abrir a lista desta tarefa"
-          className={cn("flex min-w-0 flex-1 items-center gap-3 rounded-xl py-2.5 pr-2 text-left focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none", drag && "cursor-grab active:cursor-grabbing")}
+          className={cn(
+            "flex min-w-0 flex-1 items-center gap-3 rounded-xl py-2.5 text-left focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none",
+            drag && "cursor-grab active:cursor-grabbing",
+          )}
         >
           {body}
         </button>
       ) : (
-        <div className="flex min-w-0 flex-1 items-center gap-3 py-2.5 pr-2">{body}</div>
+        <div className="flex min-w-0 flex-1 items-center gap-3 py-2.5">{body}</div>
+      )}
+      {e.onOpen && (
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          onClick={e.onOpen}
+          aria-haspopup="dialog"
+          aria-label={`Abrir detalhes de “${e.title}”`}
+          title="Abrir detalhes da tarefa"
+          className="size-11 shrink-0 text-muted-foreground"
+        >
+          <ChevronRight className="size-5" aria-hidden="true" />
+        </Button>
       )}
       {/* Another day, without opening anything. */}
       {!e.done && (

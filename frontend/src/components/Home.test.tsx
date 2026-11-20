@@ -22,6 +22,7 @@ beforeEach(() => {
   const ws = template();
   ws.items = {};
   ws.dbs = { tasks: mkDb(DEFAULT_STATUS) };
+  ws.pages.push({ id: "tasks", title: "Tarefas", icon: "lucide:list", type: "db", parent: null, order: 6 });
   ws.settings.examplesDismissed = true;
   const done = ws.dbs.tasks.props[0].options!.find((o) => o.group === "done")!.id;
   for (const [id, date, area, status] of [
@@ -34,7 +35,7 @@ beforeEach(() => {
   ]) {
     ws.items[id] = { id, db: "tasks", title: id, area, props: { date, status }, notes: "", created: 1, updated: 1, order: 0, log: [] };
   }
-  useStore.setState({ ws, ui: { ...useStore.getState().ui, area: "pessoal" } });
+  useStore.setState({ ws, ui: { ...useStore.getState().ui, route: "home", peek: null, area: "pessoal" } });
   host = document.createElement("div");
   document.body.append(host);
   root = createRoot(host);
@@ -78,4 +79,16 @@ it("não exibe a ação coletiva sem tarefas atrasadas", () => {
   useStore.getState().mut((ws) => { delete ws.items.late; delete ws.items.older; });
   act(() => root.render(<Home />));
   expect(host.textContent).not.toContain("Remarcar todas");
+});
+
+it("abre a lista pelo corpo do cartão e o painel de detalhes pela seta", () => {
+  act(() => root.render(<Home />));
+  const title = [...host.querySelectorAll<HTMLSpanElement>("li span")].find((span) => span.textContent === "today")!;
+  act(() => title.click());
+  expect(useStore.getState().ui).toMatchObject({ route: "tasks", peek: null });
+  act(() => useStore.getState().setUi((ui) => { ui.route = "home"; }));
+  const task = host.querySelector<HTMLButtonElement>('button[aria-label="Abrir detalhes de “today”"]');
+  expect(task).toBeDefined();
+  act(() => task!.click());
+  expect(useStore.getState().ui).toMatchObject({ route: "home", peek: "today" });
 });
