@@ -161,8 +161,8 @@ export function firstDoneOf(log: Record<string, string[]>, hid: string) {
   return first;
 }
 
-export function streakOf(log: Record<string, string[]>, hid: string) {
-  let d = today(),
+export function streakOf(log: Record<string, string[]>, hid: string, onDay = today()) {
+  let d = onDay,
     n = 0;
   if (!(log[d] || []).includes(hid)) d = addDays(d, -1);
   while ((log[d] || []).includes(hid)) {

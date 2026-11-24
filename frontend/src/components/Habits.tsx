@@ -1,5 +1,6 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
+  ChartNoAxesColumnIncreasing,
   Check,
   ChevronDown,
   ChevronLeft,
@@ -24,15 +25,17 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
 import type { Habit } from "@/lib/types";
+import { useBackToClose } from "@/lib/backClose";
 import { firstDoneOf, streakOf } from "@/lib/model";
 import { DEFAULT_HABIT_ICON, DOW, addDays, fmtDate, parseD, uid } from "@/lib/util";
-import { celebrate, deleteHabit, toggleHabit, useStore } from "@/store";
+import { celebrate, deleteHabit, scrollToTop, toggleHabit, useStore } from "@/store";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
 import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty";
 import { Mascot } from "@/components/brand/Brand";
 import { useToday } from "./common";
+import { HabitStatistics } from "./HabitStatistics";
 import { IconPicker } from "./IconPicker";
 
 export function Habits() {
@@ -41,7 +44,26 @@ export function Habits() {
   const doneToday = useStore((s) => (s.ws.habitLog[T] || []).filter((id) => s.ws.habits.some((h) => h.id === id)).length);
   const mut = useStore((s) => s.mut);
   // A habit is only created once it has a name; the form can be cancelled.
-  const [adding, setAdding] = useState(false);
+  const [draft, setDraft] = useState<string | null>(null);
+  const [showStatistics, setShowStatistics] = useState(false);
+  const statisticsButton = useRef<HTMLButtonElement>(null);
+  const statisticsHeading = useRef<HTMLHeadingElement>(null);
+  const restoreFocus = useRef(false);
+
+  useEffect(() => {
+    if (!restoreFocus.current) return;
+    restoreFocus.current = false;
+    scrollToTop();
+    const target = showStatistics ? statisticsHeading.current : statisticsButton.current;
+    target?.focus({ preventScroll: true });
+  }, [showStatistics]);
+
+  function changeView(statistics: boolean) {
+    restoreFocus.current = true;
+    setShowStatistics(statistics);
+  }
+  useBackToClose(showStatistics, () => changeView(false));
+
   const add = (name: string) => {
     const clean = name.trim();
     if (!clean) return;
@@ -49,8 +71,24 @@ export function Habits() {
       w.habits.push({ id: uid(), name: clean, icon: DEFAULT_HABIT_ICON, created: T });
     });
     celebrate(`Hábito “${clean}” criado`, "Toque em Marcar hoje quando fizer.", "acena");
-    setAdding(false);
+    setDraft(null);
   };
+
+  if (showStatistics) {
+    return (
+      <HabitStatistics
+        habits={habits}
+        today={T}
+        headingRef={statisticsHeading}
+        onBack={() => changeView(false)}
+        onCreate={() => {
+          setDraft((name) => name ?? "");
+          setShowStatistics(false);
+        }}
+      />
+    );
+  }
+
   return (
     <div className="mx-auto flex w-full max-w-3xl flex-col gap-6 px-4 pt-6 pb-28 md:px-8 md:pt-8">
       <div className="flex flex-wrap items-center gap-3">
@@ -62,12 +100,18 @@ export function Habits() {
               : "Pequenas coisas que você quer fazer com frequência."}
           </p>
         </div>
-        <Button onClick={() => setAdding(true)} disabled={adding}>
-          <Plus data-icon="inline-start" />
-          Novo hábito
-        </Button>
+        <div className="flex flex-wrap gap-2">
+          <Button ref={statisticsButton} variant="outline" className="rounded-full" onClick={() => changeView(true)}>
+            <ChartNoAxesColumnIncreasing data-icon="inline-start" aria-hidden="true" className="text-primary-strong" />
+            Estatísticas
+          </Button>
+          <Button onClick={() => setDraft("")} disabled={draft !== null}>
+            <Plus data-icon="inline-start" />
+            Novo hábito
+          </Button>
+        </div>
       </div>
-      {adding && <NewHabit onAdd={add} onCancel={() => setAdding(false)} />}
+      {draft !== null && <NewHabit name={draft} onNameChange={setDraft} onAdd={add} onCancel={() => setDraft(null)} />}
       {habits.length ? (
         <>
           <HabitLegend />
@@ -89,7 +133,7 @@ export function Habits() {
             <EmptyDescription>Comece com algo pequeno, como ler 10 minutos por dia.</EmptyDescription>
           </EmptyHeader>
           <EmptyContent>
-            <Button onClick={() => setAdding(true)}>Criar hábito</Button>
+            <Button onClick={() => setDraft((name) => name ?? "")}>Criar hábito</Button>
           </EmptyContent>
         </Empty>
       )}
@@ -317,8 +361,17 @@ function DayDot({
   );
 }
 
-function NewHabit({ onAdd, onCancel }: { onAdd: (name: string) => void; onCancel: () => void }) {
-  const [name, setName] = useState("");
+function NewHabit({
+  name,
+  onNameChange,
+  onAdd,
+  onCancel,
+}: {
+  name: string;
+  onNameChange: (name: string) => void;
+  onAdd: (name: string) => void;
+  onCancel: () => void;
+}) {
   return (
     <form
       className="flex flex-col gap-3 rounded-2xl border border-primary-strong/40 bg-card p-4 shadow-card sm:flex-row sm:items-end"
@@ -334,7 +387,7 @@ function NewHabit({ onAdd, onCancel }: { onAdd: (name: string) => void; onCancel
           autoComplete="off"
           placeholder="Ex.: Ler 10 minutos, Beber água"
           value={name}
-          onChange={(e) => setName(e.target.value)}
+          onChange={(e) => onNameChange(e.target.value)}
           onKeyDown={(e) => e.key === "Escape" && onCancel()}
         />
       </label>
